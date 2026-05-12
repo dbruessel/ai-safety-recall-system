@@ -1,180 +1,190 @@
-# 🛡️ AI Safety Recall System
+🚀 AI Safety Recall System
+A clean, modern monorepo for storing, searching, and recalling important information using embeddings + semantic search.
 
-An intelligent recall management platform that leverages AI to detect, classify, and coordinate safety recalls — helping teams move faster from signal to response.
+This project is a full‑stack AI-powered recall system built with:
 
----
+FastAPI (backend API + embeddings + Firestore)
 
-## 📁 Project Structure
+Next.js 14 (frontend UI)
 
-```
+Google Cloud (Vertex AI, Firestore, Cloud Run)
+
+Docker (local + production)
+
+Modern monorepo structure (backend + frontend + docs + tests)
+
+It’s designed to be simple, fast, and scalable — perfect for personal knowledge recall, safety workflows, or as a foundation for more advanced AI systems.
+
+📁 Monorepo Structure
+Code
 ai-safety-recall-system/
-├── .github/            # GitHub Actions workflows & templates
-├── backend/            # Python/FastAPI backend service
-├── ai-recall-frontend/ # React/Next.js frontend application
-├── docs/               # Architecture docs, ADRs, API specs
-├── tests/              # Integration & E2E test suites
-├── .env.example        # Environment variable reference
-└── docker-compose.yml  # Local development orchestration
-```
+│
+├── backend/               # FastAPI backend (embeddings, CRUD, semantic search)
+├── frontend/              # Next.js 14 frontend (UI + API integration)
+├── docs/                  # Architecture, API reference, deployment notes
+├── tests/                 # Backend + frontend tests
+├── .github/               # GitHub Actions CI/CD workflows
+└── README.md              # You're reading it :)
+🧠 What This System Does
+✔ Store recalls
+Each recall is saved with:
 
----
+text
 
-## 🚀 Getting Started
+embedding vector
 
-### Prerequisites
+metadata (timestamp, status, tags)
 
-- Python 3.11+
-- Node.js 18+ & npm / pnpm
-- Docker & Docker Compose (recommended for local dev)
+✔ Query recalls using semantic search
+The backend uses:
 
----
+Vertex AI embeddings
 
-### Backend Setup
+Firestore vector queries
 
-```bash
+cosine similarity filtering
+
+✔ Update recall status
+Mark items as:
+
+active
+
+archived
+
+completed
+
+✔ Clean, modern UI
+The frontend provides:
+
+a fast search bar
+
+instant results
+
+clean minimal design
+
+responsive layout
+
+🛠 Backend (FastAPI)
+🔧 Features
+CRUD endpoints for recalls
+
+Embedding generation via Vertex AI
+
+Firestore vector storage
+
+Semantic search endpoint
+
+Logging + environment variable support
+
+Dockerized for Cloud Run
+
+▶ Running locally
+bash
 cd backend
+uvicorn app.main:app --reload
+▶ Environment variables
+Create .env:
 
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+Code
+GOOGLE_PROJECT_ID=your-project
+GOOGLE_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=service-account.json
+FIRESTORE_COLLECTION=recalls
+EMBEDDING_MODEL=text-embedding-004
+🎨 Frontend (Next.js 14 + Tailwind)
+🔧 Features
+Modern UI for adding + searching recalls
 
-# Install dependencies
-pip install -r requirements.txt
+API integration with FastAPI backend
 
-# Copy and configure environment variables
-cp ../.env.example .env
+Clean minimalist design
 
-# Run the development server
-uvicorn app.main:app --reload --port 8000
-```
+Server Actions + App Router
 
-API docs will be available at `http://localhost:8000/docs`.
-
----
-
-### Frontend Setup
-
-```bash
-cd ai-recall-frontend
-
-# Install dependencies
+▶ Running locally
+bash
+cd frontend
 npm install
-
-# Copy and configure environment variables
-cp ../.env.example .env.local
-
-# Run the development server
 npm run dev
-```
+▶ Environment variables
+Create .env.local:
 
-The app will be available at `http://localhost:3000`.
+Code
+NEXT_PUBLIC_API_URL=http://localhost:8000
+🧱 Architecture Overview
+Code
+User → Next.js UI → FastAPI API → Vertex AI Embeddings
+                                   ↓
+                               Firestore
+                           (vector + metadata)
+Frontend sends text → backend
 
----
+Backend generates embedding
 
-## 🔐 Environment Variables
+Firestore stores vector + metadata
 
-Copy `.env.example` to `.env` (backend) and `.env.local` (frontend) and fill in your values.
+Search queries use vector similarity
 
-| Variable | Service | Description |
-|---|---|---|
-| `DATABASE_URL` | Backend | PostgreSQL connection string |
-| `OPENAI_API_KEY` | Backend | OpenAI API key for AI recall analysis |
-| `SECRET_KEY` | Backend | JWT signing secret |
-| `CORS_ORIGINS` | Backend | Comma-separated list of allowed frontend origins |
-| `NEXT_PUBLIC_API_URL` | Frontend | Base URL of the backend API |
-| `NEXT_PUBLIC_APP_ENV` | Frontend | `development`, `staging`, or `production` |
+Results return instantly to UI
 
----
+🧪 Tests
+Code
+tests/
+├── backend/
+└── frontend/
+Run backend tests:
 
-## 🧪 Running Tests
+bash
+cd tests/backend
+pytest
+Run frontend tests:
 
-```bash
-# Backend unit tests
-cd backend && pytest
+bash
+cd tests/frontend
+npm test
+🚢 Deployment
+Backend → Cloud Run
+bash
+gcloud builds submit --tag gcr.io/$PROJECT_ID/recall-backend
+gcloud run deploy recall-backend \
+  --image gcr.io/$PROJECT_ID/recall-backend \
+  --platform managed \
+  --region us-central1
+Frontend → Vercel or Cloud Run
+Both work — Vercel is the simplest.
 
-# Frontend unit tests
-cd ai-recall-frontend && npm run test
+📌 Roadmap
+[ ] Add user authentication
 
-# Integration / E2E tests (from root)
-cd tests && pytest
-```
+[ ] Add categories + tags
 
----
+[ ] Add recall summaries
 
-## 🔄 Development Workflow
+[ ] Add batch imports
 
-1. **Branch** off `main` using `feature/`, `fix/`, or `chore/` prefixes.
-2. **Develop** backend and frontend independently — they communicate via REST API.
-3. **Test** locally with Docker Compose: `docker compose up --build`
-4. **Open a PR** against `main` — CI will run lint, type checks, and tests automatically.
-5. **Merge** after review; staging deploys automatically via GitHub Actions.
+[ ] Add vector re‑indexing
 
-### Useful Commands
+[ ] Add mobile‑friendly UI
 
-```bash
-# Start all services locally
-docker compose up --build
+[ ] Add analytics dashboard
 
-# Stop and clean up
-docker compose down -v
+🤝 Contributing
+Pull requests welcome.
+If you break something, that’s part of the fun.
 
-# Format backend code
-cd backend && ruff format .
+🧑‍💻 Author
+Dennis — building clean, modern, AI‑powered systems one repo at a time.
 
-# Lint frontend
-cd ai-recall-frontend && npm run lint
-```
+🎉 Final Notes
+This project is intentionally simple, clean, and scalable.
+It’s the perfect foundation for:
 
----
+personal knowledge recall
 
-## 🚢 Deployment
+AI safety workflows
 
-### Docker
+memory systems
 
-Both services include a `Dockerfile`. Build and push images to your container registry:
+agent tooling
 
-```bash
-docker build -t your-registry/recall-backend:latest ./backend
-docker build -t your-registry/recall-frontend:latest ./ai-recall-frontend
-```
-
-### Environment-Specific Configuration
-
-| Environment | Backend URL | Frontend URL | Branch |
-|---|---|---|---|
-| Development | localhost:8000 | localhost:3000 | `feature/*` |
-| Staging | api.staging.yourapp.com | staging.yourapp.com | `main` |
-| Production | api.yourapp.com | yourapp.com | `release/*` |
-
-### GitHub Actions
-
-CI/CD pipelines are defined in `.github/workflows/`. On merge to `main`, the pipeline:
-1. Runs all tests
-2. Builds Docker images
-3. Pushes to the container registry
-4. Deploys to the staging environment
-
----
-
-## 📚 Documentation
-
-Extended documentation lives in `/docs`:
-
-- `docs/architecture.md` — System design & component diagram
-- `docs/api-reference.md` — Full REST API reference
-- `docs/adr/` — Architecture Decision Records
-
----
-
-## 🤝 Contributing
-
-1. Fork the repo and create your feature branch.
-2. Follow the coding standards (Ruff for Python, ESLint/Prettier for TypeScript).
-3. Write tests for new functionality.
-4. Submit a PR with a clear description of the change.
-
----
-
-## 📄 License
-
-MIT License — see [LICENSE](./LICENSE) for details.
+semantic search apps
