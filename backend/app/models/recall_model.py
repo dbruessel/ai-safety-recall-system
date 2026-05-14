@@ -8,6 +8,8 @@ class RecallCreate(BaseModel):
     status: str
     vin: str
     nhtsa_id: str
+    category: Optional[str] = "other"     # NEW
+    priority: Optional[str] = "medium"    # NEW
 
 
 class Recall(RecallCreate):
@@ -20,3 +22,5 @@ class RecallUpdate(BaseModel):
     status: Optional[str] = None
     vin: Optional[str] = None
     nhtsa_id: Optional[str] = None
+    category: Optional[str] = None        # NEW
+    priority: Optional[str] = None        # NEW
