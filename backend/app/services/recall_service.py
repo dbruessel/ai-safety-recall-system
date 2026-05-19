@@ -1,37 +1,26 @@
-﻿from typing import List, Optional
+﻿import requests
 
-from app.models.recall_model import Recall, RecallCreate, RecallUpdate
-from app.services.firestore_service import FirestoreService
+NHTSA_DECODE_URL = "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/{vin}?format=json"
+NHTSA_RECALL_URL = "https://api.nhtsa.gov/recalls/recallsByVehicle?vin={vin}"
 
+def decode_vin(vin: str):
+    """Decode VIN using NHTSA API."""
+    url = NHTSA_DECODE_URL.format(vin=vin)
+    response = requests.get(url)
+    data = response.json()
 
-class RecallService:
-    def __init__(self) -> None:
-        self.fs = FirestoreService()
+    if "Results" in data and len(data["Results"]) > 0:
+        return data["Results"][0]
 
-    def create_recall(self, payload: RecallCreate) -> Recall:
-        data = payload.dict()
-        recall_id = self.fs.create_recall(data)
-        return Recall(id=recall_id, **data)
+    return {}
 
-    def get_recall(self, recall_id: str) -> Optional[Recall]:
-        doc = self.fs.get_recall(recall_id)
-        if not doc:
-            return None
-        return Recall(**doc)
+def get_recalls_for_vin(vin: str):
+    """Fetch recall data for a VIN using NHTSA API."""
+    url = NHTSA_RECALL_URL.format(vin=vin)
+    response = requests.get(url)
+    data = response.json()
 
-    def list_recalls(self) -> List[Recall]:
-        docs = self.fs.list_recalls()
-        return [Recall(**d) for d in docs]
+    if "results" in data:
+        return data["results"]
 
-    def update_recall(self, recall_id: str, payload: RecallUpdate) -> Optional[Recall]:
-        update_data = {k: v for k, v in payload.dict().items() if v is not None}
-        if not update_data:
-            return self.get_recall(recall_id)
-
-        updated = self.fs.update_recall(recall_id, update_data)
-        if not updated:
-            return None
-        return self.get_recall(recall_id)
-
-    def delete_recall(self, recall_id: str) -> bool:
-        return self.fs.delete_recall(recall_id)
+    return []

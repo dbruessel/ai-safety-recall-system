@@ -58,3 +58,58 @@ def update_vin_item(batch_id: str, vin: str, status: str, raw_data=None,
         update_data["error_message"] = error_message
 
     vin_ref.update(update_data)
+
+def update_batch_progress(batch_id: str):
+    """
+    Aggregates VIN item statuses and updates the batch document.
+    Computes:
+      - processed_vins
+      - failed_vins
+      - avg_processing_time_ms
+      - batch status (pending/processing/complete)
+    """
+
+    batch_ref = db.collection("vin_batches").document(batch_id)
+    vin_items_ref = batch_ref.collection("vin_items")
+
+    vin_docs = vin_items_ref.stream()
+
+    processed = 0
+    failed = 0
+    total_time = 0
+    time_count = 0
+
+    for vin_doc in vin_docs:
+        data = vin_doc.to_dict()
+        status = data.get("status")
+
+        if status == "complete":
+            processed += 1
+        elif status == "failed":
+            failed += 1
+
+        if data.get("processing_time_ms"):
+            total_time += data["processing_time_ms"]
+            time_count += 1
+
+    avg_time = total_time / time_count if time_count > 0 else 0
+
+    # Fetch total VIN count from batch
+    batch_data = batch_ref.get().to_dict()
+    total_vins = batch_data.get("total_vins", 0)
+
+    # Determine batch status
+    if processed + failed == 0:
+        batch_status = "pending"
+    elif processed + failed < total_vins:
+        batch_status = "processing"
+    else:
+        batch_status = "complete"
+
+    batch_ref.update({
+        "processed_vins": processed,
+        "failed_vins": failed,
+        "avg_processing_time_ms": avg_time,
+        "status": batch_status,
+        "updated_at": datetime.utcnow()
+    })

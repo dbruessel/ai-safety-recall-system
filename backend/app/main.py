@@ -6,7 +6,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import recall_router
+
+from app.routers import metrics
+
+app.include_router(metrics.router, prefix="/api")
+
 
 
 def create_app() -> FastAPI:
@@ -22,7 +26,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(recall_router.router)
 
     @app.get("/health")
     def health_check():
