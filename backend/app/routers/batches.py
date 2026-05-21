@@ -10,18 +10,48 @@ db = firestore.Client()
 @router.get("/batches")
 def list_batches():
     """
-    Return all batches with summary metadata.
+    Return a list of all batches.
     """
     batches_ref = db.collection("vin_batches")
-    batch_docs = list(batches_ref.stream())
+    docs = list(batches_ref.stream())
 
     batches = []
-    for doc in batch_docs:
+    for doc in docs:
         data = doc.to_dict() or {}
         data["batch_id"] = doc.id
         batches.append(data)
 
     return {"batches": batches}
+
+@router.get("/batches/{batch_id}")
+def get_batch(batch_id: str):
+    """
+    Return metadata for a single batch, including its VIN items.
+    """
+    batch_ref = db.collection("vin_batches").document(batch_id)
+    batch_doc = batch_ref.get()
+
+    if not batch_doc.exists:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    # Base batch metadata
+    data = batch_doc.to_dict() or {}
+    data["batch_id"] = batch_doc.id
+
+    # Fetch VIN subcollection
+    vin_items_ref = batch_ref.collection("vin_items")
+    vin_docs = list(vin_items_ref.stream())
+
+    vins = []
+    for doc in vin_docs:
+        vin_data = doc.to_dict() or {}
+        vin_data["vin"] = doc.id
+        vins.append(vin_data)
+
+    # Attach VINs to batch
+    data["vins"] = vins
+
+    return {"batch": data}
 
 
 # -----------------------------
