@@ -1,0 +1,5 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/ai-safety-recall-system/recall/recall-task-generator', '-f', 'backend/ingestion_jobs/docker/Dockerfile.task_generator', '.']
+images:
+  - 'us-central1-docker.pkg.dev/ai-safety-recall-system/recall/recall-task-generator'

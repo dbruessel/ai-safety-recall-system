@@ -1,0 +1,4 @@
+requests
+google-cloud-firestore
+google-cloud-core
+python-dateutil

@@ -1,0 +1,17 @@
+# backend/ingestion_jobs/docker/Dockerfile.make_model
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system deps (if you need gcc/openssl/etc, add here)
+RUN pip install --no-cache-dir --upgrade pip
+
+# Copy shared requirements
+COPY ../../requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only ingestion jobs
+COPY .. /app/ingestion_jobs
+
+# Default command: run make/model ingestion
+CMD ["python", "-m", "ingestion_jobs.make_model_ingestion"]
