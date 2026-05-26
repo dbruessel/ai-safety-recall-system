@@ -4,11 +4,11 @@ steps:
       [
         "build",
         "-t",
-        "us-central1-docker.pkg.dev/$PROJECT_ID/recall/daily-ingestion-job",
+        "us-central1-docker.pkg.dev/$PROJECT_ID/recall/vin-batch-job",
         "-f",
         "backend/ingestion_jobs/docker/Dockerfile",
         "."
       ]
 
 images:
-  - "us-central1-docker.pkg.dev/$PROJECT_ID/recall/daily-ingestion-job"
+  - "us-central1-docker.pkg.dev/$PROJECT_ID/recall/vin-batch-job"

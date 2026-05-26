@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import time
+import re
 import requests
 
 from urllib.parse import quote
@@ -51,22 +52,24 @@ RECALLS_COLLECTION = db.collection("recall_campaigns")
 # Sanitization Helpers
 # -----------------------------
 def sanitize_make(make: str) -> str:
-    """Remove characters that break NHTSA API and URL-encode."""
+    """Remove numeric prefixes and invalid characters, then URL-encode."""
     cleaned = make.strip()
+    cleaned = re.sub(r"^[0-9]+", "", cleaned)  # remove leading digits
     cleaned = cleaned.replace("#", "")
     cleaned = cleaned.replace("&", "")
     cleaned = cleaned.replace("/", "")
     cleaned = cleaned.replace("  ", " ")
-    return quote(cleaned)
+    return quote(cleaned.strip())
 
 
 def sanitize_model(model: str) -> str:
-    """Remove characters that break NHTSA API and URL-encode."""
+    """Remove numeric prefixes and invalid characters, then URL-encode."""
     cleaned = model.strip()
+    cleaned = re.sub(r"^[0-9]+", "", cleaned)  # remove leading digits
     cleaned = cleaned.replace("/", "")
     cleaned = cleaned.replace("&", "")
     cleaned = cleaned.replace("  ", " ")
-    return quote(cleaned)
+    return quote(cleaned.strip())
 
 
 # -----------------------------

@@ -3,13 +3,14 @@ import datetime
 import json
 import logging
 import time
+import requests
 
+from urllib.parse import quote
 from google.cloud import firestore
 
 # -----------------------------
 # JSON Logging Setup
 # -----------------------------
-
 
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -48,6 +49,20 @@ DELTA_CHECKPOINT_DOC = db.collection("ingestion_checkpoints").document("daily_de
 
 
 # -----------------------------
+# Sanitization Helpers
+# -----------------------------
+def sanitize(text: str) -> str:
+    if not text:
+        return ""
+    cleaned = text.strip()
+    cleaned = cleaned.replace("/", "")
+    cleaned = cleaned.replace("&", "")
+    cleaned = cleaned.replace("#", "")
+    cleaned = cleaned.replace("  ", " ")
+    return quote(cleaned)
+
+
+# -----------------------------
 # Checkpoint Helpers
 # -----------------------------
 def load_last_run_timestamp():
@@ -57,8 +72,9 @@ def load_last_run_timestamp():
         log_event("Loaded daily delta checkpoint", event="delta_checkpoint_loaded", last_run=str(ts))
         return ts
 
+    fallback = datetime.datetime.utcnow() - datetime.timedelta(days=1)
     log_event("No daily delta checkpoint found. Defaulting to 24 hours ago.", event="delta_checkpoint_missing")
-    return datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    return fallback
 
 
 def save_last_run_timestamp():
@@ -68,34 +84,40 @@ def save_last_run_timestamp():
 
 
 # -----------------------------
-# Mocked External API Call
-# Replace with your real NHTSA delta fetch
+# REAL NHTSA Delta API Call
 # -----------------------------
 def fetch_recalls_since(timestamp):
     """
-    Replace this with your real NHTSA delta ingestion logic.
-    Should return a list of recall objects.
+    Fetch recalls updated since the given timestamp.
+    Uses the official NHTSA delta endpoint.
     """
-    log_event("Fetching delta recalls", event="delta_fetch_start", since=str(timestamp))
+    iso_date = timestamp.strftime("%Y-%m-%d")
 
-    # Simulated recall list
-    return [
-        {
-            "recall_number": "24V123",
-            "make": "FORD",
-            "model": "F-150",
-            "year": 2022,
-            "description": "Simulated recall",
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-        }
-    ]
+    url = f"https://api.nhtsa.gov/recalls/recallsByDate?date={iso_date}"
+
+    log_event("Fetching delta recalls", event="delta_fetch_start", url=url)
+
+    response = requests.get(url)
+    response.raise_for_status()
+
+    data = response.json()
+    results = data.get("results", [])
+
+    log_event("Delta recalls fetched", event="delta_fetch_complete", count=len(results))
+
+    return results
 
 
 # -----------------------------
 # Firestore Write
 # -----------------------------
 def store_recall(recall):
-    recall_id = recall["recall_number"]
+    recall_id = recall.get("NHTSACampaignNumber") or f"recall-{time.time()}"
+
+    # Sanitize fields before storing
+    recall["make"] = sanitize(recall.get("Make", ""))
+    recall["model"] = sanitize(recall.get("Model", ""))
+    recall["year"] = recall.get("ModelYear")
 
     RECALLS_COLLECTION.document(recall_id).set(recall)
 
@@ -119,8 +141,6 @@ def run_daily_ingestion():
 
     recalls = fetch_recalls_since(last_run)
 
-    log_event("Delta recalls fetched", event="delta_fetch_complete", count=len(recalls))
-
     for recall in recalls:
         try:
             store_recall(recall)
@@ -128,7 +148,7 @@ def run_daily_ingestion():
             log_event(
                 "Failed to store recall",
                 event="delta_store_failed",
-                recall_number=recall.get("recall_number"),
+                recall_number=recall.get("NHTSACampaignNumber"),
                 error=str(e),
             )
             raise e
