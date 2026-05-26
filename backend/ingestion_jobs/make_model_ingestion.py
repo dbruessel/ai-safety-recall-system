@@ -3,13 +3,14 @@ import datetime
 import json
 import logging
 import time
+import requests
 
+from urllib.parse import quote
 from google.cloud import firestore
 
 # -----------------------------
 # JSON Logging Setup
 # -----------------------------
-
 
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -19,7 +20,6 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        # Merge any structured fields
         if hasattr(record, "fields") and isinstance(record.fields, dict):
             log.update(record.fields)
 
@@ -44,13 +44,35 @@ def log_event(message: str, **fields):
 # -----------------------------
 db = firestore.Client()
 CHECKPOINT_DOC = db.collection("ingestion_checkpoints").document("make_model")
+RECALLS_COLLECTION = db.collection("recall_campaigns")
+
+
+# -----------------------------
+# Sanitization Helpers
+# -----------------------------
+def sanitize_make(make: str) -> str:
+    """Remove characters that break NHTSA API and URL-encode."""
+    cleaned = make.strip()
+    cleaned = cleaned.replace("#", "")
+    cleaned = cleaned.replace("&", "")
+    cleaned = cleaned.replace("/", "")
+    cleaned = cleaned.replace("  ", " ")
+    return quote(cleaned)
+
+
+def sanitize_model(model: str) -> str:
+    """Remove characters that break NHTSA API and URL-encode."""
+    cleaned = model.strip()
+    cleaned = cleaned.replace("/", "")
+    cleaned = cleaned.replace("&", "")
+    cleaned = cleaned.replace("  ", " ")
+    return quote(cleaned)
 
 
 # -----------------------------
 # Checkpoint Helpers
 # -----------------------------
 def load_checkpoint():
-    """Load last processed make/model/year from Firestore."""
     doc = CHECKPOINT_DOC.get()
     if doc.exists:
         data = doc.to_dict()
@@ -72,7 +94,6 @@ def load_checkpoint():
 
 
 def save_checkpoint(make, model, year):
-    """Save progress to Firestore."""
     CHECKPOINT_DOC.set(
         {
             "last_make": make,
@@ -91,7 +112,6 @@ def save_checkpoint(make, model, year):
 
 
 def reset_checkpoint():
-    """Delete checkpoint document."""
     CHECKPOINT_DOC.delete()
     log_event(
         "Checkpoint reset. Full ingestion will start from the beginning.",
@@ -100,41 +120,69 @@ def reset_checkpoint():
 
 
 # -----------------------------
-# Mocked External Functions
-# Replace these with your actual ingestion logic
+# REAL NHTSA API FUNCTIONS
 # -----------------------------
 def get_all_makes():
-    """Return list of makes from NHTSA."""
-    # Replace with your real function
-    return ["FORD", "HONDA", "TOYOTA"]
+    """Fetch all vehicle makes from NHTSA API."""
+    url = "https://vpic.nhtsa.dot.gov/api/vehicles/getallmakes?format=json"
+    response = requests.get(url)
+    response.raise_for_status()
+    data = response.json()
+
+    makes = [item["Make_Name"].upper() for item in data["Results"]]
+
+    log_event("Fetched all makes", event="fetch_all_makes", count=len(makes))
+    return makes
 
 
 def get_models_for_make(make):
-    """Return list of models for a given make."""
-    # Replace with your real function
-    if make == "FORD":
-        return ["F-150", "F-250"]
-    if make == "HONDA":
-        return ["CIVIC", "ACCORD"]
-    if make == "TOYOTA":
-        return ["CAMRY", "COROLLA"]
-    return []
+    """Fetch all models for a given make."""
+    safe_make = sanitize_make(make)
+    url = f"https://vpic.nhtsa.dot.gov/api/vehicles/getmodelsformake/{safe_make}?format=json"
+
+    response = requests.get(url)
+    response.raise_for_status()
+    data = response.json()
+
+    models = [item["Model_Name"].upper() for item in data["Results"]]
+
+    log_event(
+        "Fetched models for make",
+        event="fetch_models",
+        make=make,
+        count=len(models),
+    )
+    return models
 
 
 def fetch_and_store_recalls(make, model, year):
     """Fetch recalls for a make/model/year and store them in Firestore."""
-    # Replace with your real ingestion logic
+    safe_make = sanitize_make(make)
+    safe_model = sanitize_model(model)
+
+    url = (
+        f"https://api.nhtsa.gov/recalls/recallsByVehicle?"
+        f"make={safe_make}&model={safe_model}&modelYear={year}"
+    )
+
+    response = requests.get(url)
+    response.raise_for_status()
+    data = response.json()
+
+    recalls = data.get("results", [])
+
+    for recall in recalls:
+        recall_id = recall.get("NHTSACampaignNumber") or f"{make}-{model}-{year}-{time.time()}"
+        RECALLS_COLLECTION.document(recall_id).set(recall)
+
     log_event(
-        "Fetching recalls",
-        event="fetch_recalls",
+        "Stored recalls",
+        event="store_recalls",
         make=make,
         model=model,
         year=year,
+        count=len(recalls),
     )
-    # Simulate work
-    time.sleep(0.05)
-    # Simulate Firestore write here
-    return True
 
 
 # -----------------------------
@@ -151,19 +199,16 @@ def run_ingestion(reset=False):
     makes = get_all_makes()
 
     for make in makes:
-        # Skip until we reach the checkpoint make
         if last_make and make < last_make:
             continue
 
         models = get_models_for_make(make)
 
         for model in models:
-            # Skip until we reach the checkpoint model (for the same make)
             if last_make == make and last_model and model < last_model:
                 continue
 
             for year in range(2000, 2025):
-                # Skip years up to and including the checkpoint year
                 if (
                     last_make == make
                     and last_model == model
@@ -211,7 +256,6 @@ def run_ingestion(reset=False):
                         error=str(e),
                     )
 
-                    # Save checkpoint before exiting so we can resume
                     save_checkpoint(make, model, year)
                     raise e
 
