@@ -1,0 +1,14 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "us-central1-docker.pkg.dev/$PROJECT_ID/ingestion/daily-ingestion-job",
+        "-f",
+        "backend/ingestion_jobs/docker/Dockerfile.daily_ingestion",
+        ".",
+      ]
+
+images:
+  - "us-central1-docker.pkg.dev/$PROJECT_ID/ingestion/daily-ingestion-job"

@@ -1,4 +1,3 @@
-# backend/ingestion_jobs/docker/Dockerfile.recall_worker
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -10,5 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ingestion_jobs /app/ingestion_jobs
 
-# recall_worker reads CLOUD_RUN_TASK_INDEX / CLOUD_RUN_TASK_COUNT
-CMD ["python", "-m", "ingestion_jobs.recall_worker"]
+CMD ["python", "-m", "ingestion_jobs.daily_ingestion"]
