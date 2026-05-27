@@ -52,23 +52,36 @@ RECALLS_COLLECTION = db.collection("recall_campaigns")
 # Sanitization Helpers
 # -----------------------------
 def sanitize_make(make: str) -> str:
-    """Remove numeric prefixes and invalid characters, then URL-encode."""
+    """Remove leading #, spaces, digits, and invalid characters, then URL-encode."""
     cleaned = make.strip()
-    cleaned = re.sub(r"^[0-9]+", "", cleaned)  # remove leading digits
+
+    # Remove leading "#", spaces, and digits (e.g., "#1", "## 12", "  231")
+    cleaned = re.sub(r"^[#\s]*[0-9]+", "", cleaned)
+
+    # Remove remaining illegal characters
     cleaned = cleaned.replace("#", "")
     cleaned = cleaned.replace("&", "")
     cleaned = cleaned.replace("/", "")
-    cleaned = cleaned.replace("  ", " ")
+
+    # Collapse multiple spaces
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+
     return quote(cleaned.strip())
 
 
 def sanitize_model(model: str) -> str:
-    """Remove numeric prefixes and invalid characters, then URL-encode."""
+    """Remove leading #, spaces, digits, and invalid characters, then URL-encode."""
     cleaned = model.strip()
-    cleaned = re.sub(r"^[0-9]+", "", cleaned)  # remove leading digits
+
+    # Remove leading "#", spaces, and digits
+    cleaned = re.sub(r"^[#\s]*[0-9]+", "", cleaned)
+
     cleaned = cleaned.replace("/", "")
     cleaned = cleaned.replace("&", "")
-    cleaned = cleaned.replace("  ", " ")
+    cleaned = cleaned.replace("#", "")
+
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+
     return quote(cleaned.strip())
 
 
@@ -231,6 +244,7 @@ def run_ingestion(reset=False):
                 )
 
                 try:
+                    # Main recall fetch
                     fetch_and_store_recalls(make, model, year)
 
                     duration_ms = int((time.time() - start_time) * 1000)
@@ -244,11 +258,22 @@ def run_ingestion(reset=False):
                         duration_ms=duration_ms,
                     )
 
-                    save_checkpoint(make, model, year)
+                except requests.exceptions.HTTPError as e:
+                    # NHTSA returned 4xx/5xx – log and skip this combo
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    log_event(
+                        "Skipped invalid make/model",
+                        event="skip_invalid",
+                        make=make,
+                        model=model,
+                        year=year,
+                        duration_ms=duration_ms,
+                        error=str(e),
+                    )
 
                 except Exception as e:
+                    # Unexpected error – log but keep going
                     duration_ms = int((time.time() - start_time) * 1000)
-
                     log_event(
                         "Recall fetch failed",
                         event="fetch_failed",
@@ -259,8 +284,9 @@ def run_ingestion(reset=False):
                         error=str(e),
                     )
 
+                finally:
+                    # Always advance checkpoint so we never reprocess the same combo
                     save_checkpoint(make, model, year)
-                    raise e
 
     log_event("Ingestion complete. All makes/models/years processed.", event="ingestion_complete")
 
