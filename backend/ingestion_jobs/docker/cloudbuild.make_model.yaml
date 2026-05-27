@@ -1,5 +1,0 @@
-steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/ai-safety-recall-system/recall/make-model-job', '-f', 'backend/ingestion_jobs/docker/Dockerfile.make_model', '.']
-images:
-  - 'us-central1-docker.pkg.dev/ai-safety-recall-system/recall/make-model-job'
