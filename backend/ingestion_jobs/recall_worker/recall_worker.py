@@ -3,6 +3,9 @@ from google.cloud import firestore
 from datetime import datetime
 import time
 
+# Import the shared normalization logic
+from app.normalization.normalization import normalize_campaign
+
 db = firestore.Client()
 
 TASKS = "recall_tasks"
@@ -23,27 +26,6 @@ def safe_get(url, timeout=15, retries=5, backoff=1.5):
     return None
 
 
-def normalize(raw, make, model, year):
-    return {
-        "campaign_number": raw.get("CampaignNumber"),
-        "make": make,
-        "model": model,
-        "year": year,
-        "component": raw.get("Component"),
-        "summary": raw.get("Summary"),
-        "consequence": raw.get("Consequence"),
-        "remedy": raw.get("Remedy"),
-        "notes": raw.get("Notes"),
-        "population": raw.get("PotentialUnitsAffected"),
-        "manufacturer": raw.get("Manufacturer"),
-        "report_date": raw.get("ReportReceivedDate"),
-        "recall_initiated_date": raw.get("RecallInitiatedDate"),
-        "nhtsa_url": f"https://www.nhtsa.gov/recalls?nhtsaId={raw.get('CampaignNumber')}",
-        "updated_at": datetime.utcnow(),
-        "created_at": datetime.utcnow(),
-    }
-
-
 def upsert(campaign):
     cid = campaign["campaign_number"]
     if not cid:
@@ -55,9 +37,13 @@ def upsert(campaign):
     if existing.exists:
         old = existing.to_dict()
         ignore = ["created_at", "updated_at"]
+
+        # Skip write if nothing changed
         if {k: v for k, v in old.items() if k not in ignore} == \
            {k: v for k, v in campaign.items() if k not in ignore}:
             return False
+
+        # Preserve original created_at
         campaign["created_at"] = old.get("created_at")
 
     ref.set(campaign, merge=True)
@@ -96,7 +82,8 @@ def process_task(task_id, task):
     recalls = data.get("results", []) or data.get("Results", [])
 
     for raw in recalls:
-        campaign = normalize(raw, make, model, year)
+        # Use shared normalization
+        campaign = normalize_campaign(raw, make, model, year)
         upsert(campaign)
 
     db.collection(TASKS).document(task_id).update({
