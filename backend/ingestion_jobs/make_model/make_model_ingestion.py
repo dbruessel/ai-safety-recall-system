@@ -5,6 +5,9 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from google.cloud import firestore
+import logging
+import sys
+import traceback
 
 
 # -----------------------------
@@ -15,19 +18,12 @@ def log_event(message: str, **kwargs):
     """Safe JSON logging that handles Firestore timestamps and other non-serializable types."""
 
     def safe_json(obj):
-        # Firestore timestamp or datetime-like object
         if hasattr(obj, "isoformat"):
             return obj.isoformat()
-
-        # Dict
         if isinstance(obj, dict):
             return {k: safe_json(v) for k, v in obj.items()}
-
-        # List
         if isinstance(obj, list):
             return [safe_json(v) for v in obj]
-
-        # Fallback: convert to string
         return obj
 
     payload = {"message": message, **kwargs}
@@ -303,6 +299,26 @@ def run_ingestion(reset=False):
                 save_checkpoint(db, mi + 1, 0, START_YEAR)
                 continue
 
+            # ---------------------------------------------------
+            # NEW: Update make/model reference data in Firestore
+            # ---------------------------------------------------
+            model_names = [
+                (m.get("Model_Name") or "").strip()
+                for m in models
+                if m.get("Model_Name")
+            ]
+
+            db.collection("nhtsa_make_models").document(make_name).set({
+                "models": model_names,
+                "updated_at": firestore.SERVER_TIMESTAMP
+            }, merge=True)
+
+            log_event("Updated make/model reference",
+                      event="update_make_models",
+                      make=make_name,
+                      count=len(model_names))
+            # ---------------------------------------------------
+
             start_model_idx = model_index if mi == make_index else 0
             start_year_for_make = year if mi == make_index else START_YEAR
 
@@ -375,19 +391,31 @@ def run_ingestion(reset=False):
 
 
 # -----------------------------
-# Entry point
+# SAFE ENTRYPOINT FOR CONTAINER STARTUP
 # -----------------------------
 
+def safe_start():
+    """Guaranteed-safe startup wrapper so Cloud Run can start the container."""
+    print("Container started — safe_start() executing")
+
+    print(f"Python executable: {sys.executable}")
+    print(f"Python version: {sys.version}")
+
+    try:
+        print("Starting ingestion engine...")
+        run_ingestion(reset="--reset" in sys.argv)
+        print("Ingestion engine completed successfully")
+
+    except Exception as e:
+        print(f"Fatal error in ingestion: {e}")
+        traceback.print_exc()
+        sys.exit(1)
+
+    print("Job finished — exiting cleanly")
+
+
 def main():
-    import argparse
-
-    print("Container started — entering main()")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--reset", action="store_true")
-    args = parser.parse_args()
-
-    run_ingestion(reset=args.reset)
+    safe_start()
 
 
 if __name__ == "__main__":
