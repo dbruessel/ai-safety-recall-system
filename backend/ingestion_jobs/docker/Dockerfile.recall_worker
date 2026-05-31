@@ -5,10 +5,12 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir --upgrade pip
 
+# Install dependencies
 COPY backend/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
+# Copy ONLY the ingestion_jobs folder (your worker lives here)
 COPY backend/ingestion_jobs /app/ingestion_jobs
 
-# recall_worker reads CLOUD_RUN_TASK_INDEX / CLOUD_RUN_TASK_COUNT
-CMD ["python", "-m", "ingestion_jobs.recall_worker"]
+# Run the recall worker script
+CMD ["python", "ingestion_jobs/recall_worker/recall_worker.py"]
