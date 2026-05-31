@@ -1,36 +1,63 @@
 from google.cloud import firestore
+from datetime import datetime
 
 db = firestore.Client()
 
-YEARS = list(range(2000, 2025))
+MAKE_MODELS = "nhtsa_make_models"
+TASKS = "recall_tasks"
+CHECKPOINTS = "ingestion_checkpoints"
 
-def run():
-    makes_ref = db.collection("nhtsa_make_models").stream()
+START_YEAR = 1990
+END_YEAR = 2026
 
-    batch = db.batch()
-    count = 0
 
-    for doc in makes_ref:
-        make = doc.id
-        models = doc.to_dict().get("models", [])
+def generate_tasks(start_make_index=0):
+    makes = [doc.id for doc in db.collection(MAKE_MODELS).stream()]
+    total = len(makes)
+
+    print(f"📦 Total makes: {total}")
+
+    checkpoint_ref = db.collection(CHECKPOINTS).document("task_generator")
+
+    for i in range(start_make_index, total):
+        make = makes[i]
+        doc = db.collection(MAKE_MODELS).document(make).get().to_dict() or {}
+        models = doc.get("models", [])
+
+        print(f"\n🧩 Generating tasks for make_index={i} → {make}")
+
+        checkpoint_ref.set({
+            "make_index": i,
+            "make_name": make,
+            "status": "running",
+            "updated_at": datetime.utcnow().isoformat() + "Z"
+        })
+
+        if not models:
+            print(f"⚠️ No models for {make} — skipping.")
+            checkpoint_ref.update({"status": "skipped"})
+            continue
 
         for model in models:
-            for year in YEARS:
-                task_ref = db.collection("recall_tasks").document()
-                batch.set(task_ref, {
+            for year in range(START_YEAR, END_YEAR + 1):
+                task_id = f"{make}_{model}_{year}"
+                db.collection(TASKS).document(task_id).set({
                     "make": make,
                     "model": model,
                     "year": year,
-                    "status": "pending"
+                    "status": "pending",
+                    "created_at": datetime.utcnow().isoformat() + "Z"
                 })
-                count += 1
 
-                if count % 400 == 0:
-                    batch.commit()
-                    batch = db.batch()
+        checkpoint_ref.update({
+            "status": "completed",
+            "updated_at": datetime.utcnow().isoformat() + "Z"
+        })
 
-    batch.commit()
-    print(f"Generated {count} recall tasks")
+    print("\n🎉 Task generation complete!")
+
 
 if __name__ == "__main__":
-    run()
+    cp = db.collection(CHECKPOINTS).document("task_generator").get().to_dict()
+    start = cp["make_index"] + 1 if cp else 0
+    generate_tasks(start_make_index=start)

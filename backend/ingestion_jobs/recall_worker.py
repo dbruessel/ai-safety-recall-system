@@ -1,40 +1,40 @@
-import time
 import requests
 from google.cloud import firestore
 from datetime import datetime
+import time
 
 db = firestore.Client()
-session = requests.Session()
 
-def safe_get(url, retries=5):
-    for i in range(retries):
+TASKS = "recall_tasks"
+RECALLS = "recall_campaigns"
+CHECKPOINTS = "ingestion_checkpoints"
+
+
+def safe_get(url, timeout=15, retries=5, backoff=1.5):
+    for attempt in range(retries):
         try:
-            return session.get(url, timeout=10)
-        except Exception:
-            time.sleep(1.5 ** i)
-    raise Exception(f"Failed GET: {url}")
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except (requests.Timeout, requests.ConnectionError) as e:
+            wait = backoff ** attempt
+            print(f"[WARN] {type(e).__name__} on {url}. Retrying in {wait:.1f}s…")
+            time.sleep(wait)
+    return None
 
-def fetch_recalls(make, model, year):
-    url = (
-        "https://api.nhtsa.gov/recalls/recallsByVehicle"
-        f"?make={make}&model={model}&modelYear={year}"
-    )
-    r = safe_get(url)
-    r.raise_for_status()
-    return r.json().get("results", [])
 
-def normalize(raw):
+def normalize(raw, make, model, year):
     return {
         "campaign_number": raw.get("CampaignNumber"),
-        "make": raw.get("Make"),
-        "model": raw.get("Model"),
-        "year": int(raw["ModelYear"]) if raw.get("ModelYear") else None,
+        "make": make,
+        "model": model,
+        "year": year,
         "component": raw.get("Component"),
         "summary": raw.get("Summary"),
         "consequence": raw.get("Consequence"),
         "remedy": raw.get("Remedy"),
         "notes": raw.get("Notes"),
-        "population": int(raw["PotentialUnitsAffected"]) if raw.get("PotentialUnitsAffected") else None,
+        "population": raw.get("PotentialUnitsAffected"),
         "manufacturer": raw.get("Manufacturer"),
         "report_date": raw.get("ReportReceivedDate"),
         "recall_initiated_date": raw.get("RecallInitiatedDate"),
@@ -43,36 +43,93 @@ def normalize(raw):
         "created_at": datetime.utcnow(),
     }
 
-def run(task_index, task_count):
-    tasks = list(db.collection("recall_tasks").stream())
-    slice_size = len(tasks) // task_count
-    start = task_index * slice_size
-    end = start + slice_size if task_index < task_count - 1 else len(tasks)
 
-    my_tasks = tasks[start:end]
+def upsert(campaign):
+    cid = campaign["campaign_number"]
+    if not cid:
+        return False
 
-    for t in my_tasks:
-        data = t.to_dict()
-        make = data["make"]
-        model = data["model"]
-        year = data["year"]
+    ref = db.collection(RECALLS).document(cid)
+    existing = ref.get()
 
-        recalls = fetch_recalls(make, model, year)
+    if existing.exists:
+        old = existing.to_dict()
+        ignore = ["created_at", "updated_at"]
+        if {k: v for k, v in old.items() if k not in ignore} == \
+           {k: v for k, v in campaign.items() if k not in ignore}:
+            return False
+        campaign["created_at"] = old.get("created_at")
 
-        batch = db.batch()
-        for raw in recalls:
-            campaign = normalize(raw)
-            doc_id = campaign["campaign_number"]
-            ref = db.collection("recall_campaigns").document(doc_id)
-            batch.set(ref, campaign, merge=True)
+    ref.set(campaign, merge=True)
+    return True
 
-        batch.commit()
 
-        t.reference.update({"status": "done"})
+def process_task(task_id, task):
+    make = task["make"]
+    model = task["model"]
+    year = task["year"]
+
+    print(f"\n🔧 Processing {task_id}")
+
+    cp = db.collection(CHECKPOINTS).document("worker")
+    cp.set({
+        "task_id": task_id,
+        "make": make,
+        "model": model,
+        "year": year,
+        "status": "running",
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    })
+
+    url = (
+        "https://api.nhtsa.gov/recalls/recallsByVehicle"
+        f"?make={make}&model={model}&modelYear={year}"
+    )
+
+    resp = safe_get(url)
+    if not resp:
+        print(f"[ERROR] Failed to fetch {task_id}")
+        db.collection(TASKS).document(task_id).update({"status": "error"})
+        return
+
+    data = resp.json()
+    recalls = data.get("results", []) or data.get("Results", [])
+
+    for raw in recalls:
+        campaign = normalize(raw, make, model, year)
+        upsert(campaign)
+
+    db.collection(TASKS).document(task_id).update({
+        "status": "completed",
+        "completed_at": datetime.utcnow().isoformat() + "Z"
+    })
+
+    cp.update({
+        "status": "completed",
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    })
+
+
+def run_worker(batch_size=50):
+    tasks = list(
+        db.collection(TASKS)
+        .where("status", "==", "pending")
+        .limit(batch_size)
+        .stream()
+    )
+
+    if not tasks:
+        print("✅ No pending tasks.")
+        return
+
+    print(f"📦 Processing {len(tasks)} tasks…")
+
+    for t in tasks:
+        process_task(t.id, t.to_dict())
+        time.sleep(0.2)
+
+    print("\n🎉 Worker batch complete.")
+
 
 if __name__ == "__main__":
-    import os
-    run(
-        task_index=int(os.environ["CLOUD_RUN_TASK_INDEX"]),
-        task_count=int(os.environ["CLOUD_RUN_TASK_COUNT"])
-    )
+    run_worker(batch_size=50)
