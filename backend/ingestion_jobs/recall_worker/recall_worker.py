@@ -1,7 +1,9 @@
-import requests
-from google.cloud import firestore
-from datetime import datetime
 import time
+from datetime import datetime
+
+import requests
+from google.api_core import retry
+from google.cloud import firestore
 
 # Import the shared normalization logic
 from app.normalization.normalization import normalize_campaign
@@ -23,11 +25,12 @@ def safe_get(url, timeout=15, retries=5, backoff=1.5):
             wait = backoff ** attempt
             print(f"[WARN] {type(e).__name__} on {url}. Retrying in {wait:.1f}s…")
             time.sleep(wait)
+    print(f"[ERROR] Exhausted retries for {url}")
     return None
 
 
-def upsert(campaign):
-    cid = campaign["campaign_number"]
+def upsert(campaign: dict) -> bool:
+    cid = campaign.get("campaign_number")
     if not cid:
         return False
 
@@ -38,9 +41,11 @@ def upsert(campaign):
         old = existing.to_dict()
         ignore = ["created_at", "updated_at"]
 
+        old_filtered = {k: v for k, v in old.items() if k not in ignore}
+        new_filtered = {k: v for k, v in campaign.items() if k not in ignore}
+
         # Skip write if nothing changed
-        if {k: v for k, v in old.items() if k not in ignore} == \
-           {k: v for k, v in campaign.items() if k not in ignore}:
+        if old_filtered == new_filtered:
             return False
 
         # Preserve original created_at
@@ -50,22 +55,29 @@ def upsert(campaign):
     return True
 
 
-def process_task(task_id, task):
+def update_checkpoint(task_id: str, make: str, model: str, year: int, status: str):
+    cp = db.collection(CHECKPOINTS).document("worker")
+    cp.set(
+        {
+            "task_id": task_id,
+            "make": make,
+            "model": model,
+            "year": year,
+            "status": status,
+            "updated_at": datetime.utcnow().isoformat() + "Z",
+        },
+        merge=True,
+    )
+
+
+def process_task(task_id: str, task: dict):
     make = task["make"]
     model = task["model"]
     year = task["year"]
 
-    print(f"\n🔧 Processing {task_id}")
+    print(f"\n🔧 Processing {task_id} ({make} {model} {year})")
 
-    cp = db.collection(CHECKPOINTS).document("worker")
-    cp.set({
-        "task_id": task_id,
-        "make": make,
-        "model": model,
-        "year": year,
-        "status": "running",
-        "updated_at": datetime.utcnow().isoformat() + "Z"
-    })
+    update_checkpoint(task_id, make, model, year, "running")
 
     url = (
         "https://api.nhtsa.gov/recalls/recallsByVehicle"
@@ -76,33 +88,37 @@ def process_task(task_id, task):
     if not resp:
         print(f"[ERROR] Failed to fetch {task_id}")
         db.collection(TASKS).document(task_id).update({"status": "error"})
+        update_checkpoint(task_id, make, model, year, "error")
         return
 
     data = resp.json()
     recalls = data.get("results", []) or data.get("Results", [])
 
     for raw in recalls:
-        # Use shared normalization
         campaign = normalize_campaign(raw, make, model, year)
         upsert(campaign)
 
-    db.collection(TASKS).document(task_id).update({
-        "status": "completed",
-        "completed_at": datetime.utcnow().isoformat() + "Z"
-    })
+    db.collection(TASKS).document(task_id).update(
+        {
+            "status": "completed",
+            "completed_at": datetime.utcnow().isoformat() + "Z",
+        }
+    )
 
-    cp.update({
-        "status": "completed",
-        "updated_at": datetime.utcnow().isoformat() + "Z"
-    })
+    update_checkpoint(task_id, make, model, year, "completed")
 
 
-def run_worker(batch_size=50):
-    tasks = list(
+@retry.Retry(deadline=300)
+def safe_stream(query):
+    # Wrap Firestore stream in retry to handle transient UNAVAILABLE errors
+    return list(query.stream())
+
+
+def run_worker(batch_size: int = 10):
+    tasks = safe_stream(
         db.collection(TASKS)
         .where("status", "==", "pending")
         .limit(batch_size)
-        .stream()
     )
 
     if not tasks:
@@ -119,4 +135,4 @@ def run_worker(batch_size=50):
 
 
 if __name__ == "__main__":
-    run_worker(batch_size=50)
+    run_worker(batch_size=10)
