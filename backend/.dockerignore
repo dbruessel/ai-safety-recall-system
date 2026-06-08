@@ -1,0 +1,19 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore logs and temp files
+*.log
+*.tmp
+
+# Ignore environment files
+.env
+
+# Ignore Git metadata
+.git
+.gitignore
+
+# Ignore OS junk
+.DS_Store
+Thumbs.db
