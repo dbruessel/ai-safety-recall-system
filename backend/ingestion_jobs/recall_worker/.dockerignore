@@ -1,0 +1,20 @@
+# Ignore everything by default
+**
+
+# Allow only the worker files we want in the container
+!recall_worker.py
+!requirements.txt
+!Dockerfile
+
+# Allow the shared app folder (normalization logic)
+!app/
+!app/**
+
+# Prevent OS junk
+*.DS_Store
+Thumbs.db
+
+# Prevent accidental metadata or logs
+*.log
+*.tmp
+*.bak
