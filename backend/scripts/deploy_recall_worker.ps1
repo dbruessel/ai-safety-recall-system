@@ -1,11 +1,11 @@
-# Navigate to the worker directory
-Set-Location "C:\dev\clean-repo\backend\ingestion_jobs\recall_worker"
+# Navigate to the backend directory (build context includes app/)
+Set-Location "C:\dev\clean-repo\backend"
 
 # Build the container image
-gcloud builds submit --tag gcr.io/ai-safety-recall-system/recall-worker
+gcloud builds submit --tag us-central1-docker.pkg.dev/ai-safety-recall-system/recall/recall-worker .
 
 # Deploy the image to Cloud Run Jobs
-gcloud run jobs update recall-worker --image gcr.io/ai-safety-recall-system/recall-worker --region us-central1
+gcloud run jobs update recall-worker --image us-central1-docker.pkg.dev/ai-safety-recall-system/recall/recall-worker --region us-central1
 
 # Execute the job
 gcloud run jobs execute recall-worker --region us-central1
