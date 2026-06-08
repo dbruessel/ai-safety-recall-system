@@ -1,11 +1,9 @@
 import time
 from datetime import datetime
-
 import requests
 from google.api_core import retry
 from google.cloud import firestore
 
-# Import the shared normalization logic
 from app.normalization.normalization import normalize_campaign
 
 db = firestore.Client()
@@ -16,6 +14,7 @@ CHECKPOINTS = "ingestion_checkpoints"
 
 
 def safe_get(url, timeout=15, retries=5, backoff=1.5):
+    """HTTP GET with exponential backoff."""
     for attempt in range(retries):
         try:
             resp = requests.get(url, timeout=timeout)
@@ -29,6 +28,19 @@ def safe_get(url, timeout=15, retries=5, backoff=1.5):
     return None
 
 
+@retry.Retry(deadline=60)
+def safe_get_tasks(batch_size: int):
+    """Fetch pending tasks in batches (non-streaming)."""
+    query = db.collection(TASKS).where("status", "==", "pending").limit(batch_size)
+    return [doc for doc in query.get()]
+
+
+@retry.Retry(deadline=60)
+def safe_upsert(ref, campaign):
+    """Firestore upsert with retry."""
+    ref.set(campaign, merge=True)
+
+
 def upsert(campaign: dict) -> bool:
     cid = campaign.get("campaign_number")
     if not cid:
@@ -40,18 +52,13 @@ def upsert(campaign: dict) -> bool:
     if existing.exists:
         old = existing.to_dict()
         ignore = ["created_at", "updated_at"]
-
         old_filtered = {k: v for k, v in old.items() if k not in ignore}
         new_filtered = {k: v for k, v in campaign.items() if k not in ignore}
-
-        # Skip write if nothing changed
         if old_filtered == new_filtered:
             return False
-
-        # Preserve original created_at
         campaign["created_at"] = old.get("created_at")
 
-    ref.set(campaign, merge=True)
+    safe_upsert(ref, campaign)
     return True
 
 
@@ -71,19 +78,12 @@ def update_checkpoint(task_id: str, make: str, model: str, year: int, status: st
 
 
 def process_task(task_id: str, task: dict):
-    make = task["make"]
-    model = task["model"]
-    year = task["year"]
-
+    make, model, year = task["make"], task["model"], task["year"]
     print(f"\n🔧 Processing {task_id} ({make} {model} {year})")
 
     update_checkpoint(task_id, make, model, year, "running")
 
-    url = (
-        "https://api.nhtsa.gov/recalls/recallsByVehicle"
-        f"?make={make}&model={model}&modelYear={year}"
-    )
-
+    url = f"https://api.nhtsa.gov/recalls/recallsByVehicle?make={make}&model={model}&modelYear={year}"
     resp = safe_get(url)
     if not resp:
         print(f"[ERROR] Failed to fetch {task_id}")
@@ -93,33 +93,30 @@ def process_task(task_id: str, task: dict):
 
     data = resp.json()
     recalls = data.get("results", []) or data.get("Results", [])
+    ingested = 0
 
     for raw in recalls:
         campaign = normalize_campaign(raw, make, model, year)
-        upsert(campaign)
+        if upsert(campaign):
+            ingested += 1
 
     db.collection(TASKS).document(task_id).update(
         {
             "status": "completed",
             "completed_at": datetime.utcnow().isoformat() + "Z",
+            "records_ingested": ingested,
         }
     )
-
     update_checkpoint(task_id, make, model, year, "completed")
-
-
-@retry.Retry(deadline=300)
-def safe_stream(query):
-    # Wrap Firestore stream in retry to handle transient UNAVAILABLE errors
-    return list(query.stream())
+    print(f"✅ {task_id} completed — {ingested} records ingested.")
 
 
 def run_worker(batch_size: int = 10):
-    tasks = safe_stream(
-        db.collection(TASKS)
-        .where("status", "==", "pending")
-        .limit(batch_size)
-    )
+    try:
+        tasks = safe_get_tasks(batch_size)
+    except Exception as e:
+        print(f"[ERROR] Firestore read failed: {e}")
+        return
 
     if not tasks:
         print("✅ No pending tasks.")
