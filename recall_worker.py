@@ -1,9 +1,8 @@
-﻿from google.cloud import firestore
+from google.cloud import firestore
 import requests
 import time
 import re
 import sys
-import ast
 db = firestore.Client()
 def sanitize_field(v, m=False):
     if v is None: return 'UNKNOWN'
@@ -21,17 +20,9 @@ def safe_get(u):
         except: time.sleep(2)
     return None
 def process_task(tid, tdata):
-    raw_make = tdata.get('make', '')
-    raw_model = tdata.get('model', '')
-    raw_year = tdata.get('year', '')
-    if isinstance(raw_model, str) and raw_model.strip().startswith('{'):
-        try: raw_model = ast.literal_eval(raw_model)
-        except: pass
-    if isinstance(raw_model, dict):
-        raw_model = raw_model.get('model', '')
-    make = sanitize_field(raw_make)
-    model = sanitize_field(raw_model, m=True)
-    year = sanitize_field(raw_year)
+    make = sanitize_field(tdata.get('make', ''))
+    model = sanitize_field(tdata.get('model', ''), m=True)
+    year = sanitize_field(tdata.get('year', ''))
     if not make or not model or not year or model == 'ALL_MODELS':
         db.collection('recall_tasks').document(tid).update({'status': 'failed_format'}); return False
     url = f'https://api.nhtsa.gov/recalls/recallsByVehicle?make={requests.utils.quote(make)}&model={requests.utils.quote(model)}&modelYear={year}'
