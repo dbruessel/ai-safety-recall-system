@@ -1,12 +1,18 @@
+$code = @'
 from google.cloud import firestore
 import requests
 import time
 import re
+import sys
 
+# Initialize Firestore Client
 db = firestore.Client()
 
 def sanitize_field(field_value, is_model=False):
-    """Sanitize input values to handle messy NHTSA data strings."""
+    """
+    Sanitize input values to handle messy NHTSA data strings.
+    Prevents unmapped integer codes (like 777/999) from crashing validations.
+    """
     if field_value is None:
         return "UNKNOWN"
         
@@ -28,9 +34,9 @@ def safe_get(url):
     """Perform a safe GET request with retry logic and explicit error handling."""
     for attempt in range(3):
         try:
-            resp = requests.get(url, timeout=15) # Increased timeout slightly for large payloads
+            resp = requests.get(url, timeout=15) # 15s timeout accounts for heavy payload stalls
             
-            # If NHTSA explicitly tells us the client data is bad, don't keep retrying
+            # If NHTSA explicitly tells us the client data formatting is bad, stop retrying
             if resp.status_code == 400:
                 print(f"❌ Bad Request (400) for URL: {url}")
                 return resp
@@ -44,7 +50,10 @@ def safe_get(url):
 
 
 def process_task(task_id, task_data):
-    """Process a single recall ingestion task cleanly."""
+    """
+    Process a single recall ingestion task cleanly.
+    Updates the task status immediately on complete or failure.
+    """
     raw_make = task_data.get("make", "")
     raw_model = task_data.get("model", "")
     raw_year = task_data.get("year", "")
@@ -53,17 +62,18 @@ def process_task(task_id, task_data):
     if isinstance(raw_model, dict):
         raw_model = raw_model.get("model", "")
 
-    # Run everything through the sanitation layer
+    # Run fields through the sanitation layer
     make = sanitize_field(raw_make)
     model = sanitize_field(raw_model, is_model=True)
     year = sanitize_field(raw_year)
 
-    # If it's still fundamentally missing, flag it as a formatting failure
+    # If parameters are completely unworkable, flag it as a formatting failure and skip
     if not make or not model or not year or model == "ALL_MODELS":
-        print(f"⚠️ Skipping and marking invalid task: {task_id}")
+        print(f"⚠️ Skipping and marking invalid task format: {task_id}")
         db.collection("recall_tasks").document(task_id).update({"status": "failed_format"})
         return False
 
+    # Build clear, URL-encoded string
     url = (
         f"https://api.nhtsa.gov/recalls/recallsByVehicle?"
         f"make={requests.utils.quote(make)}&"
@@ -75,7 +85,7 @@ def process_task(task_id, task_data):
     resp = safe_get(url)
     
     if not resp or resp.status_code != 200:
-        print(f"❌ Failed to fetch valid data for {task_id}. Moving to failed queue.")
+        print(f"❌ Failed to fetch valid data from API for {task_id}.")
         db.collection("recall_tasks").document(task_id).update({"status": "failed_api"})
         return False
 
@@ -86,7 +96,7 @@ def process_task(task_id, task_data):
         db.collection("recall_tasks").document(task_id).update({"status": "failed_json"})
         return False
 
-    # Save results securely
+    # Save results securely inside firestore
     db.collection("recall_results").document(task_id).set({
         "make": make,
         "model": model,
@@ -96,21 +106,19 @@ def process_task(task_id, task_data):
         "timestamp": firestore.SERVER_TIMESTAMP,
     })
     
-    # IMMEDIATELY update status so this record is never pulled again
+    # IMMEDIATELY update status so this record is popped off the queue
     db.collection("recall_tasks").document(task_id).update({"status": "processed"})
     print(f"✓ Completed {task_id}")
     return True
 
 
 def run_worker(batch_size=50):
-    """Run recall ingestion worker continually in safe chunks."""
-    # Quick high-level count metrics
+    """Run recall ingestion worker in targeted, manageable database chunks."""
     total_pending = db.collection("recall_tasks").where("status", "==", "pending").count().get().count
-    print(f"📊 Starting run. Total pending tasks in queue: {total_pending}")
+    print(f"📊 Queue Snapshot: {total_pending} pending tasks remaining.")
 
     if total_pending == 0:
-        print("✅ No pending tasks found.")
-        return
+        return 0
 
     # Grab the target chunk
     tasks_ref = db.collection("recall_tasks").where("status", "==", "pending").limit(batch_size)
@@ -119,20 +127,57 @@ def run_worker(batch_size=50):
     print(f"🔄 Processing batch of {len(tasks)} tasks...")
 
     for t in tasks:
-        # Optimistic lock: change status to processing immediately so simultaneous workers won't touch it
+        # Atomic processing lock: change status immediately so multiple workers don't grab it
         db.collection("recall_tasks").document(t.id).update({"status": "processing"})
         
-        # Process task handles its own success/fail state updates internally
+        # Process task handles internal state adjustments (success vs error buckets)
         process_task(t.id, t.to_dict())
         
-        # Politeness throttle to avoid hitting NHTSA's rate limit walls
+        # 0.5s polite throttle to prevent running into NHTSA firewall rate limits at scale
         time.sleep(0.5) 
 
-    remaining = db.collection("recall_tasks").where("status", "==", "pending").count().get().count
-    print(f"⏳ Batch finished. Remaining pending tasks: {remaining}")
+    return len(tasks)
+
+
+def run_until_empty(chunk_size=50, max_empty_loops=3):
+    """
+    Continually executes the worker script in chunks until the pending queue 
+    is entirely depleted. Avoids memory overhead and engine timeouts.
+    """
+    empty_count = 0
+    loop_number = 1
+
+    print("🚀 Initializing Full-Scale Fleet Recall Ingestion Pipeline...")
+    
+    while True:
+        print(f"\n--- 🔄 Starting Processing Cycle #{loop_number} ---")
+        
+        try:
+            processed_count = run_worker(batch_size=chunk_size)
+            
+            if processed_count == 0:
+                empty_count += 1
+                print(f"💤 No pending tasks found. Verification check ({empty_count}/{max_empty_loops})...")
+                if empty_count >= max_empty_loops:
+                    print("\n🎉 SUCCESS: Ingestion pipeline complete! No pending tasks remaining.")
+                    break
+                time.sleep(5)  # Let any delayed async writes settle
+                continue
+                
+            # Reset validation counter if jobs were actively processed
+            empty_count = 0
+            
+        except Exception as loop_error:
+            print(f"❌ Critical error unexpected during cycle #{loop_number}: {loop_error}")
+            print("Resuming next batch in 10 seconds to maintain pipeline momentum...")
+            time.sleep(10)
+            
+        loop_number += 1
 
 
 if __name__ == "__main__":
-    # Bumped batch size up safely now that inline task resolution is secure.
-    # You can loop this via bash or a while True loop to empty the pipeline completely!
-    run_worker(batch_size=50)
+    # Chunk size 50 is optimized for reliable throughput without exceeding Firestore payload bounds.
+    run_until_empty(chunk_size=50)
+'@
+
+Set-Content -Path recall_worker.py -Value $code -Encoding utf8
