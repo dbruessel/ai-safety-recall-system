@@ -3,7 +3,6 @@ import sys
 import importlib.util
 from datetime import datetime
 from google.cloud import firestore
-from google.cloud.firestore_v1 import FieldPath
 
 # -------------------------------------------------------------------------
 # DIRECT PATH BYPASS: Bypassing Python's folder vs module naming collisions
@@ -55,8 +54,9 @@ def migrate_batch():
     last_doc = None
     
     while True:
-        # Build paginated query sorting by document ID to ensure consistent cursor positions
-        query = raw_ref.order_by(FieldPath.document_id()).limit(batch_size)
+        # UNIVERSAL STRING MECHANISM: "__name__" tells Firestore to sort by document ID
+        # natively without needing to import or reference the FieldPath class.
+        query = raw_ref.order_by("__name__").limit(batch_size)
         
         if last_doc:
             query = query.start_after(last_doc)

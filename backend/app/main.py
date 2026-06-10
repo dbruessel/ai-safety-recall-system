@@ -5,6 +5,7 @@ from app.config import init_vertex, get_settings
 from app.routers import metrics, batches
 from app.routers import vins
 from app.routers import upload
+from app.routers import recalls  # INJECTED: Our new query router namespace
 
 
 # Initialize Vertex AI before app creation
@@ -15,8 +16,6 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(title="AI Safety Recall Backend")
-    app.include_router(vins.router, prefix="/api")
-
 
     # CORS
     app.add_middleware(
@@ -37,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(batches.router, prefix="/api") 
     app.include_router(vins.router, prefix="/api")
     app.include_router(upload.router, prefix="/api")
+    app.include_router(recalls.router, prefix="/api")  # INJECTED: Exposing /api/recalls
 
     return app
 
