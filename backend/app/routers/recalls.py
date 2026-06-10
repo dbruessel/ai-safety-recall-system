@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from google.cloud import firestore
 
 # Initialize the router namespace
-# FIXED: Changed prefix to "" because main.py already applies the "/api" prefix globally
 router = APIRouter(
     prefix="",
     tags=["recalls"]
@@ -12,7 +11,8 @@ router = APIRouter(
 
 # Initialize Firestore
 db = firestore.Client()
-NORM_COLLECTION = "recalls_normalized"
+# Aligned directly with your worker pipeline production target
+TRUE_RESULTS_COLLECTION = "recall_results"
 
 # Define the data contract for your frontend
 class RecallResponse(BaseModel):
@@ -37,27 +37,48 @@ async def get_vehicle_recalls(
     year: str = Query(..., description="Vehicle Model Year (e.g., 2018)")
 ):
     """
-    Query the newly populated, pristine dataset by Make, Model, and Year.
+    Query the active, cleaned dataset by Make, Model, and Year.
+    Un-nests NHTSA payload structures to serve flat fields to Next.js.
     """
     try:
         target_make = make.strip().upper()
         target_model = model.strip().upper()
         target_year = year.strip().upper()
 
-        # Target our brand new 25,041 record collection
+        # Query your active production results collection
         query_ref = (
-            db.collection(NORM_COLLECTION)
-            .where("make", "==", target_make)
-            .where("model", "==", target_model)
-            .where("year", "==", target_year)
+            db.collection(TRUE_RESULTS_COLLECTION)
+            .where(filter=firestore.FieldFilter("make", "==", target_make))
+            .where(filter=firestore.FieldFilter("model", "==", target_model))
+            .where(filter=firestore.FieldFilter("year", "==", target_year))
         )
 
-        results = []
+        flat_results = []
+        
+        # Pull documents matching this vehicle query parameters
         for doc in query_ref.stream():
-            results.append(doc.to_dict())
+            doc_data = doc.to_dict() or {}
+            
+            # Un-nest the raw API response dictionary maps stored inside the record doc
+            api_payload = doc_data.get("result") or {}
+            nhtsa_recalls_array = api_payload.get("results") or []
+            
+            for item in nhtsa_recalls_array:
+                # Map messy api casing directly onto your strict data schema requirements
+                flat_results.append({
+                    "campaign_number": item.get("campaignNumber", "UNKNOWN"),
+                    "make": item.get("make", target_make),
+                    "model": item.get("model", target_model),
+                    "year": item.get("modelYear", target_year),
+                    "component": item.get("component", "UNKNOWN"),
+                    "summary": item.get("summary", ""),
+                    "consequence": item.get("consequence", ""),
+                    "remedy": item.get("remedy", ""),
+                    "notes": item.get("notes", "")
+                })
 
-        return results
+        return flat_results
 
     except Exception as e:
         print(f"❌ Database Query Exception: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error querying normalized recall data.")
+        raise HTTPException(status_code=500, detail="Error querying production recall results.")
