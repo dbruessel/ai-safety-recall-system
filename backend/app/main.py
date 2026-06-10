@@ -17,15 +17,19 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="AI Safety Recall Backend")
 
-    # CORS
+   # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_origin],
+        allow_origins=[
+            settings.frontend_origin,      # Keeps your existing config intact
+            "http://localhost:5173",       # Explicitly allows your local Vite dev server
+            "http://127.0.0.1:5173"        # Covers the loopback IP variant just in case
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
+    
     # Health check
     @app.get("/health")
     def health_check():
