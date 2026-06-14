@@ -1,9 +1,7 @@
+# backend/tests/test_recalls.py
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
+from unittest.mock import MagicMock
 from app.routers.recalls import calculate_safety_telemetry
-
-client = TestClient(app)
 
 # ==============================================================================
 # 🧠 TRACK 1: CORE UNIT TESTS (ALGORITHM MATRIX VERIFICATION)
@@ -22,6 +20,7 @@ def test_calculate_safety_telemetry_electrical_with_heat():
     assert telemetry["calculated_severity_score"] == 81
     assert "REGIONAL WEATHER WARNING" in telemetry["executive_action_directive"]
 
+
 def test_calculate_safety_telemetry_structural_low_risk():
     """Verify standard structural parameters return base values with routine monitor directives."""
     telemetry = calculate_safety_telemetry(
@@ -34,18 +33,45 @@ def test_calculate_safety_telemetry_structural_low_risk():
     assert telemetry["calculated_severity_score"] == 40
     assert "MONITOR CONDITION" in telemetry["executive_action_directive"]
 
+
 # ==============================================================================
 # 📡 TRACK 2: INTEGRATION API TESTS (ROUTER SCHEMA AGGREGATIONS)
 # ==============================================================================
 
-def test_get_vehicle_recalls_empty_payload():
-    """Confirm the routing layer handles missing or unindexed parameters cleanly."""
+def test_get_vehicle_recalls_empty_payload(client, mock_db_collections):
+    """
+    Confirm the routing layer handles missing or unindexed parameters cleanly
+    by mocking an empty Firestore stream result.
+    """
+    # Force Firestore query filters to evaluate to an empty list of documents
+    mock_query = MagicMock()
+    mock_query.where.return_value = mock_query
+    mock_query.stream.return_value = []
+    mock_db_collections["recalls"].where.return_value = mock_query
+
     response = client.get("/api/recalls?make=INVALID&model=NONEXISTENT&year=1900")
     assert response.status_code == 200
     assert response.json() == []
 
-def test_badge_verification_sandbox_default():
-    """Assert developer utility route handles sandstone queries and flags the metered pulse validation."""
+
+def test_badge_verification_sandbox_default(client, mock_db_collections):
+    """
+    Assert developer utility route handles sandstone queries and flags the metered pulse validation
+    while mocking necessary underlying collection checkups.
+    """
+    # Setup mock document snapshots for your asset tracking verification routines
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "safety_status": "verified",
+        "metered_pulse_recorded": True
+    }
+    
+    mock_query = MagicMock()
+    mock_query.where.return_value = mock_query
+    mock_query.stream.return_value = [mock_doc]
+    mock_db_collections["recalls"].where.return_value = mock_query
+
     response = client.get("/api/recalls/badge-verification?make=FORD&model=TRANSIT-250&year=2022")
     assert response.status_code == 200
     data = response.json()
