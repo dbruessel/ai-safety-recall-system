@@ -1,16 +1,12 @@
-# Node dependencies
-node_modules/
-dist/
-.npm/
-
-# Python Virtual Environments
-.venv/
-venv/
-ENV/
-__pycache__/
-*.pyc
-
-# IDEs and local secrets
+# Secrets
+*.json
 .env
-.vscode/
-.idea/
+.gcp/
+service-account.json
+
+# Build & Environment
+node_modules/
+.venv/
+__pycache__/
+dist/
+.DS_Store
