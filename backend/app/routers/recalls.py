@@ -1,5 +1,6 @@
+# backend/app/routers/recalls.py
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Response
 from pydantic import BaseModel
 from google.cloud import firestore
 
@@ -9,15 +10,14 @@ router = APIRouter(
     tags=["recalls"]
 )
 
-# Initialize Firestore
+# Initialize Firestore Client
 db = firestore.Client()
 
-# Aligned with your pristine, 25,041 flat-file production records
+# Aligned collection production target
 TRUE_NORMALIZED_COLLECTION = "recalls_normalized"
 
 # --- DATA SCHEMA SCHEMES ---
 
-# Expanded Response Schema delivering your proprietary predictive parameters
 class RecallResponse(BaseModel):
     campaign_number: str
     make: str
@@ -28,11 +28,10 @@ class RecallResponse(BaseModel):
     consequence: Optional[str] = ""
     remedy: Optional[str] = ""
     notes: Optional[str] = ""
-    # --- PROPRIETARY SAAS DATA MOAT METRICS ---
-    assembly_category: str          # Normalized structural assembly focus
-    thermal_multiplier_active: bool  # True if exposed to high regional desert degradation risks
-    calculated_severity_score: int  # 0 (Pristine Safe) to 100 (Immediate Subassembly Melt Risk)
-    executive_action_directive: str # Actionable instructions tailored for fleet dispatch managers
+    assembly_category: str          
+    thermal_multiplier_active: bool  
+    calculated_severity_score: int  
+    executive_action_directive: str 
 
 class BadgeVerificationResponse(BaseModel):
     make: str
@@ -43,78 +42,27 @@ class BadgeVerificationResponse(BaseModel):
     metered_pulse_recorded: bool
     aggregate_fleet_hazard_index: int  # Dynamic composite health baseline score
 
-# --- INTERNAL PREDICTIVE CORE WORKFLOW UTILITIES ---
-
-def calculate_safety_telemetry(component: str, summary: str, consequence: str) -> Dict[str, Any]:
-    """
-    The Proprietary Secret Sauce: Core Parsing & Hazard Risk Logic.
-    Processes raw database strings to output high-value environmental intelligence parameters.
-    """
-    comp_upper = component.upper()
-    text_corpus = (summary + " " + consequence).upper()
-    
-    # 1. Standardize and Categorize System Subassemblies
-    if "ELECTRICAL" in comp_upper or "WIRING" in comp_upper or "MODULE" in comp_upper:
-        category = "ELECTRICAL SYSTEM"
-        base_severity = 65
-    elif "BATTERY" in comp_upper or "CELL" in comp_upper or "CHARGER" in comp_upper:
-        category = "ENERGY STORAGE / BATTERY"
-        base_severity = 80
-    elif "FUEL" in comp_upper or "TANK" in comp_upper or "LINE" in comp_upper or "RAIL" in comp_upper:
-        category = "FUEL DELIVERY ARCHITECTURE"
-        base_severity = 75
-    elif "BRAKE" in comp_upper or "HYDRAULIC" in comp_upper or "CALIPER" in comp_upper:
-        category = "DECELERATION CONTROL"
-        base_severity = 85
-    elif "STEERING" in comp_upper or "LINKAGE" in comp_upper:
-        category = "DIRECTIONAL MATRIX"
-        base_severity = 70
-    else:
-        category = "STRUCTURAL CHASSIS MOUNT"
-        base_severity = 40
-
-    # 2. Localized Regional Environment Threat Detection (The Desert Coefficient)
-    # Scans for heat-accelerated failure vectors typical of Phoenix/Mojave corridors
-    thermal_keywords = ["HEAT", "FIRE", "MELT", "THERMAL", "CORROSION", "EXPANSION", "SHORT CIRCUIT", "DEGRADATION", "SHORT"]
-    has_thermal_risk = any(kw in text_corpus for kw in thermal_keywords)
-    
-    # Apply predictive mathematical penalty scaling rules based on climate exposures
-    severity_multiplier = 1.25 if has_thermal_risk else 1.00
-    final_severity = min(100, int(base_severity * severity_multiplier))
-
-    # 3. Formulate Actionable Fleet Dispatch Directives
-    if final_severity >= 85:
-        directive = "⚠️ CRITICAL HAZARD: Ground vehicle immediately. Structural or subassembly failure risk under current operational parameters."
-    elif final_severity >= 65:
-        if has_thermal_risk:
-            directive = "☀️ REGIONAL WEATHER WARNING: High ambient localized thermal exposure risks compound component degradation. Reroute assets out of high-heat desert vectors."
-        else:
-            directive = "🔧 ADVANCED MAINTENANCE REQUIRED: Schedule component inspection and subassembly mitigation loop within 48 operational hours."
-    else:
-        directive = "📋 MONITOR CONDITION: Routine tracking active. Address update during next standard depot inspection layout interval."
-
-    return {
-        "assembly_category": category,
-        "thermal_multiplier_active": has_thermal_risk,
-        "calculated_severity_score": final_severity,
-        "executive_action_directive": directive
-    }
-
 # --- ROUTER ENDPOINTS ---
 
 @router.get("/recalls", response_model=List[RecallResponse])
 async def get_vehicle_recalls(
+    response: Response,
     make: str = Query(..., description="Vehicle Make (e.g., FORD)"),
     model: str = Query(..., description="Vehicle Model (e.g., F-150)"),
     year: str = Query(..., description="Vehicle Model Year (e.g., 2018)")
 ):
     """
-    Query the clean production layer and calculate dynamic vulnerability intelligence telemetry on the fly.
+    Query the pre-calculated production layer and return materialized data instantly.
+    Injects optimal HTTP Client-facing caching headers to reduce database lookup overhead bills.
     """
     try:
         target_make = make.strip().upper()
         target_model = model.strip().upper()
         target_year = year.strip()
+
+        # Inject REFACTOR #3: Client-Facing Caching Header (24-Hour Cache Window)
+        # Instructs browsers, CDNs, and API gateways to store this identical payload lookup safely
+        response.headers["Cache-Control"] = "public, max-age=86400"
 
         query_ref = (
             db.collection(TRUE_NORMALIZED_COLLECTION)
@@ -123,36 +71,33 @@ async def get_vehicle_recalls(
             .where(filter=firestore.FieldFilter("year", "==", target_year))
         )
 
-        flat_results = []
+        docs = list(query_ref.stream())
         
-        for doc in query_ref.stream():
-            data = doc.to_dict() or {}
-            comp = data.get("component", "UNKNOWN")
-            summ = data.get("summary", "")
-            cons = data.get("consequence", "")
-            
-            # Execute our proprietary scoring metrics logic
-            telemetry = calculate_safety_telemetry(comp, summ, cons)
+        # REFACTOR #1 REACTION: If no document exists in the normalized collection, 
+        # it is a confirmed clean vehicle with 0 threats. Return a clean empty array instantly.
+        if not docs:
+            return []
 
-            # If our internal calculation flags a Mojave weather alert, seamlessly push it to the output card notes
-            notes_override = data.get("notes", "")
-            if telemetry["thermal_multiplier_active"] and telemetry["calculated_severity_score"] >= 75:
-                notes_override = f"⚠️ [REGIONAL WEATHER ALERT: CRITICAL HIGH] - Mojave / Sonoran thermal thresholds exceeded. {telemetry['executive_action_directive']}"
-
+        # Pull down the first matching document and read pre-calculated campaign telemetry arrays
+        doc_data = docs[0].to_dict() or {}
+        materialized_campaigns = doc_data.get("campaigns", [])
+        
+        flat_results = []
+        for camp in materialized_campaigns:
             flat_results.append({
-                "campaign_number": data.get("campaign_number") or data.get("campaignNumber", "UNKNOWN"),
-                "make": data.get("make", target_make),
-                "model": data.get("model", target_model),
-                "year": data.get("year", target_year),
-                "component": comp,
-                "summary": summ,
-                "consequence": cons,
-                "remedy": data.get("remedy", ""),
-                "notes": notes_override,
-                "assembly_category": telemetry["assembly_category"],
-                "thermal_multiplier_active": telemetry["thermal_multiplier_active"],
-                "calculated_severity_score": telemetry["calculated_severity_score"],
-                "executive_action_directive": telemetry["executive_action_directive"]
+                "campaign_number": camp.get("campaign_number", "UNKNOWN"),
+                "make": target_make,
+                "model": target_model,
+                "year": target_year,
+                "component": camp.get("component", "UNKNOWN"),
+                "summary": camp.get("summary", ""),
+                "consequence": camp.get("consequence", ""),
+                "remedy": camp.get("remedy", ""),
+                "notes": camp.get("notes", ""),
+                "assembly_category": camp.get("assembly_category", "STRUCTURAL CHASSIS MOUNT"),
+                "thermal_multiplier_active": camp.get("thermal_multiplier_active", False),
+                "calculated_severity_score": camp.get("calculated_severity_score", 40),
+                "executive_action_directive": camp.get("executive_action_directive", "")
             })
 
         return flat_results
@@ -164,18 +109,19 @@ async def get_vehicle_recalls(
 
 @router.get("/recalls/badge-verification", response_model=BadgeVerificationResponse)
 async def verify_vehicle_badge(
+    response: Response,
     make: str = Query(..., description="Vehicle Make"),
     model: str = Query(..., description="Vehicle Model"),
     year: str = Query(..., description="Vehicle Year"),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key", description="Developer Access Metering Token")
 ):
     """
-    Epic 3: High-speed programmatic verification engine method.
-    Returns binary flags and an aggregate integrity baseline for enterprise rideshare batch sweeps.
+    High-speed programmatic verification engine endpoint.
+    Leverages pre-calculated, materialized scoring flags directly to instantly evaluate aggregate indexes.
     """
     try:
-        if not x_api_key:
-            print("⚠️ Request triggered without explicit X-API-Key header context.")
+        # Inject REFACTOR #3: Cache verification checks for 12 hours
+        response.headers["Cache-Control"] = "public, max-age=43200"
 
         target_make = make.strip().upper()
         target_model = model.strip().upper()
@@ -188,21 +134,34 @@ async def verify_vehicle_badge(
             .where(filter=firestore.FieldFilter("year", "==", target_year))
         )
         
-        # Pull documents to calculate true composite risk indexes rather than generic counting summaries
         docs = list(query_ref.stream())
-        threat_count = len(docs)
         
-        # Calculate a baseline index: Start at a perfect 100, deduct points based on subassembly severity caps
+        # Clean Asset Optimization Fallback
+        if not docs:
+            return {
+                "make": target_make,
+                "model": target_model,
+                "year": target_year,
+                "safety_status": "PASS",
+                "total_active_threats": 0,
+                "metered_pulse_recorded": True,
+                "aggregate_fleet_hazard_index": 100
+            }
+        
+        doc_data = docs[0].to_dict() or {}
+        materialized_campaigns = doc_data.get("campaigns", [])
+        threat_count = len(materialized_campaigns)
+        
+        # Sum deductions cleanly over pre-materialized score keys
         running_score_deductions = 0
-        for doc in docs:
-            d = doc.to_dict() or {}
-            telemetry = calculate_safety_telemetry(d.get("component", ""), d.get("summary", ""), d.get("consequence", ""))
-            running_score_deductions += int(telemetry["calculated_severity_score"] * 0.35)
+        for camp in materialized_campaigns:
+            score = camp.get("calculated_severity_score", 40)
+            running_score_deductions += int(score * 0.35)
             
         fleet_hazard_index = max(0, 100 - running_score_deductions)
         status = "FAIL" if threat_count > 0 or fleet_hazard_index < 85 else "PASS"
 
-        print(f"⚡ [METERED PULSE RECORDED] - Key token: {x_api_key or 'SANDBOX_DEV'} evaluated {target_year} {target_make} {target_model} -> Safety Score: {fleet_hazard_index}% -> Status: {status}")
+        print(f"⚡ [METERED PULSE] - {target_year} {target_make} {target_model} -> Safety Score: {fleet_hazard_index}%")
 
         return {
             "make": target_make,
@@ -215,5 +174,5 @@ async def verify_vehicle_badge(
         }
 
     except Exception as e:
-        print(f"❌ Badge Validation API Exception: {str(e)}")
+        print(f"❌ Badge Verification API Exception: {str(e)}")
         raise HTTPException(status_code=500, detail="Error inside high-speed verification engine processing pipelines.")
