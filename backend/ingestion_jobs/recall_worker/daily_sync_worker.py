@@ -35,12 +35,57 @@ def safe_get(url):
             time.sleep(2)
     return None
 
+def calculate_materialized_telemetry(component: str, summary: str, consequence: str) -> dict:
+    comp_upper = str(component).upper()
+    text_corpus = (str(summary) + " " + str(consequence)).upper()
+    
+    if "ELECTRICAL" in comp_upper or "WIRING" in comp_upper or "MODULE" in comp_upper:
+        category = "ELECTRICAL SYSTEM"
+        base_severity = 65
+    elif "BATTERY" in comp_upper or "CELL" in comp_upper or "CHARGER" in comp_upper:
+        category = "ENERGY STORAGE / BATTERY"
+        base_severity = 80
+    elif "FUEL" in comp_upper or "TANK" in comp_upper or "LINE" in comp_upper or "RAIL" in comp_upper:
+        category = "FUEL DELIVERY ARCHITECTURE"
+        base_severity = 75
+    elif "BRAKE" in comp_upper or "HYDRAULIC" in comp_upper or "CALIPER" in comp_upper:
+        category = "DECELERATION CONTROL"
+        base_severity = 85
+    elif "STEERING" in comp_upper or "LINKAGE" in comp_upper:
+        category = "DIRECTIONAL MATRIX"
+        base_severity = 70
+    else:
+        category = "STRUCTURAL CHASSIS MOUNT"
+        base_severity = 40
+
+    thermal_keywords = ["HEAT", "FIRE", "MELT", "THERMAL", "CORROSION", "EXPANSION", "SHORT CIRCUIT", "DEGRADATION", "SHORT"]
+    has_thermal_risk = any(kw in text_corpus for kw in thermal_keywords)
+    
+    severity_multiplier = 1.25 if has_thermal_risk else 1.00
+    final_severity = min(100, int(base_severity * severity_multiplier))
+
+    if final_severity >= 85:
+        directive = "⚠️ CRITICAL HAZARD: Ground vehicle immediately. Structural or subassembly failure risk under current operational parameters."
+    elif final_severity >= 65:
+        if has_thermal_risk:
+            directive = "☀️ REGIONAL WEATHER WARNING: High ambient localized thermal exposure risks compound component degradation. Reroute assets out of high-heat desert vectors."
+        else:
+            directive = "🔧 ADVANCED MAINTENANCE REQUIRED: Schedule component inspection and subassembly mitigation loop within 48 operational hours."
+    else:
+        directive = "📋 MONITOR CONDITION: Routine tracking active. Address update during next standard depot inspection layout interval."
+
+    return {
+        "assembly_category": category,
+        "thermal_multiplier_active": has_thermal_risk,
+        "calculated_severity_score": final_severity,
+        "executive_action_directive": directive
+    }
+
 def process_task(task_id, task_data):
     raw_make = task_data.get('make', '')
     raw_model = task_data.get('model', '')
     raw_year = task_data.get('year', '')
     
-    # Process stringified dictionary array variations safely
     if isinstance(raw_model, str) and raw_model.strip().startswith('{'):
         try: 
             raw_model = ast.literal_eval(raw_model)
@@ -57,7 +102,6 @@ def process_task(task_id, task_data):
     model = sanitize_field(raw_model, m=True)
     year = sanitize_field(raw_year)
     
-    # Circuit Breaker Trace 1: Bad Internal Formatting Check
     if not make or not model or not year:
         print(f"   ⚠️ Malformed document record layout encountered on token ID: {task_id}")
         db.collection(QUEUE_COLLECTION).document(task_id).update({
@@ -70,14 +114,13 @@ def process_task(task_id, task_data):
     
     response = safe_get(url)
     
-    # Circuit Breaker Trace 2: Handling API drops, bad query limits, or 404 targets gracefully
     if not response or response.status_code != 200:
         status_code_log = response.status_code if response else "TIMEOUT_DISCONNECT"
         print(f"   ⚠️ Endpoint warning on token ID {task_id} (NHTSA Status Code: {status_code_log})")
         db.collection(QUEUE_COLLECTION).document(task_id).update({
             'status': 'invalid_nhtsa_target',
             'error_context': f"HTTP_ERR_{status_code_log}",
-            'last_synchronized': firestore.SERVER_TIMESTAMP # Moves it chronologically backward
+            'last_synchronized': firestore.SERVER_TIMESTAMP 
         })
         return False
         
@@ -90,20 +133,53 @@ def process_task(task_id, task_data):
         })
         return False
         
-    # Standard Case Path: Hydrate production recalls data storage layers natively
-    db.collection(PRODUCTION_TARGET_COLLECTION).document(task_id).set({
-        'make': make, 
-        'model': model, 
-        'year': year, 
-        'result': data, 
-        'status': 'completed', 
-        'timestamp': firestore.SERVER_TIMESTAMP
-    })
+    # REFACTOR #1 IMPLEMENTATION: Isolate zero threat targets
+    api_count = data.get("Count", 0)
     
-    # Secure state manifest markers
+    if api_count == 0:
+        print(f"   ℹ️ Zero active threats found for {year} {make} {model}. Bypassing production cache write.")
+        db.collection(PRODUCTION_TARGET_COLLECTION).document(task_id).delete()
+    else:
+        # REFACTOR #2 IMPLEMENTATION: Materialize scoring logic straight into document rows
+        campaigns_list = data.get("results", [])
+        processed_campaigns = []
+        
+        for camp in campaigns_list:
+            comp = camp.get("Component", "UNKNOWN")
+            summ = camp.get("Summary", "")
+            cons = camp.get("Consequence", "")
+            
+            telemetry = calculate_materialized_telemetry(comp, summ, cons)
+            
+            notes_override = camp.get("Notes", "")
+            if telemetry["thermal_multiplier_active"] and telemetry["calculated_severity_score"] >= 75:
+                notes_override = f"⚠️ [REGIONAL WEATHER ALERT: CRITICAL HIGH] - Mojave / Sonoran thermal thresholds exceeded. {telemetry['executive_action_directive']}"
+            
+            processed_campaigns.append({
+                "campaign_number": camp.get("CampaignNumber", "UNKNOWN"),
+                "component": comp,
+                "summary": summ,
+                "consequence": cons,
+                "remedy": camp.get("Remedy", ""),
+                "notes": notes_override,
+                "assembly_category": telemetry["assembly_category"],
+                "thermal_multiplier_active": telemetry["thermal_multiplier_active"],
+                "calculated_severity_score": telemetry["calculated_severity_score"],
+                "executive_action_directive": telemetry["executive_action_directive"]
+            })
+
+        db.collection(PRODUCTION_TARGET_COLLECTION).document(task_id).set({
+            'make': make, 
+            'model': model, 
+            'year': year, 
+            'campaigns': processed_campaigns, 
+            'status': 'completed', 
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+    
     db.collection(QUEUE_COLLECTION).document(task_id).update({
         'status': 'processed',
-        'error_context': firestore.DELETE_FIELD, # Wipe old validation error markers if fixed
+        'error_context': firestore.DELETE_FIELD, 
         'last_synchronized': firestore.SERVER_TIMESTAMP
     })
     print(f'   ✓ Consolidated synchronization matrix for: {year} {make} {model}')
@@ -113,8 +189,6 @@ def execute_batch_sync(batch_size=100):
     print("📡 Querying target sync indexes via status exclusion logic...")
     tasks_ref = db.collection(QUEUE_COLLECTION)
     
-    # STATUS EXCLUSION UPDATE: Filter out rows that have already been evaluated 
-    # or flagged with terminal conditions, clearing out un-synchronized entities cleanly.
     query = (tasks_ref
              .where(filter=firestore.FieldFilter('status', 'not-in', ['processed', 'invalid_nhtsa_target', 'corrupted_format', 'processing']))
              .limit(batch_size))
@@ -129,7 +203,7 @@ def execute_batch_sync(batch_size=100):
         db.collection(QUEUE_COLLECTION).document(t.id).update({'status': 'processing'})
         process_task(t.id, t.to_dict())
         processed_count += 1
-        time.sleep(0.20) # Throttle cleanly to satisfy live API connection limits
+        time.sleep(0.20) 
         
     return processed_count
 
@@ -139,8 +213,6 @@ if __name__ == '__main__':
     print('==============================================================================')
     
     start_time = time.time()
-    
-    # Processing block ceiling limit per invocation pass to ensure safety limits
     MAX_RUN_QUOTA = 500
     total_processed = 0
     
@@ -158,7 +230,7 @@ if __name__ == '__main__':
         
     duration = round(time.time() - start_time, 2)
     print('==============================================================================')
-    print(f'🎉 SUCCESS: Status-Exclusion Delta-Time Sync Pass Complete.')
+    print(f'🎉 SUCCESS: Materialized Ingestion Refactor Pass Complete.')
     print(f'🏁 Total Assets Processed: {total_processed} items | Duration: {duration}s')
     print('==============================================================================')
     sys.exit(0)
