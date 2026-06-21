@@ -3,7 +3,8 @@ from firebase_admin import firestore, credentials
 
 # 1. Initialize Firestore
 # Ensure serviceAccountKey.json is in your root directory
-cred = credentials.Certificate("serviceAccountKey.json")
+# Change this line in your script
+cred = credentials.Certificate(r"C:\dev\clean-repo\serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 

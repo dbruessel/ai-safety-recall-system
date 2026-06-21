@@ -2,7 +2,6 @@
 from google.cloud import aiplatform
 from functools import lru_cache
 from pydantic_settings import BaseSettings
-# 1. Import Supabase
 from supabase import create_client, Client
 
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
@@ -16,9 +15,13 @@ class Settings(BaseSettings):
     google_application_credentials: str | None = None
     frontend_origin: str = "http://localhost:3000"
     
-    # 2. Add Supabase settings
+    # Supabase Settings for the API client (sb_publishable/anon keys)
     supabase_url: str
     supabase_key: str
+
+    # Direct Postgres URI Connection string for SQLModel / SQLAlchemy ORM
+    # Found in Supabase Dashboard -> Settings -> Database -> Connection string -> URI
+    database_url: str
 
     class Config:
         env_file = ".env"
@@ -27,6 +30,8 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     return Settings()
 
-# 3. Create the Supabase Client globally for use across the backend
+# Instantiate globally for use across the backend layers
 settings = get_settings()
+
+# 1. PostREST HTTP API Client Client (Frontend/Auth operations)
 supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
