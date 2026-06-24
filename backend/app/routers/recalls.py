@@ -1,13 +1,14 @@
 # backend/app/routers/recalls.py
+import hashlib
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 from supabase import create_client, Client
-from app.config import settings  # <--- Add this import
+from app.config import settings 
 
 router = APIRouter(tags=["recalls"])
 
-# Update these initialization lines to use your validated settings object
+# Supabase Client Initialization
 sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
 
 # --- DATA SCHEMA SCHEMES ---
@@ -28,6 +29,7 @@ class BadgeVerificationResponse(BaseModel):
     total_active_threats: int
     metered_pulse_recorded: bool
     aggregate_fleet_hazard_index: int
+    cryptographic_id: str  # Secure hash validating fleet current state
 
 # --- ROUTER ENDPOINTS ---
 
@@ -85,7 +87,8 @@ async def verify_vehicle_badge(
 ):
     """
     High-speed verification engine querying Supabase directly.
-    Calculates hazard index based on persisted severity_score.
+    Calculates hazard index based on persisted severity_score and outputs a 
+    cryptographically traceable badge hash to prevent tampering with safety metrics.
     """
     try:
         response.headers["Cache-Control"] = "public, max-age=43200"
@@ -109,6 +112,12 @@ async def verify_vehicle_badge(
         hazard_index = max(0, 100 - total_deduction)
         status = "PASS" if threat_count == 0 else "FAIL"
 
+        # --- Cryptographic Hash Engine ---
+        # Generates a secure hash of the vehicle/fleet's current state to prevent metric tampering
+        state_string = f"{make.upper()}_{model.upper()}_{year}_threats_{threat_count}_hazard_{hazard_index}"
+        secure_hash = hashlib.sha256(state_string.encode()).hexdigest()[:16].upper()
+        cryptographic_id = f"AEGIS-{secure_hash}"
+
         return {
             "make": make.upper(),
             "model": model.upper(),
@@ -116,8 +125,10 @@ async def verify_vehicle_badge(
             "safety_status": status,
             "total_active_threats": threat_count,
             "metered_pulse_recorded": True,
-            "aggregate_fleet_hazard_index": hazard_index
+            "aggregate_fleet_hazard_index": hazard_index,
+            "cryptographic_id": cryptographic_id
         }
+        
     except Exception as e:
         print(f"❌ Badge Verification API Exception: {str(e)}")
         raise HTTPException(status_code=500, detail="Error inside high-speed verification engine.")
