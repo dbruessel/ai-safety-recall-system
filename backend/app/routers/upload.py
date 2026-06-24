@@ -1,13 +1,12 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from google.cloud import firestore
-import csv
-import io
-import uuid
-from datetime import datetime
+from supabase import create_client, Client
+from app.config import settings # <--- Add this
 from app.services.batch_processor import start_batch_processing
 
-router = APIRouter()
-db = firestore.Client()
+router = APIRouter(tags=["upload"])
+
+# Update this line
+sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
 
 
 def parse_csv(file_bytes: bytes):
@@ -32,8 +31,8 @@ def parse_csv(file_bytes: bytes):
 @router.post("/batches/upload")
 async def upload_vins(file: UploadFile = File(...)):
     """
-    Upload a CSV of VINs, create a batch, store VIN items,
-    and automatically trigger batch processing.
+    Upload a CSV of VINs, create a relational parent batch row, 
+    bulk-insert the child VIN entries, and trigger background processing.
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
@@ -44,32 +43,42 @@ async def upload_vins(file: UploadFile = File(...)):
     if not vins:
         raise HTTPException(status_code=400, detail="No VINs found in file")
 
-    # Create batch
     batch_id = str(uuid.uuid4())
-    batch_ref = db.collection("vin_batches").document(batch_id)
+    timestamp = datetime.utcnow().isoformat()
 
-    batch_ref.set({
-        "batch_id": batch_id,
-        "created_at": datetime.utcnow().isoformat(),
-        "total_vins": len(vins),
-        "processed_vins": 0,
-        "status": "processing",
-    })
+    try:
+        # 1. Create parent batch record
+        sb.table("vin_batches").insert({
+            "id": batch_id,
+            "created_at": timestamp,
+            "total_vins": len(vins),
+            "processed_vins": 0,
+            "status": "processing"
+        }).execute()
 
-    # Add VIN items
-    for vin in vins:
-        vin_ref = batch_ref.collection("vin_items").document(vin)
-        vin_ref.set({
-            "vin": vin,
-            "status": "pending",
-            "created_at": datetime.utcnow().isoformat(),
-        })
+        # 2. Prepare child entries for lightning-fast relational bulk insertion
+        vin_payloads = [
+            {
+                "batch_id": batch_id,
+                "vin": vin,
+                "status": "pending",
+                "created_at": timestamp
+            }
+            for vin in vins
+        ]
 
-    # 🔥 Auto-trigger processing
-    start_batch_processing(batch_id)
+        # Bulk insert completely avoids heavy row-by-row loops over the network link
+        sb.table("vin_items").insert(vin_payloads).execute()
 
-    return {
-        "batch_id": batch_id,
-        "vin_count": len(vins),
-        "message": "Batch created and processing started"
-    }
+        # 🔥 Auto-trigger processing
+        start_batch_processing(batch_id)
+
+        return {
+            "batch_id": batch_id,
+            "vin_count": len(vins),
+            "message": "Batch created and processing started"
+        }
+
+    except Exception as e:
+        print(f"❌ Upload Ingestion Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Database write failure compiling manifest.")

@@ -1,12 +1,25 @@
-# Secrets
-*.json
-.env
-.gcp/
-service-account.json
+# --- Backend Storage Restrictions ---
+# Ignore the raw flat data dumps and zip files located inside the scripts folder
+backend/scripts/FLAT_RCL_*
+backend/scripts/*.txt
+backend/scripts/*.zip
 
-# Build & Environment
-node_modules/
-.venv/
+# Also catch generic local data files, python caches, and your virtual environment
+backend/.venv/
+backend/__pycache__/
+backend/.env
+*.zip
+*.txt
+*.json
+
+# --- Python Runtime and App Cache ---
 __pycache__/
-dist/
-.DS_Store
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# --- Frontend Node & Package Artifacts ---
+node_modules/
+frontend/node_modules/
+frontend/test-results/

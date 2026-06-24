@@ -1,37 +1,25 @@
-﻿import os
-from google.cloud import aiplatform
-from functools import lru_cache
-from pydantic_settings import BaseSettings
-from supabase import create_client, Client
-
-GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
-
-def init_vertex():
-    aiplatform.init(project=GCP_PROJECT_ID, location=GCP_LOCATION)
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # These must match your .env keys (case-insensitive in Pydantic)
     project_id: str
-    google_application_credentials: str | None = None
-    frontend_origin: str = "http://localhost:3000"
-    
-    # Supabase Settings for the API client (sb_publishable/anon keys)
+    frontend_origin: str
     supabase_url: str
     supabase_key: str
-
-    # Direct Postgres URI Connection string for SQLModel / SQLAlchemy ORM
-    # Found in Supabase Dashboard -> Settings -> Database -> Connection string -> URI
+    supabase_service_key: str  # <--- THIS WAS MISSING
     database_url: str
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra='ignore')
 
-@lru_cache
-def get_settings() -> Settings:
+    # This tells Pydantic where to load the environment variables
+    model_config = SettingsConfigDict(env_file=".env", extra='ignore')
+
+def get_settings():
     return Settings()
 
-# Instantiate globally for use across the backend layers
+# Instantiate settings
 settings = get_settings()
 
-# 1. PostREST HTTP API Client Client (Frontend/Auth operations)
-supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
+def init_vertex():
+    """Placeholder for your Vertex AI init if still needed."""
+    pass

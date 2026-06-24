@@ -1,8 +1,12 @@
+import os
 from fastapi import APIRouter, HTTPException
-from google.cloud import firestore
+from supabase import create_client, Client
+from app.config import settings # <--- Add this
 
-router = APIRouter()
-db = firestore.Client()
+router = APIRouter(tags=["batches"])
+
+# Update this line
+sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
 
 # -----------------------------
 # GET /api/batches
@@ -10,48 +14,14 @@ db = firestore.Client()
 @router.get("/batches")
 def list_batches():
     """
-    Return a list of all batches.
+    Return a list of all processing batches stored in Supabase.
     """
-    batches_ref = db.collection("vin_batches")
-    docs = list(batches_ref.stream())
-
-    batches = []
-    for doc in docs:
-        data = doc.to_dict() or {}
-        data["batch_id"] = doc.id
-        batches.append(data)
-
-    return {"batches": batches}
-
-@router.get("/batches/{batch_id}")
-def get_batch(batch_id: str):
-    """
-    Return metadata for a single batch, including its VIN items.
-    """
-    batch_ref = db.collection("vin_batches").document(batch_id)
-    batch_doc = batch_ref.get()
-
-    if not batch_doc.exists:
-        raise HTTPException(status_code=404, detail="Batch not found")
-
-    # Base batch metadata
-    data = batch_doc.to_dict() or {}
-    data["batch_id"] = batch_doc.id
-
-    # Fetch VIN subcollection
-    vin_items_ref = batch_ref.collection("vin_items")
-    vin_docs = list(vin_items_ref.stream())
-
-    vins = []
-    for doc in vin_docs:
-        vin_data = doc.to_dict() or {}
-        vin_data["vin"] = doc.id
-        vins.append(vin_data)
-
-    # Attach VINs to batch
-    data["vins"] = vins
-
-    return {"batch": data}
+    try:
+        response = sb.table("vin_batches").select("*").execute()
+        return {"batches": response.data}
+    except Exception as e:
+        print(f"❌ Error fetching batches: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error querying batch storage layer.")
 
 
 # -----------------------------
@@ -60,18 +30,31 @@ def get_batch(batch_id: str):
 @router.get("/batches/{batch_id}")
 def get_batch(batch_id: str):
     """
-    Return metadata for a single batch.
+    Return metadata for a single batch, including its nested VIN items 
+    retrieved via an explicit relational filter query.
     """
-    batch_ref = db.collection("vin_batches").document(batch_id)
-    batch_doc = batch_ref.get()
+    try:
+        # 1. Fetch the master batch data row
+        batch_response = sb.table("vin_batches").select("*").eq("id", batch_id).execute()
+        
+        if not batch_response.data:
+            raise HTTPException(status_code=404, detail="Batch not found")
+            
+        batch_data = batch_response.data[0]
 
-    if not batch_doc.exists:
-        raise HTTPException(status_code=404, detail="Batch not found")
+        # 2. Query the associated children entries using relational constraints
+        vin_response = sb.table("vin_items").select("*").eq("batch_id", batch_id).execute()
+        
+        # Structure the payload to perfectly preserve what the frontend expects
+        batch_data["vins"] = vin_response.data
 
-    data = batch_doc.to_dict() or {}
-    data["batch_id"] = batch_doc.id
-
-    return {"batch": data}
+        return {"batch": batch_data}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching single batch details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server loop exception fetching batch indexes.")
 
 
 # -----------------------------
@@ -80,19 +63,20 @@ def get_batch(batch_id: str):
 @router.get("/batches/{batch_id}/vins")
 def list_batch_vins(batch_id: str):
     """
-    Return all VIN items inside a batch.
+    Return all VIN items tightly coupled to this specific batch_id.
     """
-    batch_ref = db.collection("vin_batches").document(batch_id)
-    if not batch_ref.get().exists:
-        raise HTTPException(status_code=404, detail="Batch not found")
+    try:
+        # Check if the parent batch row exists first
+        batch_check = sb.table("vin_batches").select("id").eq("id", batch_id).execute()
+        if not batch_check.data:
+            raise HTTPException(status_code=404, detail="Batch asset not found")
 
-    vin_items_ref = batch_ref.collection("vin_items")
-    vin_docs = list(vin_items_ref.stream())
-
-    vins = []
-    for doc in vin_docs:
-        data = doc.to_dict() or {}
-        data["vin"] = doc.id
-        vins.append(data)
-
-    return {"vins": vins}
+        # Fetch all child entries matching the criteria
+        vin_response = sb.table("vin_items").select("*").eq("batch_id", batch_id).execute()
+        return {"vins": vin_response.data}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error listing batch VIN arrays: {str(e)}")
+        raise HTTPException(status_code=500, detail="Pipeline fault parsing child node entries.")

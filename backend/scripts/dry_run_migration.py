@@ -1,43 +1,50 @@
+import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
 import firebase_admin
-from firebase_admin import firestore, credentials
+from firebase_admin import credentials, firestore
+from supabase import create_client
 
-# 1. Initialize Firestore
-# Ensure serviceAccountKey.json is in your root directory
-# Change this line in your script
-cred = credentials.Certificate(r"C:\dev\clean-repo\serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+# Setup environment
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+KEY_PATH = Path(__file__).parent / "serviceAccountKey.json"
 
-def normalize_model_data(model_val):
-    """The quality gate to enforce schema string types."""
-    if isinstance(model_val, list):
-        return ", ".join(map(str, model_val))
-    if not model_val:
-        return "UNKNOWN"
-    return str(model_val)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-def run_dry_run():
-    print("🚀 Starting Dry Run: Extracting 5 records from 'recalls_normalized'...")
-    # Fetch 5 sample records
-    docs = db.collection('recalls_normalized').limit(5).stream()
+def migration_verify():
+    print("🚀 Starting Verification...")
+    
+    # Init Firestore
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(str(KEY_PATH))
+        firebase_admin.initialize_app(cred)
+    fs = firestore.client()
+    
+    # Init Supabase
+    sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    
+    print("🔍 Fetching 3 records from Firestore...")
+    docs = list(fs.collection("recall_campaigns").limit(3).stream())
+    print(f"   Found {len(docs)} documents.")
     
     for doc in docs:
         data = doc.to_dict()
-        
-        # Apply the mapping logic we defined for the new Supabase schema
-        mapped_data = {
-            "campaign_number": data.get("campaign_number"),
-            "make": str(data.get("make", "UNKNOWN")),
-            "model": normalize_model_data(data.get("model")),
-            "year": str(data.get("year", "9999")),
-            "component": data.get("component", "Other"),
-            "summary": data.get("summary", "")[:250], # Truncating for display
+        payload = {
+            "campaign_number": data.get("campaign_number") or "UNKNOWN_CAMPAIGN",
+            "make": str(data.get("make", "UNKNOWN")).upper(),
+            "model": str(data.get("model", "UNKNOWN")).upper(),
+            "year": int(data.get("year", 0)) if data.get("year") else 0
         }
         
-        print("\n--- Document Found ---")
-        print(f"Firestore ID: {doc.id}")
-        print("Mapped Data for Supabase:")
-        print(mapped_data)
+        print(f"   Attempting to insert: {payload['campaign_number']}...")
+        try:
+            # Pushing to 'recall_results'
+            response = sb.table("recall_results").insert(payload).execute()
+            print(f"   ✅ Success! HTTP Status: {response.data}")
+        except Exception as e:
+            print(f"   ❌ Error: {e}")
 
 if __name__ == "__main__":
-    run_dry_run()
+    migration_verify()
