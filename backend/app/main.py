@@ -2,11 +2,14 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import init_vertex, get_settings
-from app.routers import metrics, batches
-from app.routers import vins
-from app.routers import upload
-from app.routers import recalls  # INJECTED: Our new query router namespace
+from app.routers import metrics, batches, vins, upload, recalls
+from app.routers import webhook_router  # INJECTED: Our new Stripe webhook router namespace
 
+# Try importing the sandbox router conditionally to safeguard production environments
+try:
+    from app.routers import sandbox
+except ImportError:
+    sandbox = None
 
 # Initialize Vertex AI before app creation
 init_vertex()
@@ -17,7 +20,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="AI Safety Recall Backend")
 
-   # CORS
+    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -35,12 +38,18 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok"}
 
-    # Register routers INSIDE the app
+    # Register routers INSIDE the app context
     app.include_router(metrics.router, prefix="/api")
     app.include_router(batches.router, prefix="/api") 
     app.include_router(vins.router, prefix="/api")
     app.include_router(upload.router, prefix="/api")
-    app.include_router(recalls.router, prefix="/api")  # INJECTED: Exposing /api/recalls
+    app.include_router(recalls.router, prefix="/api")     # Exposing /api/recalls paths
+    app.include_router(webhook_router.router, prefix="/api")  # INJECTED: Exposing /api/payments/webhook
+
+    # EPIC 6 SANDBOX INTERCEPTOR:
+    # If explicitly flagged in local environment variables, mount the agent testing replica control routes
+    if getattr(settings, "environment", "").lower() == "sandbox" and sandbox is not None:
+        app.include_router(sandbox.router, prefix="/api/sandbox", tags=["Sandbox Automation"])
 
     return app
 
