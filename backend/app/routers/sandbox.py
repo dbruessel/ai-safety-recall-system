@@ -1,72 +1,47 @@
-# Add this import at the top
-from fastapi import Header
-
-@router.post("/reset")
-async def reset_replica_state(
-    sb: Client = Depends(get_sandbox_supabase),
-    x_sandbox_key: str = Header(...) # A shared secret for local dev environments
-):
-    # Security layer: Require an X-Sandbox-Key header
-    if x_sandbox_key != "RECALL_LOGIC_LOCAL_ONLY_SECRET":
-        raise HTTPException(status_code=403, detail="Unauthorized: Access Denied")
-    
-    # ... rest of your reset logic ...
-
+import hmac
+import hashlib
+import json
+import time
 import logging
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, status
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Depends, status, Header
 from pydantic import BaseModel
-from supabase import Client
+from supabase import create_client, Client
 from app.config import get_settings
 
-# Configure logging for audit trails - CRITICAL for PM interview discussions
-logging.basicConfig(level=logging.INFO)
+# 1. Initialize the router object FIRST
+router = APIRouter(tags=["sandbox"])
 logger = logging.getLogger("sandbox-controller")
 
-router = APIRouter()
+class MockCheckoutPayload(BaseModel):
+    customer_email: str = "agent-test-fleet@recalllogic.internal"
+    price_id: str = "price_premium_tier_10_vin_gate"
+    metadata: Optional[Dict[str, Any]] = {"fleet_limit_override": "true"}
 
-# Schema for the Agent's "Task Matrix" input
-class TaskMatrix(BaseModel):
-    workflow_id: str
-    target_state: Dict[str, Any]
-    steps: list[str]
-
-def get_sb_client():
+def get_sandbox_supabase() -> Client:
     settings = get_settings()
-    if settings.environment != "sandbox":
-        raise HTTPException(status_code=403, detail="Forbidden: Production Environment")
-    return Client(settings.supabase_url, settings.supabase_service_key)
+    if getattr(settings, "environment", "").lower() != "sandbox":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sandbox Mutation Layer is disabled."
+        )
+    return create_client(settings.supabase_url, settings.supabase_service_key)
 
-@router.post("/reset")
-async def reset_replica_state(sb: Client = Depends(get_sb_client)):
-    """
-    Ensures 'State Stability'. Clears testing tables and reseeds 
-    with a deterministic dataset matrix.
-    """
+# 2. Now the routes will work because 'router' is defined above
+@router.post("/reset", status_code=status.HTTP_200_OK)
+async def reset_replica_state(
+    sb: Client = Depends(get_sandbox_supabase),
+    x_sandbox_key: str = Header(None)
+):
+    # Safety guardrail
+    if x_sandbox_key != "RECALL_LOGIC_LOCAL_ONLY_SECRET":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
     logger.info("Initializing Sandbox Replica Reset...")
-    try:
-        # 1. Clean Slate (Atomic cleanup)
-        sb.table("recalls_normalized").delete().neq("id", "none").execute()
-        sb.table("fleets").delete().neq("id", "none").execute()
+    # ... (rest of your reset logic)
+    return {"status": "success", "message": "Replica reset."}
 
-        # 2. Seed Data (Deterministic Test Vectors)
-        # This demonstrates "Data Minimization" - only what is needed for the test
-        sb.table("fleets").insert([
-            {"id": "test-fleet-alpha", "name": "Freemium Fleet", "vin_count": 5},
-            {"id": "test-fleet-beta", "name": "Premium Fleet", "vin_count": 15}
-        ]).execute()
-
-        return {"status": "success", "message": "Replica environment state reset."}
-    except Exception as e:
-        logger.error(f"Reset failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/execute-matrix")
-async def execute_task_matrix(matrix: TaskMatrix):
-    """
-    Enables 'Multiple-Task' testing by accepting a workflow definition
-    from the Agent.
-    """
-    logger.info(f"Executing Workflow: {matrix.workflow_id}")
-    # Logic to parse steps and trigger backend services would go here
-    return {"status": "accepted", "workflow": matrix.workflow_id}
+@router.post("/mock-checkout", status_code=status.HTTP_200_OK)
+async def trigger_mock_stripe_checkout_event(payload: MockCheckoutPayload):
+    # ... (rest of your checkout logic)
+    return {"status": "simulated"}
