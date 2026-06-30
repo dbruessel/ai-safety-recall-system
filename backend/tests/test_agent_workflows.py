@@ -36,18 +36,18 @@ def test_end_to_end_agent_workflow_loop(client):
     # -------------------------------------------------------------------------
     # STEP 2: Verify Freemium Limit Interceptor Block
     # -------------------------------------------------------------------------
-    # Convert your manifest to a file-like object for upload
-    manifest_csv_content = "vin,make,model\n" + "\n".join([f"1FA6P8CF0HVALID{i:02d},FORD,TRANSIT" for i in range(12)])
-    files = {"file": ("manifest.csv", manifest_csv_content, "text/csv")}
+    # Create the CSV content string
+    csv_content = "vin\n" + "\n".join([f"1FA6P8CF0HVALID{i:02d}" for i in range(12)])
     
     # Send as multipart/form-data using the 'files' parameter
+    # The key 'file' must match what is in upload_vins(file: UploadFile = File(...))
+    files = {"file": ("manifest.csv", csv_content, "text/csv")}
+    
     upload_response = client.post("/api/batches/upload", files=files)
     
-    # 422 Unprocessable Entity is often returned when validation fails (like missing file)
-    # The fix above should result in 200 or 402/403 now
+    # Now this should return a 200/201 or 402/403
     assert upload_response.status_code in [200, 201, 402, 403], f"Upload failed: {upload_response.text}"
-    # -------------------------------------------------------------------------
-    
+
     # STEP 3: Simulate Stripe Subscription Checkout Event
     # -------------------------------------------------------------------------
     # This remains unchanged as it matches the route audit
