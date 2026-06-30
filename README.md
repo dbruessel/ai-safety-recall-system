@@ -1,38 +1,49 @@
-# Aegis Intelligence System
+RecallLogic Intelligence System
+A production-grade, cloud-native intelligence engine for predictive vehicle safety and recall management.
 
-A production-grade, cloud-native intelligence engine for predictive vehicle safety and recall management. Aegis normalizes complex, inconsistent government vehicle data into actionable fleet safety intelligence.
+RecallLogic normalizes complex, inconsistent government vehicle data into actionable fleet safety intelligence, enabling fleet operators to proactively identify subassembly failure risks, schedule maintenance, and mitigate liability.
 
-## 📌 Overview
-The Aegis Intelligence System automates the collection, normalization, and analysis of vehicle safety data from the National Highway Traffic Safety Administration (NHTSA). By transforming raw, unreliable datasets into a high-fidelity intelligence layer, Aegis enables fleet operators to proactively identify subassembly failure risks, schedule maintenance, and mitigate liability.
+📌 Overview
+The RecallLogic Intelligence System automates the collection, normalization, and analysis of vehicle safety data from the National Highway Traffic Safety Administration (NHTSA). By transforming raw, unreliable datasets into a high-fidelity intelligence layer, the system provides:
 
-## 🚀 Key Capabilities
-* **Predictive Safety Scoring:** Proprietary algorithms calculate hazard severity (0–100) by correlating recall summaries with environmental and mechanical stressors.
-* **Automated Delta-Sync:** A resilient, timestamp-driven ingestion engine that operates continuously to update fleet risk profiles.
-* **Production-Hardened Ingestion:** Fault-tolerant workers that sanitize inconsistent manufacturer nomenclature (VPIC) and handle API partial-failures without interrupting the broader pipeline.
-* **Materialized Intelligence:** Data is pre-calculated at the ingestion layer, ensuring lightning-fast API response times for mission-critical fleet decisions.
+Fleet Recall Intelligence: Comprehensive monitoring of vehicle safety status.
 
-## 🧱 Architecture
-The system is designed for massive scale and reliability using a serverless infrastructure.
+Materialized Intelligence: Pre-calculated safety scoring (severity, regional climate vulnerability) performed during ingestion.
 
+Predictive Risk Scoring: Actionable directives tailored for fleet dispatch managers.
 
+Automated Delta Sync: Resilient 3:00 AM data ingestion ensuring data is always current.
 
-* **Ingestion:** Cloud Run Jobs (Python) perform throttled, fault-tolerant API calls.
-* **Storage:** Google Cloud Firestore (NoSQL) stores normalized campaign data and ingestion checkpoints.
-* **API Layer:** FastAPI provides high-performance, cached endpoints for vehicle recall verification.
-* **Resiliency:** Built-in circuit breakers and chronological status-exclusion logic ensure consistent performance despite upstream API volatility.
+🚀 Quick Start
+Environment Setup: Ensure your monorepo is located at C:\dev\clean-repo.
 
-## ⚙️ Quick Start
+Backend: Navigate to backend/ and run the FastAPI server:
 
-### Prerequisites
-* Google Cloud SDK
-* Python 3.12+
-* Active GCP Project with Firestore enabled
+Bash
+uvicorn app.main:app --reload --port 8000
+Frontend: Navigate to frontend/ and start the development server:
 
-### Installation
-```bash
-# Clone the repository
-git clone [https://github.com/yourusername/aegis-intelligence](https://github.com/yourusername/aegis-intelligence)
-cd aegis-intelligence/backend
+Bash
+npm run dev
+🧪 Testing & Agent Workflow Framework
+To ensure enterprise reliability, RecallLogic employs a decoupled Replica Testing Architecture. This framework allows AI testing agents to safely interact with, stress-test, and validate product workflows without impacting production data.
 
-# Install dependencies
-pip install -r requirements.txt
+The Replica Strategy
+Isolated State: Agents operate within disposable, containerized environments (utilizing Docker-Compose mirrors) to prevent destructive updates on the live Supabase/PostgreSQL instance.
+
+Deterministic Environment Provisioning: By using JSON-based "Task Matrices," we guarantee that every test run starts with the exact same data configuration, eliminating test flakiness.
+
+Risk Mitigation (Blast Radius): The Sandbox Control Plane (/api/sandbox/reset) makes it physically impossible for testing agents to accidentally execute against production data.
+
+Testing Tracks
+Unit & Integration (Backend): pytest suite focused on core scoring algorithms, data filtering, and API endpoint verification.
+
+Agent Workflows: A WorkflowExecutor parses JSON "Task Matrices" to simulate complex user behaviors (e.g., freemium limit enforcement, Stripe checkout interception, or CSV ingestion edge-cases).
+
+End-to-End (E2E) UI: Playwright integration utilized by AI agents to validate UI dashboard behaviors, freemium guardrails, and compliance badge generation.
+
+Observability
+All agent actions are captured in an Audit Log, providing a traceable history of how the agent performed, rather than just simple pass/fail results. This allows for rapid debugging of complex ingestion workflows.
+
+📄 License
+MIT License.
