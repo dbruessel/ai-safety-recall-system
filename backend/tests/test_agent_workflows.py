@@ -36,19 +36,18 @@ def test_end_to_end_agent_workflow_loop(client):
     # -------------------------------------------------------------------------
     # STEP 2: Verify Freemium Limit Interceptor Block
     # -------------------------------------------------------------------------
-    # UPDATED: Using the confirmed route path from your route audit table
-    manifest_payload = {
-        "fleet_id": "test-fleet-beta",
-        "vins": [f"1FA6P8CF0HVALID{i:02d}" for i in range(12)]
-    }
+    # Convert your manifest to a file-like object for upload
+    manifest_csv_content = "vin,make,model\n" + "\n".join([f"1FA6P8CF0HVALID{i:02d},FORD,TRANSIT" for i in range(12)])
+    files = {"file": ("manifest.csv", manifest_csv_content, "text/csv")}
     
-    # Using confirmed path /api/batches/upload
-    upload_response = client.post("/api/batches/upload", json=manifest_payload)
+    # Send as multipart/form-data using the 'files' parameter
+    upload_response = client.post("/api/batches/upload", files=files)
     
-    # Allow 402/403 for limit enforcement, 200/201 for success
+    # 422 Unprocessable Entity is often returned when validation fails (like missing file)
+    # The fix above should result in 200 or 402/403 now
     assert upload_response.status_code in [200, 201, 402, 403], f"Upload failed: {upload_response.text}"
-
     # -------------------------------------------------------------------------
+    
     # STEP 3: Simulate Stripe Subscription Checkout Event
     # -------------------------------------------------------------------------
     # This remains unchanged as it matches the route audit
