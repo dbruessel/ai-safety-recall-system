@@ -1,121 +1,72 @@
-import hmac
-import hashlib
-import json
-import time
-from typing import Dict, Any, Optional
+# Add this import at the top
+from fastapi import Header
+
+@router.post("/reset")
+async def reset_replica_state(
+    sb: Client = Depends(get_sandbox_supabase),
+    x_sandbox_key: str = Header(...) # A shared secret for local dev environments
+):
+    # Security layer: Require an X-Sandbox-Key header
+    if x_sandbox_key != "RECALL_LOGIC_LOCAL_ONLY_SECRET":
+        raise HTTPException(status_code=403, detail="Unauthorized: Access Denied")
+    
+    # ... rest of your reset logic ...
+
+import logging
+from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from supabase import create_client, Client
-
+from supabase import Client
 from app.config import get_settings
+
+# Configure logging for audit trails - CRITICAL for PM interview discussions
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("sandbox-controller")
 
 router = APIRouter()
 
-class MockCheckoutPayload(BaseModel):
-    customer_email: str = "agent-test-fleet@recalllogic.internal"
-    price_id: str = "price_premium_tier_10_vin_gate"
-    metadata: Optional[Dict[str, str]] = {"fleet_limit_override": "true"}
+# Schema for the Agent's "Task Matrix" input
+class TaskMatrix(BaseModel):
+    workflow_id: str
+    target_state: Dict[str, Any]
+    steps: list[str]
 
-
-def get_sandbox_supabase() -> Client:
+def get_sb_client():
     settings = get_settings()
-    if getattr(settings, "environment", "").lower() != "sandbox":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sandbox Mutation Layer is completely disabled outside of sandbox testing nodes."
-        )
-    return create_client(settings.supabase_url, settings.supabase_service_key)
+    if settings.environment != "sandbox":
+        raise HTTPException(status_code=403, detail="Forbidden: Production Environment")
+    return Client(settings.supabase_url, settings.supabase_service_key)
 
-
-@router.post("/reset", status_code=status.HTTP_200_OK)
-async def reset_replica_state(sb: Client = Depends(get_sandbox_supabase)):
+@router.post("/reset")
+async def reset_replica_state(sb: Client = Depends(get_sb_client)):
     """
-    ENDPOINT FOR TESTING AGENTS:
-    Programmatically flushes and sets up pristine environment conditions for test loops.
-    Uses universal 'not.is.null' filter mechanics to bypass column type casting constraints.
+    Ensures 'State Stability'. Clears testing tables and reseeds 
+    with a deterministic dataset matrix.
     """
-    # Programmatically filter rows where 'id' is not null (works for integer, string, and UUID keys)
-    for table_name in ["recalls_normalized", "fleets"]:
-        try:
-            sb.table(table_name).delete().filter("id", "not.is", "null").execute()
-        except Exception as table_err:
-            print(f"[Sandbox Setup Warning] Table {table_name} flush skipped: {str(table_err)}")
-
+    logger.info("Initializing Sandbox Replica Reset...")
     try:
-        # Seed Clean Matrix of States for Autonomous Workflows
+        # 1. Clean Slate (Atomic cleanup)
+        sb.table("recalls_normalized").delete().neq("id", "none").execute()
+        sb.table("fleets").delete().neq("id", "none").execute()
+
+        # 2. Seed Data (Deterministic Test Vectors)
+        # This demonstrates "Data Minimization" - only what is needed for the test
         sb.table("fleets").insert([
-            {"id": "test-fleet-alpha", "fleet_name": "Alpha Clean Telemetry Fleet"},
-            {"id": "test-fleet-beta", "fleet_name": "Beta Boundary Limit Fleet"},
-            {"id": "test-fleet-gamma", "fleet_name": "Gamma Desert Stress Fleet"}
+            {"id": "test-fleet-alpha", "name": "Freemium Fleet", "vin_count": 5},
+            {"id": "test-fleet-beta", "name": "Premium Fleet", "vin_count": 15}
         ]).execute()
-        
-        # Seed high-risk mock asset for Mojave calculation tracking
-        try:
-            sb.table("recalls_normalized").insert([
-                {
-                    "fleet_id": "test-fleet-gamma",
-                    "vin": "1FA6P8CF0HXXXXXXX", 
-                    "make": "FORD", 
-                    "model": "MUSTANG", 
-                    "year": "2017",
-                    "campaign_number": "17V001000",
-                    "component": "AIR BAGS",
-                    "is_critical": True
-                }
-            ]).execute()
-        except Exception as seed_err:
-            print(f"[Sandbox Setup Warning] Mock asset seeding deferred: {str(seed_err)}")
 
-        return {
-            "status": "success",
-            "message": "Replica environment prepared cleanly for agent automated workflow run.",
-            "metrics_seeded": {
-                "active_test_fleets": 3,
-                "critical_high_heat_fixtures": 1
-            }
-        }
+        return {"status": "success", "message": "Replica environment state reset."}
     except Exception as e:
-        # DIAGNOSTIC IMPROVEMENT: Bubble up the raw, exact database engine exception message 
-        # to terminal logs and responses so we can see what exact column or constraint is failing.
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database Seeding Exception: {str(e)}"
-        )
+        logger.error(f"Reset failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/mock-checkout", status_code=status.HTTP_200_OK)
-async def trigger_mock_stripe_checkout_event(payload: MockCheckoutPayload):
-    settings = get_settings()
-    current_timestamp = int(time.time())
-    
-    synthetic_stripe_event = {
-        "id": f"evt_mock_{current_timestamp}",
-        "object": "event",
-        "type": "checkout.session.completed",
-        "data": {
-            "object": {
-                "id": f"cs_test_{current_timestamp}",
-                "customer_details": {"email": payload.customer_email},
-                "payment_status": "paid",
-                "amount_total": 4900,
-                "currency": "usd",
-                "metadata": payload.metadata
-            }
-        }
-    }
-    
-    payload_string = json.dumps(synthetic_stripe_event, separators=(',', ':'))
-    signature_payload = f"t={current_timestamp}.v1={payload_string}".encode("utf-8")
-    
-    webhook_secret = getattr(settings, "stripe_webhook_secret", "mock_secret_for_agent_testing")
-    computed_signature = hmac.new(
-        webhook_secret.encode("utf-8"),
-        signature_payload,
-        hashlib.sha256
-    ).hexdigest()
-    
-    return {
-        "status": "simulated",
-        "payload": synthetic_stripe_event,
-        "simulated_header": f"t={current_timestamp},v1={computed_signature}"
-    }
+@router.post("/execute-matrix")
+async def execute_task_matrix(matrix: TaskMatrix):
+    """
+    Enables 'Multiple-Task' testing by accepting a workflow definition
+    from the Agent.
+    """
+    logger.info(f"Executing Workflow: {matrix.workflow_id}")
+    # Logic to parse steps and trigger backend services would go here
+    return {"status": "accepted", "workflow": matrix.workflow_id}
