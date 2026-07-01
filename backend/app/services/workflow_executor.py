@@ -34,20 +34,27 @@ class WorkflowExecutor:
             # Dispatch the action
             response = await self.dispatch(step)
             
+            # Safe JSON parsing to prevent agent crashes on 500 Server Errors
+            try:
+                parsed_response = response.json() if response.status_code != 204 else {}
+            except Exception:
+                parsed_response = {"raw_text": response.text}
+            
             # Collect trace data for audit
             step_trace = {
                 "step": step['step'],
                 "action": step['action'],
                 "status": response.status_code,
-                "response": response.json() if response.status_code != 204 else {}
+                "response": parsed_response
             }
             audit_trail["steps"].append(step_trace)
             
-            # Validation logic
-            success = response.status_code == step.get('expected_status', 200)
+            # Safe fallback for expected status (Defaults to 200 to prevent KeyError)
+            expected_status = step.get('expected_status', 200)
+            success = response.status_code == expected_status
             
             if not success:
-                logger.error(f"Step {step['step']} failed! Expected {step['expected_status']}, got {response.status_code}")
+                logger.error(f"Step {step['step']} failed! Expected {expected_status}, got {response.status_code}. Response: {response.text}")
                 break
         
         # Serialization for PM reporting
@@ -66,13 +73,29 @@ class WorkflowExecutor:
         action = step['action']
         
         if action == "RESET_STATE":
-            return await self.client.post("/api/sandbox/reset")
+            # Fixes the 404 by pointing to the correct route and passes the required security header
+            return await self.client.post(
+                "/sandbox/reset", 
+                headers={"x-sandbox-key": "RECALL_LOGIC_LOCAL_ONLY_SECRET"}
+            )
             
         elif action == "UPLOAD_MANIFEST":
-            # Using the defined payload from your JSON matrix
-            return await self.client.post("/api/upload", json=step.get('payload', {}))
+            # 1. Read the requested VIN count from your JSON matrix (defaults to 12)
+            vin_count = step.get('payload', {}).get('vin_count', 12)
+            
+            # 2. Generate a mock CSV string dynamically based on that count
+            csv_content = "vin\n" + "\n".join([f"1FA6P8CF0HVALID{i:02d}" for i in range(vin_count)])
+            
+            # 3. Package it as a multipart/form-data file payload
+            files = {"file": ("manifest.csv", csv_content, "text/csv")}
+            
+            # 4. Send using the 'files' parameter instead of 'json' to satisfy FastAPI
+            return await self.client.post("/api/batches/upload", files=files)
             
         elif action == "TRIGGER_STRIPE_MOCK":
-            return await self.client.post("/api/sandbox/mock-checkout", json=step.get('metadata', {}))
+            return await self.client.post("/sandbox/mock-checkout", json=step.get('metadata', {}))
+            
+        elif action == "VERIFY_TIER_UPGRADE":
+            return await self.client.get("/api/metrics/global")
             
         raise ValueError(f"Unknown action: {action}")

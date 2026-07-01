@@ -4,14 +4,13 @@ import uuid
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from supabase import create_client, Client
-from app.config import settings # <--- Add this
+from app.config import settings
 from app.services.batch_processor import start_batch_processing
 
 router = APIRouter(tags=["upload"])
 
-# Update this line
+# Initialize Supabase client
 sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
-
 
 def parse_csv(file_bytes: bytes):
     """
@@ -25,18 +24,20 @@ def parse_csv(file_bytes: bytes):
     for row in reader:
         if not row:
             continue
-        vin = row[0].strip()
+        
+        # Explicitly grab the first item in the list and strip it
+        vin = str(row).strip()
+        
         if vin:
             vins.append(vin)
 
     return vins
 
-
 @router.post("/batches/upload")
 async def upload_vins(file: UploadFile = File(...)):
     """
-    Upload a CSV of VINs, create a relational parent batch row, 
-    bulk-insert the child VIN entries, and trigger background processing.
+    Upload a CSV of VINs, enforce freemium limits, and bulk-insert
+    directly into the consolidated recall_results table.
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
@@ -47,32 +48,27 @@ async def upload_vins(file: UploadFile = File(...)):
     if not vins:
         raise HTTPException(status_code=400, detail="No VINs found in file")
 
+    # 1. Freemium Paywall Interceptor: Enforce the 10-VIN limit for the API backend
+    if len(vins) > 10:
+        raise HTTPException(
+            status_code=402, 
+            detail="Payment Required: Freemium limit exceeded. Please upgrade to Pro."
+        )
+
     batch_id = str(uuid.uuid4())
-    timestamp = datetime.utcnow().isoformat()
 
     try:
-        # 1. Create parent batch record
-        sb.table("vin_batches").insert({
-            "id": batch_id,
-            "created_at": timestamp,
-            "total_vins": len(vins),
-            "processed_vins": 0,
-            "status": "processing"
-        }).execute()
-
-        # 2. Prepare child entries for lightning-fast relational bulk insertion
+        # 2. Target the active consolidated relational table directly
         vin_payloads = [
             {
-                "batch_id": batch_id,
                 "vin": vin,
-                "status": "pending",
-                "created_at": timestamp
+                "status": "pending"
             }
             for vin in vins
         ]
 
-        # Bulk insert completely avoids heavy row-by-row loops over the network link
-        sb.table("vin_items").insert(vin_payloads).execute()
+        # 3. Bulk insert completely avoiding the legacy tables
+        sb.table("recall_results").insert(vin_payloads).execute()
 
         # 🔥 Auto-trigger processing
         start_batch_processing(batch_id)
@@ -80,7 +76,7 @@ async def upload_vins(file: UploadFile = File(...)):
         return {
             "batch_id": batch_id,
             "vin_count": len(vins),
-            "message": "Batch created and processing started"
+            "message": "Upload successful and processing started"
         }
 
     except Exception as e:
