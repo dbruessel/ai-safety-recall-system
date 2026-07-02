@@ -1,0 +1,329 @@
+
+    <html>
+    <head>
+        <title>Replica Automation - Executive Report</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-950 text-slate-100 p-8 font-sans">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-4xl font-black text-cyan-400 mb-2">🛡️ Replica Environment: Executive Audit</h1>
+            <p class="text-slate-400 mb-8">Automated validation of core user journeys and monetization guardrails.</p>
+    
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8 shadow-2xl">
+            <div class="mb-6 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">freemium-exploration-flow</h2>
+                <p class="text-emerald-400 text-sm font-medium mt-1">🎯 Story: Validates that uploading <= 10 VINs allows free exploration without triggering the paywall</p>
+                <span class="text-xs text-slate-500 font-mono mt-2 block">Execution Timestamp: 2026-07-01T19:14:18.692919</span>
+            </div>
+            <div class="space-y-4">
+        
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 1: <span class="text-cyan-400">RESET_STATE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Provisioned a clean, deterministic database replica environment."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "success",
+  "message": "Replica reset."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 2: <span class="text-cyan-400">UPLOAD_MANIFEST</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Agent submitted fleet manifest dataset to the ingestion dropzone."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "batch_id": "db436862-53a5-432a-a1df-dee790e80992",
+  "vin_count": 6,
+  "message": "Upload successful and processing started"
+}</pre>
+                    </details>
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8 shadow-2xl">
+            <div class="mb-6 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">freemium-to-pro-conversion</h2>
+                <p class="text-emerald-400 text-sm font-medium mt-1">🎯 Story: Validates that uploading > 10 VINs triggers the Pro paywall and Stripe intent</p>
+                <span class="text-xs text-slate-500 font-mono mt-2 block">Execution Timestamp: 2026-07-01T19:14:17.746561</span>
+            </div>
+            <div class="space-y-4">
+        
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 1: <span class="text-cyan-400">RESET_STATE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Provisioned a clean, deterministic database replica environment."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "success",
+  "message": "Replica reset."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 2: <span class="text-cyan-400">UPLOAD_MANIFEST</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Agent submitted fleet manifest dataset to the ingestion dropzone."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 402
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 402</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "detail": "Payment Required: Freemium limit exceeded. Please upgrade to Pro."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 3: <span class="text-cyan-400">TRIGGER_STRIPE_MOCK</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Simulated an authorized Stripe payment webhook upgrade event."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "simulated"
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 4: <span class="text-cyan-400">VERIFY_TIER_UPGRADE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Verified system correctly granted Pro-Tier platform capabilities."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "metrics": {
+    "total_vins": 12,
+    "processed_vins": 12,
+    "total_recalls": 15059,
+    "fleet_health_index": 94.5
+  }
+}</pre>
+                    </details>
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8 shadow-2xl">
+            <div class="mb-6 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">freemium-exploration-flow</h2>
+                <p class="text-emerald-400 text-sm font-medium mt-1">🎯 Story: User journey validation trace.</p>
+                <span class="text-xs text-slate-500 font-mono mt-2 block">Execution Timestamp: 2026-07-01T18:59:33.204886</span>
+            </div>
+            <div class="space-y-4">
+        
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 1: <span class="text-cyan-400">RESET_STATE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Provisioned a clean, deterministic database replica environment."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "success",
+  "message": "Replica reset."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 2: <span class="text-cyan-400">UPLOAD_MANIFEST</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Agent submitted fleet manifest dataset to the ingestion dropzone."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "batch_id": "6c251017-09ea-4a63-9d6f-9625298af24d",
+  "vin_count": 6,
+  "message": "Upload successful and processing started"
+}</pre>
+                    </details>
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8 shadow-2xl">
+            <div class="mb-6 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">freemium-to-pro-conversion</h2>
+                <p class="text-emerald-400 text-sm font-medium mt-1">🎯 Story: User journey validation trace.</p>
+                <span class="text-xs text-slate-500 font-mono mt-2 block">Execution Timestamp: 2026-07-01T18:59:32.242132</span>
+            </div>
+            <div class="space-y-4">
+        
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 1: <span class="text-cyan-400">RESET_STATE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Provisioned a clean, deterministic database replica environment."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "success",
+  "message": "Replica reset."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 2: <span class="text-cyan-400">UPLOAD_MANIFEST</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Agent submitted fleet manifest dataset to the ingestion dropzone."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 402
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 402</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "detail": "Payment Required: Freemium limit exceeded. Please upgrade to Pro."
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 3: <span class="text-cyan-400">TRIGGER_STRIPE_MOCK</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Simulated an authorized Stripe payment webhook upgrade event."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "status": "simulated"
+}</pre>
+                    </details>
+                </div>
+            
+                <div class="flex flex-col bg-slate-950 border border-slate-800 rounded-lg p-5">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="font-bold text-slate-300 text-lg">Step 4: <span class="text-cyan-400">VERIFY_TIER_UPGRADE</span></div>
+                            <div class="text-sm text-slate-500 mt-1 italic">"Verified system correctly granted Pro-Tier platform capabilities."</div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="px-3 py-1.5 rounded border text-sm font-mono font-bold text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                                ✅ Actual: HTTP 200
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-1.5 font-bold uppercase tracking-widest">Expected: HTTP 200</div>
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-cyan-400 font-mono mb-2 uppercase tracking-wider">View Raw Database Payload</summary>
+                        <pre class="text-[10px] text-slate-400 font-mono bg-black p-3 rounded-lg overflow-x-auto border border-slate-800/60 shadow-inner">{
+  "metrics": {
+    "total_vins": 6,
+    "processed_vins": 6,
+    "total_recalls": 15059,
+    "fleet_health_index": 94.5
+  }
+}</pre>
+                    </details>
+                </div>
+            
+            </div>
+        </div>
+        
+        </div>
+    </body>
+    </html>
+    
