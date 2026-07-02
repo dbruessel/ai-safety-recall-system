@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   // Points to your frontend test folder relative to this config file
-  testDir: './frontend/tests',
+  testDir: './clean-repo/tests',
   
   /* Run tests in files in parallel */
   fullyParallel: true,
