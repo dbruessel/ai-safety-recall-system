@@ -5,8 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
  * Optimized for Vite, Supabase Sandbox Reset Loops, and Auto-Debugging.
  */
 export default defineConfig({
-  // Points to your frontend test folder relative to this config file
-  testDir: './clean-repo/tests',
+  // Points out of the frontend directory and into your root tests folder [cite: 1]
+  testDir: '../tests',
   
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -25,16 +25,11 @@ export default defineConfig({
   
   /* Shared settings for all the projects below */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')` */
+    /* Base URL to use in actions like await page.goto('/') [cite: 2] */
     baseURL: 'http://localhost:5173',
-
-    /* Zero-maintenance debugging utilities: captures visual proof on failure */
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
   },
 
-  /* Configure projects for major browser engine verification */
+  /* Configure projects for major browser engine verification [cite: 2] */
   projects: [
     {
       name: 'chromium',
@@ -50,12 +45,12 @@ export default defineConfig({
     },
   ],
 
-  /* Automatically boot your local Vite dev server before starting E2E tests */
+  /* Automatically boot your local Vite dev server before starting E2E tests [cite: 3] */
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
-    cwd: './frontend', // Directs execution to run inside the frontend directory
-    timeout: 120000,   // 2 minutes startup grace window
+    cwd: './frontend', // Directs execution to run inside the frontend directory [cite: 3]
+    timeout: 120000,   // 2 minutes startup grace window [cite: 3]
   },
 });
