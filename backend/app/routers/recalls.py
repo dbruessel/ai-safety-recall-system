@@ -22,7 +22,7 @@ class RecallQueryRequest(BaseModel):
 
 class IngestTriggerRequest(BaseModel):
     days_back: Optional[int] = 1  # Default to fetching yesterday's delta [2]
-    force_full_run: Optional[bool] = False [2]
+    force_full_run: Optional[bool] = False
 
 class BadgeGenerateRequest(BaseModel):
     fleet_name: str
@@ -148,7 +148,7 @@ async def trigger_nightly_ingest(
     """
     expected_secret = getattr(settings, "cron_secret_token", None) [1]
     if expected_secret and x_cron_secret != expected_secret: [1]
-        raise HTTPException(status_code=401, detail="Unauthorized automation token handshake failed.") [1]
+    raise HTTPException(status_code=401, detail="Unauthorized automation token handshake failed.") [1]
         
     # Schedule the synchronous pipeline logic to execute in the background [1]
     background_tasks.add_task(
