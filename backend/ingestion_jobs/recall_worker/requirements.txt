@@ -1,5 +1,0 @@
-google-cloud-firestore
-requests
-
-google-cloud-core
-google-auth
