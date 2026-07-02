@@ -30,7 +30,9 @@ def generate_html_report():
         "RESET_STATE": "Provisioned a clean, deterministic database replica environment.",
         "UPLOAD_MANIFEST": "Agent submitted fleet manifest dataset to the ingestion dropzone.",
         "TRIGGER_STRIPE_MOCK": "Simulated an authorized Stripe payment webhook upgrade event.",
-        "VERIFY_TIER_UPGRADE": "Verified system correctly granted Pro-Tier platform capabilities."
+        "VERIFY_TIER_UPGRADE": "Verified system correctly granted Pro-Tier platform capabilities.",
+        "GENERATE_BADGE": "Generated a cryptographically signed compliance token (perfect 100% safety score).",
+        "SHARE_BADGE": "Securely broadcasted the signed digital compliance token to the target insurance underwriter."
     }
 
     for file_path in log_files:

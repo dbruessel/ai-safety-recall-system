@@ -13,7 +13,7 @@ class WorkflowExecutor:
     def __init__(self, base_url: str):
         self.base_url = base_url
         self.client = httpx.AsyncClient(base_url=base_url)
-        # FIXED: Removed the 'backend/' prefix to prevent double-nesting
+        # Ensure logs directory exists for our audit trails
         os.makedirs("logs", exist_ok=True)
 
     async def execute(self, matrix: Dict[str, Any]):
@@ -22,7 +22,6 @@ class WorkflowExecutor:
         """
         print(f"--- Starting Workflow: {matrix.get('workflow_id')} ---")
         
-        # 1. NEW: Capture the PM-defined user story description
         audit_trail = {
             "workflow_id": matrix.get('workflow_id'),
             "description": matrix.get('description', 'User journey validation trace.'),
@@ -45,7 +44,7 @@ class WorkflowExecutor:
             except Exception:
                 parsed_response = {"raw_text": response.text}
             
-            # 2. NEW: Capture the expected outcome vs actual status
+            # Capture the expected outcome vs actual status
             step_trace = {
                 "step": step['step'],
                 "action": step['action'],
@@ -63,9 +62,8 @@ class WorkflowExecutor:
         
         # Serialization for PM reporting
         timestamp = int(datetime.datetime.now().timestamp())
-        # FIXED: Removed the 'backend/' prefix from the file path
         log_path = f"logs/audit_{matrix['workflow_id']}_{timestamp}.json"
-        with open(log_path, "w") as f:
+        with open(log_path, "w", encoding="utf-8") as f:
             json.dump(audit_trail, f, indent=2)
             
         logger.info(f"Audit trail saved to {log_path}")
@@ -94,5 +92,13 @@ class WorkflowExecutor:
             
         elif action == "VERIFY_TIER_UPGRADE":
             return await self.client.get("/api/metrics/global")
+            
+        elif action == "GENERATE_BADGE":
+            # Hits the secure, metered compliance badge endpoint
+            return await self.client.post("/api/badges/generate", json=step.get('payload', {}))
+            
+        elif action == "SHARE_BADGE":
+            # Hits the direct underwriter dispatch sharing endpoint
+            return await self.client.post("/api/badges/share", json=step.get('payload', {}))
             
         raise ValueError(f"Unknown action: {action}")

@@ -1,63 +1,68 @@
 # backend/app/services/batch_processor.py
+import logging
 from supabase import create_client, Client
-from app.config import settings # <--- Add this import
+from app.config import settings
 from app.services.vin_processing import process_single_vin
-from app.services.vin_batches import update_batch_progress
 
-# Update these initialization lines to use your validated settings object
+# Setup structured logging
+logger = logging.getLogger("batch-processor")
+
+# Initialize the Supabase client using the service role key to bypass Row Level Security (RLS) in background tasks [cite: 61, 400]
 sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
 
 
 def process_batch(batch_id: str):
     """
     Processes all VIN records associated with a specific batch ID from Supabase.
+    Queries and updates the consolidated 'recall_results' table.
     """
     try:
-        # Fetch child rows linked to the parent batch
-        response = sb.table("vin_items").select("vin").eq("batch_id", batch_id).execute()
-        vin_items = response.data
+        logger.info(f"🔄 Starting background processing for batch: {batch_id}")
+        
+        # 1. Fetch pending records from the consolidated recall_results table [cite: 67, 174]
+        response = sb.table("recall_results").select("*").eq("status", "pending").execute()
+        pending_records = response.data or []
 
-        if not vin_items:
-            print(f"No VINs found for batch {batch_id}")
+        if not pending_records:
+            logger.info(f"ℹ️ No pending VINs found to process for batch {batch_id}.")
             return
 
-        print(f"Processing {len(vin_items)} VINs for batch {batch_id}...")
+        logger.info(f"🚀 Processing {len(pending_records)} VINs for batch {batch_id}...")
 
-        for item in vin_items:
-            vin = item["vin"]
-            print(f"→ Processing VIN: {vin}")
+        for record in pending_records:
+            vin = record.get("vin")
+            logger.info(f"→ Processing VIN: {vin}")
+            
             try:
-                process_single_vin(batch_id, vin)
+                # Execute the recall analysis logic for the individual VIN
+                process_single_vin(batch_id=batch_id, vin=vin)
             except Exception as e:
-                print(f"   ❌ Error processing {vin}: {e}")
+                logger.error(f"   ❌ Error processing VIN {vin}: {e}")
 
             try:
-                update_batch_progress(batch_id)
+                # 2. Update status from 'pending' to 'completed' directly in recall_results [cite: 655]
+                sb.table("recall_results").update({"status": "completed"}).eq("vin", vin).execute()
+                logger.info(f"   ✅ Marked VIN {vin} as completed.")
             except Exception as e:
-                print(f"   ⚠️ Error updating batch progress: {e}")
+                logger.warning(f"   ⚠️ Error updating status for VIN {vin} in database: {e}")
 
-        print(f"✅ Finished processing batch {batch_id}")
+        logger.info(f"✅ Finished processing batch {batch_id}")
         
     except Exception as e:
-        print(f"❌ Batch Processor standard exception: {str(e)}")
+        logger.error(f"❌ Batch Processor standard exception: {str(e)}")
 
 
 def start_batch_processing(batch_id: str):
     """
-    Relational background batch iteration handler triggered by the upload endpoint.
+    Relational background batch iteration handler triggered by the upload endpoint [cite: 1190].
     """
     try:
-        # Pull down target records matching the foreign key constraint
-        response = sb.table("vin_items").select("vin").eq("batch_id", batch_id).execute()
-        vin_items = response.data
-
-        for item in vin_items:
-            vin = item["vin"]
-            process_single_vin(batch_id=batch_id, vin=vin)
-
-        # Mark parent record state as complete in the relational table
-        sb.table("vin_batches").update({"status": "complete"}).eq("id", batch_id).execute()
-        print(f"🎉 Batch {batch_id} marked complete in database.")
+        logger.info(f"🔄 Triggering background execution task for batch: {batch_id}")
+        
+        # Route processing task to use the consolidated recall_results table
+        process_batch(batch_id=batch_id)
+        
+        logger.info(f"🎉 Background processing execution complete for batch {batch_id}.")
         
     except Exception as e:
-        print(f"❌ Error during background processing execution: {str(e)}")
+        logger.error(f"❌ Error during background processing execution: {str(e)}")
