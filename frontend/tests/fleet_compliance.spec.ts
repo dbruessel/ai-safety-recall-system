@@ -3,39 +3,44 @@ import { test, expect } from '@playwright/test';
 test.describe('Fleet Compliance Dashboard E2E Workflow', () => {
 
   test('should load the dashboard and process a clean fleet VIN search', async ({ page }) => {
-    // 1. Navigate to the local dashboard (Base URL resolved from playwright.config.ts) [cite: 2]
+    // 1. Navigate to the local dashboard [1]
     await page.goto('/');
 
-    // 2. Verify the landing elements are fully visible and styled
+    // 2. Verify branding elements are present
     await expect(page.locator('h1')).toContainText('RecallLogic');
     
-    // 3. Simulate entering a known clean VIN from your database
+    // 3. Locate the VIN input and fill it with a valid test record
     const vinInput = page.locator('input[placeholder*="Enter VIN"]');
     await expect(vinInput).toBeVisible();
-    await vinInput.fill('1FTFW1ED5GXXXXXXX'); // Replace with a valid test VIN from your Supabase setup
+    await vinInput.fill('1FTFW1ED5GXXXXXXX'); 
+    
+    // 4. Click the search trigger
     await page.click('button:has-text("Check VIN")');
 
-    // 4. Assert the glassmorphic trust badge renders with a PASS state
+    // 5. Assert the glassmorphic badge displays the correct success state
     const trustBadge = page.locator('.glassmorphic-badge');
     await expect(trustBadge).toBeVisible();
     await expect(trustBadge).toContainText('PASS');
   });
 
   test('should handle a batch CSV fleet manifest upload', async ({ page }) => {
+    // 1. Navigate to the local dashboard [1]
     await page.goto('/');
 
-    // 1. Target the file input inside your drag-and-drop dropzone
+    // 2. Set up a listener to intercept the browser's native file-picker
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.locator('text=Drag & Drop Fleet Manifest').click();
     const fileChooser = await fileChooserPromise;
 
-    // 2. Upload a sample CSV file
-    // (Ensure you have a mock/clean CSV inside a 'tests/fixtures' folder)
+    // 3. Upload the sample CSV manifest we generated
     await fileChooser.setFiles('tests/fixtures/clean_fleet.csv');
 
-    // 3. Assert the batch progress indicator completes and shows 100% safe status
-    const uploadSuccess = page.locator('.upload-success-message');
-    await expect(uploadSuccess).toBeVisible();
-    await expect(page.locator('.fleet-score')).toContainText('100');
+    // 4. Assert the frontend processes the batch upload successfully
+    const successAlert = page.locator('.upload-success-message');
+    await expect(successAlert).toBeVisible();
+    
+    // 5. Verify the aggregated fleet safety score matches expectations
+    const fleetScore = page.locator('.fleet-score');
+    await expect(fleetScore).toContainText('100');
   });
 });
