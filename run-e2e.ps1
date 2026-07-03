@@ -1,82 +1,86 @@
-# run-e2e.ps1
-# Native Windows PowerShell automation script to run local FastAPI backend & Playwright E2E tests in lockstep.
-# Run in PowerShell: .\run-e2e.ps1
+# run-e2e-v2.ps1 - Automated End-to-End Test Runner for Windows (Emoji-free edition)
+$ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Starting E2E Automation Pipeline..." -ForegroundColor Cyan
-
-# 1. Start FastAPI Backend in the background
-Write-Host "🐍 Launching FastAPI Backend..." -ForegroundColor Yellow
-Push-Location backend
-
-# Activate Python virtual environment if present
-if (Test-Path ".venv\Scripts\Activate.ps1") {
-    Write-Host "⚡ Activating .venv virtual environment..." -ForegroundColor Gray
-    & .venv\Scripts\Activate.ps1
-} elseif (Test-Path "venv\Scripts\Activate.ps1") {
-    Write-Host "⚡ Activating venv virtual environment..." -ForegroundColor Gray
-    & venv\Scripts\Activate.ps1
-}
-
-# Launch Uvicorn asynchronously and stream console output to backend-e2e.log
-$backendProcess = Start-Process python -ArgumentList "-m uvicorn app.main:app --host 127.0.0.1 --port 8000" -NoNewWindow -PassThru -RedirectStandardOutput "backend-e2e.log" -RedirectStandardError "backend-e2e.log"
-
-# 2. Wait for the backend to start up
-Write-Host "⏳ Waiting for FastAPI to respond on port 8000..." -ForegroundColor Yellow
-$timeout = 30
-$elapsed = 0
+# Keep track of background process
+$BackendProcess = $null
 $started = $false
 
-while ($elapsed -lt $timeout) {
-    try {
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/docs" -UseBasicParsing -ErrorAction SilentlyContinue
-        if ($response.StatusCode -eq 200) {
-            $started = $true
-            break
+function Cleanup {
+    Write-Host ""
+    if ($BackendProcess) {
+        Write-Host "[STOP] Stopping FastAPI Backend server..." -ForegroundColor Red
+        try {
+            Stop-Process -Id $BackendProcess.Id -Force -ErrorAction SilentlyContinue
+            Write-Host "[STOP] FastAPI Backend server stopped." -ForegroundColor Red
+        } catch {
+            Write-Host "[WARN] Failed to stop backend cleanly. It may already be closed." -ForegroundColor Yellow
         }
-    } catch {
-        # Silent fail during wait loops
     }
-    Start-Sleep -Seconds 1
-    $elapsed++
-}
-
-if (-not $started) {
-    Write-Host "❌ Error: FastAPI failed to start within $timeout seconds." -ForegroundColor Red
+    
     if (Test-Path "backend-e2e.log") {
-        Write-Host "🔍 Printing backend-e2e.log:" -ForegroundColor Gray
-        Get-Content "backend-e2e.log" -Tail 15
+        Write-Host "[CLEANUP] Removing temporary backend-e2e.log..." -ForegroundColor DarkGray
+        Remove-Item "backend-e2e.log" -ErrorAction SilentlyContinue
     }
-    Stop-Process -Id $backendProcess.Id -Force
-    Pop-Location
-    Exit 1
+    Write-Host "[OK] E2E Lifecycle ended." -ForegroundColor Green
 }
 
-Write-Host "✅ FastAPI is online and healthy!" -ForegroundColor Green
-Pop-Location
-
-# 3. Run Playwright E2E Tests
-Write-Host "🎭 Executing Playwright E2E Tests..." -ForegroundColor Yellow
-Push-Location frontend
-
-$testFailed = $false
+# Register the cleanup block to run on exit (Ctrl+C, normal completion, or crash)
 try {
-    npx playwright test
-    Write-Host "🎉 E2E verification completed successfully!" -ForegroundColor Green
-} catch {
-    $testFailed = $true
-    Write-Host "❌ E2E tests failed!" -ForegroundColor Red
-} finally {
-    # 4. Clean up background process under any termination condition
-    Write-Host "🧹 Cleaning up background processes..." -ForegroundColor Cyan
-    if ($backendProcess -and -not $backendProcess.HasExited) {
-        Stop-Process -Id $backendProcess.Id -Force
-        Write-Host "🛑 FastAPI Backend server stopped." -ForegroundColor Red
-    }
-    Pop-Location
-}
+    Write-Host "[START] Launching FastAPI Backend Server..." -ForegroundColor Cyan
+    
+    # Start the backend process from the backend directory
+    $BackendProcess = Start-Process -FilePath "uvicorn" -ArgumentList "app.main:app", "--port", "8000" `
+        -WorkingDirectory "backend" `
+        -RedirectStandardOutput "..\backend-e2e.log" `
+        -RedirectStandardError "..\backend-e2e.log" `
+        -NoNewWindow `
+        -PassThru
 
-if ($testFailed) {
-    Exit 1
-} else {
-    Exit 0
+    Write-Host "[INFO] Backend started with PID: $($BackendProcess.Id). Probing health..." -ForegroundColor Gray
+
+    # Active Probing Loop
+    $maxAttempts = 15
+    $attempt = 1
+    $healthy = $false
+
+    while ($attempt -le $maxAttempts) {
+        try {
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/docs" -Method Head -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+            if ($response.StatusCode -eq 200) {
+                $healthy = $true
+                break
+            }
+        } catch {
+            # Quietly fail and retry
+        }
+        Write-Host "[INFO] Waiting for backend to spin up (attempt $attempt/$maxAttempts)..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 1
+        $attempt++
+    }
+
+    if (-not $healthy) {
+        Write-Host "[ERROR] FastAPI backend failed to become healthy on port 8000. Check backend-e2e.log for details." -ForegroundColor Red
+        if (Test-Path "backend-e2e.log") {
+            Get-Content "backend-e2e.log" -Tail 20 | Write-Host -ForegroundColor DarkRed
+        }
+        exit 1
+    }
+
+    Write-Host "[OK] FastAPI Backend is healthy and responding!" -ForegroundColor Green
+    $started = $true
+
+    # Navigate to frontend and run playwright
+    Write-Host "[START] Launching Playwright E2E Tests..." -ForegroundColor Cyan
+    Set-Location "frontend"
+    
+    # Forward arguments if any (like --ui)
+    if ($args) {
+        npx playwright test $args
+    } else {
+        npx playwright test
+    }
+    
+} finally {
+    Set-Location $PSScriptRoot
+    Cleanup
 }
