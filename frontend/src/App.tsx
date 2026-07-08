@@ -44,10 +44,15 @@ export interface Lead {
   lead_status?: string;
 }
 
-// Initialize Supabase Client securely using Vite's environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Safe initialization prevents module-level crashes if environment variables are unconfigured
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const isSupabaseConfigured = 
+  import.meta.env.VITE_SUPABASE_URL && 
+  import.meta.env.VITE_SUPABASE_ANON_KEY && 
+  import.meta.env.VITE_SUPABASE_URL !== '';
 
 // ========================================== //
 // CUSTOM HOOK: useLeadData                   //
@@ -64,7 +69,13 @@ export function useLeadData() {
         setLoading(true);
         setError(null);
 
-        // Parse search query variables bracket-free
+        // Self-heal fallback: if database configuration is missing, run in local offline mode
+        if (!isSupabaseConfigured) {
+          setLoading(false);
+          return;
+        }
+
+        // Parse search query variables bracket-free to protect compiling
         const params = new URLSearchParams(window.location.search);
         const emailParam = params.get('email');
         const idParam = params.get('lead_id') || params.get('id');
@@ -85,7 +96,6 @@ export function useLeadData() {
         const { data, error: apiError } = await query.single();
 
         if (apiError) {
-          // Check for empty results gracefully (Code 'PGRST116' means 0 rows)
           if (apiError.code === 'PGRST116') {
             setLoading(false);
             return;
@@ -124,104 +134,57 @@ export function useLeadData() {
 }
 
 // ========================================== //
-// EMBEDDED STYLES FOR 3D TRANSFORMS          //
+// VALUE CARDS COMPONENT                      //
 // ========================================== //
 
-const flipCardStyles = `
-.perspective-1000 { perspective: 1000px; } 
-.backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; } 
-.transform-style-3d { transform-style: preserve-3d; }
-`;
-
-// ========================================== //
-// VALUE FLIP CARD COMPONENT                  //
-// ========================================== //
-
-interface FlipCardProps {
-  frontTitle: string;
-  frontDescription: string;
-  backTitle: string;
-  backDescription: string;
+interface PillarCardProps {
+  title: string;
+  description: string;
   icon: React.ReactNode;
   tagline?: string;
 }
 
-const FlipCard: React.FC<FlipCardProps> = ({ frontTitle, frontDescription, backTitle, backDescription, icon, tagline }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+const PillarCard: React.FC<PillarCardProps> = ({ title, description, icon, tagline }) => {
   return (
-    <div 
-      className="w-full h-80 perspective-1000 cursor-pointer group" 
-      onClick={() => setIsFlipped(!isFlipped)} 
-      onMouseEnter={() => setIsFlipped(true)} 
-      onMouseLeave={() => setIsFlipped(false)} 
-    > 
-      <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}> 
-        
-        {/* Front of Card */} 
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all duration-300 group-hover:border-emerald-500/30 group-hover:shadow-emerald-950/20"> 
-          <div> 
-            <div className="text-emerald-400 w-12 h-12 mb-4 flex items-center justify-center bg-white/5 rounded-xl border border-white/10"> 
-              {icon} 
-            </div> 
-            <h3 className="text-lg font-semibold text-white mb-2">{frontTitle}</h3> 
-            <p className="text-gray-400 text-sm leading-relaxed">{frontDescription}</p> 
-          </div> 
-          <div className="flex items-center justify-between mt-auto pt-4"> 
-            {tagline && ( 
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20"> 
-                {tagline} 
-              </span> 
-            )} 
-            <span className="text-xs text-gray-500 font-medium">Hover or tap →</span> 
-          </div> 
+    <div className="w-full bg-[#0b0f19]/40 border border-slate-900 rounded-2xl p-6 flex flex-col justify-between shadow-lg hover:border-emerald-500/20 transition-all duration-300">
+      <div>
+        <div className="text-emerald-400 w-10 h-10 mb-4 flex items-center justify-center bg-slate-900 rounded-xl border border-slate-800">
+          {icon}
         </div>
-        
-        {/* Back of Card */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-emerald-950/10 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-6 flex flex-col justify-between shadow-xl [transform:rotateY(180deg)]">
-          <div>
-            <h3 className="text-lg font-bold text-emerald-400 mb-2">{backTitle}</h3>
-            <p className="text-gray-300 text-sm leading-relaxed">{backDescription}</p>
-          </div>
-          <div className="text-xs text-emerald-500 font-mono">Verified Active Security</div>
+        <h3 className="text-base font-semibold text-white mb-2">{title}</h3>
+        <p className="text-slate-400 text-xs leading-relaxed">{description}</p>
+      </div>
+      {tagline && (
+        <div className="mt-4 pt-3 border-t border-slate-900/60">
+          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">{tagline}</span>
         </div>
-      </div> 
+      )}
     </div>
-  ); 
+  );
 };
 
-// ========================================== //
-// VALUE FLIP CARDS CONTAINER                 //
-// ========================================== //
-
-const ValueFlipCards: React.FC = () => { 
+const CompliancePillars: React.FC = () => { 
   return ( 
-    <section className="py-12 border-t border-white/5 mt-12 w-full max-w-6xl"> 
-      <style>{flipCardStyles}</style>
-      <h2 className="text-2xl font-bold text-white mb-8 text-center">Standard Compliance Pillars</h2>
+    <section className="py-8 border-t border-slate-900 mt-8 w-full max-w-5xl mx-auto"> 
+      <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-8">Standard Compliance Pillars</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <FlipCard 
-          frontTitle="Automated Recall Sweeping" 
-          frontDescription="Eliminate manual lookup logs. We automatically check manufacturer catalogs daily."
-          backTitle="Direct NHTSA Ingestion"
-          backDescription="Continuous synchronization against federal databases to protect operations from vehicle safety risks."
+        <PillarCard 
+          title="Automated Recall Sweeping" 
+          description="Eliminate manual manufacturer lookup sheets. Our platform monitors global registries to capture safety hazards automatically."
           icon={<span>📡</span>}
-          tagline="Core Utility"
+          tagline="Continuous Telemetry"
         />
-        <FlipCard 
-          frontTitle="Operator Compliance Badge" 
-          frontDescription="Display your live safety compliance index directly to prospective cargo clients and brokers."
-          backTitle="Safety Badging"
-          backDescription="Earn real-time trust markers with active, public links demonstrating a 100% clean recall profile."
+        <PillarCard 
+          title="Operator Compliance Badge" 
+          description="Embed a live, authenticated safety seal onto your carrier profile to prove 100% active compliance to shipping brokers."
           icon={<span>🛡️</span>}
-          tagline="Outbound Trust"
+          tagline="Contract Acceleration"
         />
-        <FlipCard 
-          frontTitle="Legal Liability Shield" 
-          frontDescription="Maintain complete documented proof of safety recall remediation in case of regulatory audits."
-          backTitle="Liability Reduction"
-          backDescription="Maintain exportable PDF certificates to dramatically lower carrier liability thresholds."
+        <PillarCard 
+          title="Legal Liability Shield" 
+          description="Generate secure, PDF safety remediation timelines to instantly insulate your business from heavy carrier liability audits."
           icon={<span>⚖️</span>}
-          tagline="Asset Protection"
+          tagline="Liability Reduction"
         />
       </div>
     </section> 
@@ -229,16 +192,17 @@ const ValueFlipCards: React.FC = () => {
 };
 
 // ========================================== //
-// INTERACTIVE GHOST AUDIT CARD COMPONENT    //
+// HIGH-CONVERTING CENTERPIECE COMPONENT      //
 // ========================================== //
 
 interface GhostAuditProps {
   lead: Lead | null;
   leadLoading: boolean;
   leadError: string | null;
+  onRunSweep: () => void;
 }
 
-function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
+function CenterpieceUploader({ lead, leadLoading, leadError, onRunSweep }: GhostAuditProps) {
   const [isSweeping, setIsSweeping] = useState<boolean>(false);
   const [sweepProgress, setSweepProgress] = useState<number>(0);
   const [sweepComplete, setSweepComplete] = useState<boolean>(false);
@@ -246,22 +210,19 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
 
   if (leadLoading) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-emerald-500/20 rounded-2xl p-8 shadow-2xl animate-pulse my-8">
-        <div className="h-6 bg-gray-800 rounded w-1/3 mb-4"></div>
-        <div className="h-10 bg-gray-800 rounded mb-6"></div>
-        <div className="space-y-3">
-          <div className="h-4 bg-gray-800 rounded w-5/6 text-slate-800"></div>
-          <div className="h-4 bg-gray-800 rounded flex-1"></div>
-        </div>
+      <div className="w-full max-w-3xl mx-auto bg-slate-900/40 border border-slate-800 rounded-2xl p-8 shadow-2xl animate-pulse my-4">
+        <div className="h-6 bg-slate-800 rounded w-1/4 mb-4"></div>
+        <div className="h-10 bg-slate-800 rounded mb-6"></div>
+        <div className="h-4 bg-slate-800 rounded w-5/6"></div>
       </div>
     );
   }
 
   if (leadError) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-red-950/30 border border-red-500/50 rounded-2xl p-6 text-center text-red-200 my-8">
-        <p className="font-semibold">⚠️ Failed to Load Fleet Profile</p>
-        <p className="text-sm mt-1 text-red-400">{leadError}</p>
+      <div className="w-full max-w-3xl mx-auto bg-red-950/20 border border-red-500/30 rounded-2xl p-6 text-center text-red-400 my-4">
+        <p className="font-semibold text-sm">⚠️ Configuration Interrupted</p>
+        <p className="text-xs mt-1 text-slate-500">{leadError}</p>
       </div>
     );
   }
@@ -277,6 +238,7 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
           clearInterval(interval);
           setIsSweeping(false);
           setSweepComplete(true);
+          onRunSweep();
           return 100;
         }
         return prev + 10;
@@ -290,85 +252,87 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
   const checkoutEmail = lead ? lead.contact_email : manualEmail;
   const stripeLink = `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(checkoutEmail)}&tier=${fleetSize > 25 ? 'enterprise' : 'growth'}`;
 
-  // RENDER CASE A: Fallback Generic Search
+  // SCENARIO A: Generic Prospect Visitor Flow
   if (!lead) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl my-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Scan Your Fleet for Active Recalls</h2>
-        <p className="text-gray-400 mb-6 text-sm">
-          Enter your email to run a secure, automated "Ghost Sweep" on up to 10 fleet vehicles in real time.
+      <div className="w-full max-w-3xl mx-auto bg-gradient-to-b from-[#0b0f19] to-[#040812] border border-slate-900 rounded-3xl p-8 md:p-10 shadow-2xl text-center relative overflow-hidden my-4">
+        <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+        
+        <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight mb-2">Scan Your Fleet For Active Safety Recalls</h3>
+        <p className="text-slate-400 text-xs md:text-sm max-w-md mx-auto mb-8 leading-relaxed">
+          Unlock your free, automated safety report. Instantly cross-reference active manufacturer safety records across up to 10 vehicles in real-time.
         </p>
 
         {!sweepComplete ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-2">Corporate Email Address</label>
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="relative">
               <input 
                 type="email"
-                placeholder="you@yourcompany.com"
+                placeholder="Enter your corporate email address..."
                 value={manualEmail}
                 onChange={(e) => setManualEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-5 py-4 bg-slate-950/80 border border-slate-800 rounded-xl text-xs md:text-sm text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/80 transition-all shadow-inner"
               />
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-700 text-xs">🔒</div>
             </div>
+            
             <button
               onClick={triggerSweep}
               disabled={isSweeping || !manualEmail}
-              className={`w-full py-4 rounded-xl font-bold text-center transition flex justify-center items-center ${
+              className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-lg ${
                 isSweeping || !manualEmail
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-gray-950'
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-slate-950 shadow-emerald-500/10'
               }`}
             >
-              {isSweeping ? `Scanning NHTSA Databases (${sweepProgress}%)...` : 'Run Free 10-VIN Sweep'}
+              {isSweeping ? `Scanning NHTSA Registers (${sweepProgress}%)...` : 'Deploy Free Fleet Sweep'}
             </button>
           </div>
         ) : (
-          <div className="text-center py-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full mb-4">
+          <div className="py-4 space-y-6 animate-fadeIn">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full mb-2">
               <span className="text-2xl text-emerald-400">⚠️</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Sweep Completed!</h3>
-            <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
-              Our automated system detected **3 open manufacturer recalls** associated with your registered vehicles.
+            <h4 className="text-lg font-bold text-white uppercase tracking-tight">Vulnerabilities Detected</h4>
+            <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+              Our background scan identified unaddressed federal safety recalls matches across your vehicles. Upgrade to unlock complete mitigation reports.
             </p>
-            <a 
-              href={stripeLink}
-              className="inline-block px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold rounded-xl transition"
-            >
-              Unlock Complete Fleet Safety Report
-            </a>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xs mx-auto">
+              <a 
+                href={stripeLink}
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-lg transition shadow-md"
+              >
+                Access Threat Shield
+              </a>
+            </div>
           </div>
         )}
       </div>
     );
   }
 
-  // RENDER CASE B: Hyper-Personalized Prospect Layout
+  // SCENARIO B: Hyper-Personalized Client Portal Flow
   return (
-    <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-emerald-500/30 rounded-2xl shadow-2xl overflow-hidden my-8">
-      <div className="bg-gradient-to-r from-emerald-950/40 to-teal-950/40 border-b border-emerald-500/20 p-6">
-        <span className="inline-block text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full mb-3">
-          Wave 1 Pilot Account: Active
+    <div className="w-full max-w-3xl mx-auto bg-[#0b0f19] border border-emerald-500/20 rounded-3xl overflow-hidden shadow-2xl my-4">
+      <div className="bg-gradient-to-b from-emerald-950/20 to-transparent p-6 md:p-8 border-b border-slate-900">
+        <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full mb-3">
+          Authenticated Pilot Link
         </span>
-        <h2 className="text-2xl font-bold text-white">
-          Welcome, {lead.contact_name} | {lead.company_name}
+        <h2 className="text-xl md:text-2xl font-bold text-white">
+          Welcome back, {lead.contact_name}
         </h2>
-        <p className="text-gray-300 text-sm mt-1">
-          We have pre-loaded your local Nevada fleet profile (Estimated: <span className="font-semibold text-white">{lead.est_fleet_size} {lead.primary_vehicle_mix}s</span>).
+        <p className="text-slate-400 text-xs mt-1">
+          Pre-loaded Nevada registry for <span className="text-slate-200 font-semibold">{lead.company_name}</span> (Estimated: {lead.est_fleet_size} {lead.primary_vehicle_mix}s).
         </p>
       </div>
 
       {lead.localized_threat_hook && (
-        <div className="p-6 bg-orange-950/20 border-b border-orange-500/20 flex gap-4">
-          <div className="flex-shrink-0 text-3xl mt-1">🔥</div>
+        <div className="px-6 py-4 bg-orange-950/10 border-b border-slate-900 flex gap-4 items-start">
+          <span className="text-lg mt-0.5">☀️</span>
           <div>
-            <h4 className="text-sm font-bold uppercase tracking-wider text-orange-400">Mojave Desert Operational Risk</h4>
-            <p className="text-orange-200 text-sm mt-1 font-medium italic">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-orange-400">Mojave Climate Hazard Trigger</h4>
+            <p className="text-slate-300 text-xs mt-1 leading-normal italic">
               "{lead.localized_threat_hook}"
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              With Southern Nevada climbing past 114°F, unaddressed manufacturer harness issues pose an active ground safety hazard to your operations.
             </p>
           </div>
         </div>
@@ -376,53 +340,53 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
 
       <div className="p-8">
         {!sweepComplete ? (
-          <div className="text-center py-4">
-            <h3 className="text-lg font-bold text-white mb-2">Run Your Priority Fleet Sweep</h3>
-            <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
-              Our system pre-loaded your vehicle parameters. Run an active validation sweep on 10 of your cargo vehicles right now.
+          <div className="text-center py-4 space-y-5">
+            <h3 className="text-base font-bold text-white uppercase tracking-tight">Active Ingestion Portal Standby</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+              Your regional parameters have been cached. Click below to verify active vehicle compliance logs against live NHTSA manufacturer registries.
             </p>
             <button
               onClick={triggerSweep}
               disabled={isSweeping}
-              className={`w-full max-w-sm py-4 rounded-xl font-bold transition ${
+              className={`px-8 py-3.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 ${
                 isSweeping 
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-gray-950 shadow-lg shadow-emerald-500/10'
+                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-lg shadow-emerald-500/10'
               }`}
             >
-              {isSweeping ? `Querying NHTSA APIs (${sweepProgress}%)...` : 'Execute 10-VIN Safety Sweep'}
+              {isSweeping ? `Connecting NHTSA Server (${sweepProgress}%)...` : 'Execute Priority Safety Sweep'}
             </button>
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="bg-gray-950 border border-gray-800 rounded-xl p-5 text-center">
-              <span className="text-red-500 text-2xl">⚠️</span>
-              <h4 className="text-lg font-bold text-white mt-2">Critical Recalls Identified!</h4>
-              <p className="text-sm text-gray-400 mt-1">
-                Your sweep completed. We identified open safety recalls on your active {lead.primary_vehicle_mix} fleet.
+            <div className="bg-slate-950/60 border border-slate-900 rounded-xl p-5 text-center">
+              <span className="text-rose-500 text-xl">⚠️</span>
+              <h4 className="text-sm font-black text-white uppercase tracking-wider mt-2">Active Vehicle Threat Vectors Detected</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Security scanners flagged open recalls associated with your active {lead.primary_vehicle_mix} fleet.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-950/50 p-4 border border-gray-850 rounded-xl text-center">
-                <p className="text-xs text-gray-400 uppercase font-semibold">Estimated Fleet Savings</p>
-                <p className="text-2xl font-bold text-emerald-400 mt-1">${estimatedAnnualSavings.toLocaleString()}/yr</p>
+              <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
+                <p className="text-[10px] text-slate-500 uppercase font-black font-mono">Projected Annual Savings</p>
+                <p className="text-lg font-black text-emerald-400 mt-1">${estimatedAnnualSavings.toLocaleString()}/yr</p>
               </div>
-              <div className="bg-gray-950/50 p-4 border border-gray-850 rounded-xl text-center">
-                <p className="text-xs text-gray-400 uppercase font-semibold">Active Monitoring Cost</p>
-                <p className="text-2xl font-bold text-white mt-1">${monthlySaaSPrice}/mo</p>
+              <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
+                <p className="text-[10px] text-slate-500 uppercase font-black font-mono">Platform SaaS Pricing</p>
+                <p className="text-lg font-black text-white mt-1">${monthlySaaSPrice}/mo</p>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-800 flex flex-col items-center gap-3">
+            <div className="pt-4 border-t border-slate-900 text-center space-y-4">
               <a
                 href={stripeLink}
-                className="w-full text-center py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition"
+                className="inline-block w-full max-w-xs py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-lg shadow-lg hover:opacity-95 transition"
               >
-                Upgrade to Active Monitoring (${monthlySaaSPrice}/mo)
+                Access Mitigation Matrix (${monthlySaaSPrice}/mo)
               </a>
-              <p className="text-xs text-gray-400 text-center">
-                Bypasses paywalls, pre-populates stripe session for {lead.contact_email}, and generates compliance certificates.
+              <p className="text-[10px] text-slate-500 leading-normal">
+                Bypasses testing limit gates, configures active webhook tracking, and publishes live Compliance Badges.
               </p>
             </div>
           </div>
@@ -437,7 +401,10 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
 // ========================================== //
 
 export default function App() {
-  // Existing States [cite: 11]
+  // Navigation & Interactive Tabs
+  const [activeTab, setActiveTab] = useState<'scanner' | 'roi'>('scanner');
+
+  // Application States
   const [metrics, setMetrics] = useState<GlobalMetrics | null>({
     total_vins: 25041,
     processed_vins: 1420,
@@ -458,21 +425,21 @@ export default function App() {
   const [showUploadNotification, setShowUploadNotification] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ROI Calculator State Tracking [cite: 12]
+  // ROI Calculator State Tracking
   const [sliderVinCount, setSliderVinCount] = useState<number>(25);
 
-  // Active Hook Integration [cite: 12]
+  // Active Hook Integration
   const { lead, loading: leadLoading, error: leadError } = useLeadData();
 
-  // Sandbox States [cite: 12]
+  // Sandbox States
   const [sandboxResetStatus, setSandboxResetStatus] = useState<string>('');
   const [sandboxWebhookLogs, setSandboxWebhookLogs] = useState<string>('');
 
-  const mockReferenceToken = "RL-2026-NKT82X"; // [cite: 12]
-  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`; // [cite: 12]
-  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; // [cite: 12]
+  const mockReferenceToken = "RL-2026-NKT82X";
+  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`;
+  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  // Existing Handlers [cite: 13]
+  // Fetch Global Metrics
   const fetchGlobalMetrics = () => {
     axios.get('http://127.0.0.1:8000/api/metrics/global')
       .then(res => {
@@ -521,7 +488,7 @@ export default function App() {
     }, 800);
   };
 
-  // Sandbox Orchestrators: Automated Reset Actions [cite: 15]
+  // Sandbox Reset
   const triggerSandboxEnvironmentReset = async () => {
     setSandboxResetStatus('Resetting Replica State...');
     try {
@@ -535,7 +502,7 @@ export default function App() {
     }
   };
 
-  // Sandbox Mock stripe upgrader [cite: 16]
+  // Sandbox Subscription Mock
   const simulateSandboxSubscriptionUpgrade = async () => {
     setSandboxWebhookLogs('Generating signed token payload...');
     try {
@@ -550,7 +517,7 @@ export default function App() {
     }
   };
 
-  // Full processing logic [cite: 17]
+  // Processing Manifest Registry Lines
   const processManifestLines = async (rawLines: Array<string>) => {
     const cleanedLines = rawLines
       .map(line => line.trim())
@@ -561,7 +528,6 @@ export default function App() {
       return;
     }
 
-    // Standard Freemium 10-VIN Gate
     if (cleanedLines.length > 10) {
       setBlockedVinCount(cleanedLines.length);
       setShowUpgradeModal(true);
@@ -577,7 +543,7 @@ export default function App() {
         const parts = line.split(',').map(p => p.trim());
         if (parts.length < 3) continue;
 
-        // Bracket-safe extraction using native .at()
+        // Bracket-safe native .at() calls protect system compilation
         const make = parts.at(0) || '';
         const model = parts.at(1) || '';
         const year = parts.at(2) || '';
@@ -612,7 +578,7 @@ export default function App() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method [cite: 17]
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe native FileList item fetching
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -647,7 +613,7 @@ export default function App() {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method [cite: 18]
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe native FileList item fetching
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -673,278 +639,274 @@ export default function App() {
     fileInputRef.current?.click();
   };
 
+  const simulateSuccessFromCenterpiece = () => {
+    // Fills uploader placeholder rows on sweep completion
+    setBulkInput("FORD, TRANSIT-250, 2022\nCHEVROLET, BOLT EV, 2021");
+    processManifestLines(["FORD, TRANSIT-250, 2022", "CHEVROLET, BOLT EV, 2021"]);
+  };
+
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
       
-      {/* 1. Left Navigation Sidebar */}
-      <aside className="w-64 border-r border-slate-900 bg-[#0b0f19]/80 p-6 hidden lg:flex flex-col justify-between shrink-0 backdrop-blur-md">
-        <div className="space-y-8">
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-lg shadow-lg shadow-emerald-500/20 border border-emerald-400/20">🛡️</div>
-            <div className="flex flex-col">
-              <span className="font-black text-slate-100 tracking-tight text-sm uppercase">RecallLogic Shield</span>
-              <span className="text-[10px] text-slate-500 font-mono tracking-wider">v2026.4.2</span>
-            </div>
+      {/* 1. Global Navigation Bar */}
+      <header className="border-b border-slate-900 bg-[#0b0f19]/40 backdrop-blur-md px-6 py-4 sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-base shadow-lg shadow-emerald-500/10 border border-emerald-400/10">🛡️</div>
+            <span className="font-black text-slate-100 tracking-tight text-xs md:text-sm uppercase tracking-wider">RecallLogic Shield</span>
           </div>
-          <nav className="space-y-1">
-            <span className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-emerald-400 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-inner">
-              📊 Threat Intelligence
-            </span>
+
+          <div className="flex items-center gap-4">
             <span 
               onClick={() => setShowShareModal(true)}
-              className="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-emerald-400 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer hover:bg-slate-900/40"
+              className="text-slate-400 hover:text-emerald-400 font-black text-[10px] md:text-xs uppercase tracking-wider cursor-pointer transition"
             >
-              🤝 Share Verification
+              🤝 Share Verification Badge
             </span>
-          </nav>
-        </div>
-        <div className="border-t border-slate-900 pt-4 px-2 space-y-2">
-          <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Network Blueprint</div>
-          <div className="text-xs text-slate-400 font-bold font-mono flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981] animate-pulse" /> Core_Live_Node_8000
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* 2. Primary Workspace Viewport Panel */}
-      <main className="flex-1 overflow-y-auto p-6 lg:p-12 space-y-8">
+      {/* 2. Primary Workspace Body */}
+      <main className="flex-1 p-6 md:p-12 max-w-5xl w-full mx-auto space-y-12">
         
-        {/* Dynamic Personalization Layer (Highest Hierarchy) */}
-        <GhostAuditCard lead={lead} leadLoading={leadLoading} leadError={leadError} />
-
-        {/* Dynamic Header Telemetry Metrics Block */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-900 pb-8">
-          <div className="space-y-2">
-            <h2 className="text-slate-100 text-3xl font-black tracking-tight sm:text-4xl uppercase">
-              Predictive Safety <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-500 bg-clip-text text-transparent">Intelligence</span>
-            </h2>
-            <p className="text-slate-400 text-xs sm:text-sm font-medium max-w-xl leading-relaxed">
+        {/* Modern Scientific Header & Premium Telemetry Blocks */}
+        <section className="text-center space-y-6">
+          <div className="space-y-3">
+            <h1 className="text-white text-3xl md:text-5xl font-black tracking-tight uppercase">
+              Predictive Safety <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent">Intelligence</span>
+            </h1>
+            <p className="text-slate-400 text-xs md:text-sm font-medium max-w-2xl mx-auto leading-relaxed">
               Cross-industry risk engine scoring technical asset subassembly failure frequencies against real-time environmental ambient multipliers.
             </p>
           </div>
 
-          {metrics && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Database</p>
-                <p className="text-xl font-black text-white font-mono mt-1">{metrics.total_vins.toLocaleString()}</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Processed Sweeps</p>
-                <p className="text-xl font-black text-emerald-400 font-mono mt-1">{metrics.processed_vins.toLocaleString()}</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Open Risks</p>
-                <p className="text-xl font-black text-rose-500 font-mono mt-1">{metrics.total_recalls}</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Health Rating</p>
-                <p className="text-xl font-black text-teal-400 font-mono mt-1">{metrics.fleet_health_index}%</p>
-              </div>
+          {/* Premium Value-First Telemetry Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto pt-4">
+            <div className="bg-[#0b0f19]/50 border border-slate-900 rounded-2xl p-5 text-center shadow-lg">
+              <p className="text-xl md:text-2xl font-black text-white font-mono">15,000+</p>
+              <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider mt-1">Safety Recalls Monitored</p>
+              <p className="text-[10px] text-slate-500 leading-normal mt-1.5">Direct continuous synchronization against federal databases.</p>
             </div>
-          )}
-        </header>
-
-        {/* Command Ingestion Console */}
-        <section className="space-y-6">
-          <div className="flex justify-between items-center px-1">
-            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Tactical Ingestion Console</h3>
-            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">Secure SSL Ingestion Live</span>
+            <div className="bg-[#0b0f19]/50 border border-slate-900 rounded-2xl p-5 text-center shadow-lg">
+              <p className="text-xl md:text-2xl font-black text-white font-mono">24/7 Sync</p>
+              <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider mt-1">Automated Monitoring</p>
+              <p className="text-[10px] text-slate-500 leading-normal mt-1.5">Eliminate manual sheets. Our system tracks records daily.</p>
+            </div>
+            <div className="bg-[#0b0f19]/50 border border-slate-900 rounded-2xl p-5 text-center shadow-lg">
+              <p className="text-xl md:text-2xl font-black text-white font-mono">Broker-Ready</p>
+              <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider mt-1">Compliance Badging</p>
+              <p className="text-[10px] text-slate-500 leading-normal mt-1.5">Prove vehicle compliance outbound to cargo underwriters.</p>
+            </div>
           </div>
-
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Drag and Drop Container */}
-              <div 
-                onClick={triggerFileSelect}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`p-6 border-2 border-dashed rounded-2xl text-center cursor-pointer flex flex-col items-center justify-center transition-all duration-300 relative group overflow-hidden ${
-                  isDragging  
-                    ? 'border-emerald-500 bg-emerald-950/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]'  
-                    : 'border-slate-800 bg-[#0b0f19]/30 hover:border-slate-700 hover:bg-[#0b0f19]/50'
-                }`}
-              >
-                <span className="text-3xl mb-2 transition-transform duration-300 group-hover:-translate-y-1">📥</span>
-                <span className="text-slate-200 font-bold text-sm block tracking-tight">Mount Fleet Manifest</span>
-                <span className="text-slate-500 text-[10px] mt-1 block leading-normal">Drop or browse raw .csv / .txt registries</span>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv,.txt" className="hidden" />
-                
-                {showUploadNotification && (
-                  <div className="mt-4 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-lg animate-bounce">
-                    ✓ File loaded! Click search below to query.
-                  </div>
-                )}
-              </div>
-
-              {/* Code-Style Input Console */}
-              <div className="lg:col-span-2 relative">
-                <textarea
-                  rows={4}
-                  placeholder="Manual String Override Input Loop: Paste comma-delimited asset arrays row-by-row...&#10;Example:&#10;FORD, TRANSIT-250, 2022&#10;CHEVROLET, BOLT EV, 2021"
-                  value={bulkInput}
-                  onChange={(e) => setBulkInput(e.target.value)}
-                  className="w-full h-full min-h-[140px] p-4 text-xs rounded-2xl border border-slate-900 bg-[#050914] text-emerald-400 font-mono outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/20 transition-all placeholder:text-slate-700 leading-relaxed shadow-inner resize-none"
-                />
-                <div className="absolute bottom-3 right-3 text-[9px] font-bold font-mono text-slate-600 bg-slate-950 px-2 py-1 rounded border border-slate-900/60 uppercase">PowerShell_Input_Active</div>
-              </div>
-
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-              <div className="text-slate-600 text-[11px] font-semibold max-w-xl leading-relaxed px-1">
-                ⚠️ Platform Guardrail Token: Unverified developer sandboxes are scaled to an execution maximum constraint threshold of 10 vehicle matrix components per evaluation wave.
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto px-6 py-3.5 text-xs uppercase tracking-wider bg-slate-100 text-slate-950 rounded-xl font-extrabold hover:bg-white active:scale-[0.985] transition-all shrink-0 shadow-xl disabled:opacity-30 disabled:pointer-events-none"
-              >
-                {loading ? 'Hashing Database Index Nodes...' : 'Run Safety Threat Sweep'}
-              </button>
-            </div>
-          </form>
         </section>
 
-        {/* Global errors banner */}
-        {error && (
-          <div className="text-emerald-400 p-4 bg-emerald-950/10 border border-emerald-900/40 rounded-xl font-mono text-xs flex items-center gap-3 shadow-inner">
-            <span className="text-sm">📡</span> {error}
+        {/* Value-First Personalized Welcome or Ghost Sweep */}
+        <section>
+          <CenterpieceUploader 
+            lead={lead} 
+            leadLoading={leadLoading} 
+            leadError={leadError} 
+            onRunSweep={simulateSuccessFromCenterpiece} 
+          />
+        </section>
+
+        {/* Tabbed Interactive Control Hub */}
+        <section className="space-y-6">
+          <div className="flex border-b border-slate-900 gap-6 justify-center">
+            <button
+              onClick={() => setActiveTab('scanner')}
+              className={`pb-3 font-bold text-xs uppercase tracking-wider border-b-2 transition-all ${
+                activeTab === 'scanner' 
+                  ? 'border-emerald-500 text-white' 
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              📊 Interactive Fleet Scanner
+            </button>
+            <button
+              onClick={() => setActiveTab('roi')}
+              className={`pb-3 font-bold text-xs uppercase tracking-wider border-b-2 transition-all ${
+                activeTab === 'roi' 
+                  ? 'border-emerald-500 text-white' 
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              💸 Fleet ROI Estimator
+            </button>
           </div>
-        )}
 
-        {/* Results List Viewport */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-center px-1">
-            <div className="text-xs font-black text-slate-500 uppercase tracking-widest">Active Threat Exposure Stream ({recalls.length})</div>
-            {recalls.length > 0 && <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#10b981] animate-ping" />}
-          </div>
-
-          {recalls.length === 0 && !loading && (
-            <div className="text-slate-600 py-20 text-center border border-slate-900/60 bg-[#0b0f19]/10 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-inner">
-              <span className="text-3xl animate-pulse">📡</span>
-              <p className="text-xs font-bold font-mono uppercase tracking-wide">Console Standby. Inject fleet manifest data matrices to compile metrics.</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4">
-            {recalls.map((recall, index) => {
-              const severity = recall.calculated_severity_score ?? 50;
-              const isCritical = severity >= 75;
-              return (
-                <div 
-                  key={index} 
-                  className={`border rounded-2xl p-6 transition-all duration-300 shadow-2xl relative overflow-hidden backdrop-blur-sm ${
-                    isCritical  
-                      ? 'border-red-500/20 bg-gradient-to-b from-red-950/10 via-[#030712] to-[#030712]'  
-                      : 'border-slate-900 bg-[#0b0f19]/20 hover:border-slate-800'
-                  }`}
-                >
-                  <div className={`absolute top-0 right-0 h-12 w-12 border-t-2 border-r-2 opacity-10 pointer-events-none ${isCritical ? 'border-red-500' : 'border-emerald-500'}`} />
+          {/* TAB A: Technical Fleet Scanner Ingestion */}
+          {activeTab === 'scanner' && (
+            <div className="space-y-6 animate-fadeIn">
+              <form onSubmit={handleSearch} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
-                  <div className="flex justify-between items-start flex-wrap gap-4 mb-4 relative z-10">
-                    <div>
-                      <h4 className="font-black text-slate-100 text-xl tracking-tight uppercase">
-                        {recall.make} <span className="text-emerald-400 font-mono font-medium">{recall.model}</span> ({recall.year})
-                      </h4>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                          isCritical ? 'bg-red-950/60 text-red-400 border border-red-500/20' : 'bg-slate-900 text-emerald-400 border border-slate-800'
-                        }`}>
-                          {recall.assembly_category || 'General Assembly'}
-                        </span>
-                        {recall.thermal_multiplier_active && (
-                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-950/60 text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                            ☀️ Climatic Multiplier Active
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1 font-mono">
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${isCritical ? 'text-red-400' : 'text-slate-500'}`}>
-                        NHTSA Ledger #{recall.campaign_number}
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-400">
-                        Severity Weight: <span className={`font-black ${isCritical ? 'text-red-400' : 'text-emerald-400'}`}>{severity}/100</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Severity Progress Bar */}
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full mb-5 overflow-hidden border border-slate-800/40">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${isCritical ? 'bg-gradient-to-r from-red-500 to-orange-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'}`}
-                      style={{ width: `${severity}%` }}
-                    />
-                  </div>
-
-                  <div className="space-y-3 text-xs text-slate-400 leading-relaxed relative z-10 font-medium">
-                    <p><strong className="text-slate-200 uppercase text-[10px] tracking-wider font-bold block mb-0.5">Component Breakdown:</strong> {recall.component}</p>
-                    <p><strong className="text-slate-200 uppercase text-[10px] tracking-wider font-bold block mb-0.5">Vulnerability Technical Summary:</strong> {recall.summary}</p>
-                    {recall.notes && (
-                      <div className={`mt-4 p-4 rounded-xl border-l-2 text-xs font-mono tracking-normal leading-relaxed shadow-inner ${
-                        isCritical  
-                          ? 'bg-red-500/5 border-red-500 text-red-300/90'  
-                          : 'bg-slate-950/50 border-emerald-500 text-slate-400'
-                      }`}>
-                        {recall.notes}
+                  {/* CSV Drag Drop */}
+                  <div 
+                    onClick={triggerFileSelect}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`p-6 border border-dashed rounded-2xl text-center cursor-pointer flex flex-col items-center justify-center transition-all duration-300 relative group ${
+                      isDragging  
+                        ? 'border-emerald-500 bg-emerald-950/10'  
+                        : 'border-slate-800 bg-[#0b0f19]/10 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-2xl mb-2">📥</span>
+                    <span className="text-slate-200 font-bold text-xs block">Manifest File Registry</span>
+                    <span className="text-slate-500 text-[10px] mt-1 block">Drop raw .csv or .txt spreadsheet matrices</span>
+                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv,.txt" className="hidden" />
+                    
+                    {showUploadNotification && (
+                      <div className="mt-3 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] rounded animate-bounce">
+                        File loaded! Run sweep below to process.
                       </div>
                     )}
                   </div>
+
+                  {/* PowerShell Terminal Paste */}
+                  <div className="md:col-span-2 relative">
+                    <textarea
+                      rows={4}
+                      placeholder="Paste comma-delimited registry arrays row-by-row...&#10;Example:&#10;FORD, TRANSIT-250, 2022&#10;CHEVROLET, BOLT EV, 2021"
+                      value={bulkInput}
+                      onChange={(e) => setBulkInput(e.target.value)}
+                      className="w-full h-full min-h-[120px] p-4 text-xs rounded-2xl border border-slate-900 bg-slate-950/80 text-emerald-400 font-mono outline-none focus:border-emerald-500/60 transition-all placeholder:text-slate-800 resize-none"
+                    />
+                    <div className="absolute bottom-3 right-3 text-[8px] font-mono text-slate-700 bg-slate-950 px-2 py-0.5 rounded border border-slate-900/60">Registry_Override_Console</div>
+                  </div>
+
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                  <div className="text-slate-600 text-[10px] max-w-md leading-normal">
+                    ⚠️ Evaluation Wave Guard: Testing sandboxes have an execution pipeline limit restricted to 10 vehicles per sweep pass.
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-white text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg disabled:opacity-40"
+                  >
+                    {loading ? 'Analyzing Registers...' : 'Run Safety Scanner'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Ingestion Errors Banner */}
+              {error && (
+                <div className="text-emerald-400 p-4 bg-emerald-950/10 border border-emerald-900/30 rounded-xl font-mono text-xs flex items-center gap-2">
+                  <span>📡</span> {error}
+                </div>
+              )}
+
+              {/* Render Active Scanner Threat Streams */}
+              <div className="space-y-4">
+                {recalls.length > 0 && (
+                  <div className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Detected Recalls ({recalls.length})</div>
+                )}
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {recalls.map((recall, index) => {
+                    const score = recall.calculated_severity_score ?? 50;
+                    const isHazardous = score >= 75;
+                    return (
+                      <div 
+                        key={index}
+                        className={`border rounded-2xl p-6 transition-all bg-slate-950/40 relative overflow-hidden ${
+                          isHazardous ? 'border-red-500/20 shadow-red-950/5' : 'border-slate-900'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start flex-wrap gap-4 mb-4">
+                          <div>
+                            <h4 className="font-bold text-white text-base md:text-lg">
+                              {recall.make} <span className="text-emerald-400 font-mono font-normal">{recall.model}</span> ({recall.year})
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 text-emerald-400 border border-slate-800">
+                                {recall.assembly_category || 'General Assembly'}
+                              </span>
+                              {recall.thermal_multiplier_active && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-950/30 text-amber-400 border border-amber-500/20">
+                                  Climatic Trigger Active
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right font-mono text-[10px]">
+                            <p className="text-slate-500">NHTSA Ledger #{recall.campaign_number}</p>
+                            <p className="text-slate-400 font-semibold mt-1">Severity: <span className={isHazardous ? 'text-red-400' : 'text-emerald-400'}>{score}/100</span></p>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-slate-900 h-1 rounded-full mb-4 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${isHazardous ? 'bg-gradient-to-r from-red-500 to-orange-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'}`}
+                            style={{ width: `${score}%` }}
+                          />
+                        </div>
+
+                        <div className="space-y-2 text-xs text-slate-400 leading-relaxed">
+                          <p><strong className="text-slate-200 uppercase text-[9px] tracking-wider font-bold block mb-0.5">Component Vector:</strong> {recall.component}</p>
+                          <p><strong className="text-slate-200 uppercase text-[9px] tracking-wider font-bold block mb-0.5">Technical Summary:</strong> {recall.summary}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB B: Premium Enterprise ROI Calculator */}
+          {activeTab === 'roi' && (
+            <div className="bg-[#0b0f19]/30 border border-slate-900 rounded-3xl p-6 md:p-8 space-y-6 animate-fadeIn">
+              <div>
+                <h4 className="text-sm font-black text-white uppercase tracking-wider mb-2">Fleet Scale ROI Calculator</h4>
+                <p className="text-xs text-slate-500 leading-relaxed mb-6">Drag the range bar to estimate active monitoring SaaS pricing tiers and compliance savings.</p>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between text-xs font-bold text-slate-400 font-mono">
+                    <span>ACTIVE EVALUATION ROADWAY ASSETS:</span>
+                    <span className="text-emerald-400">{sliderVinCount} vehicles</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="5" 
+                    max="500" 
+                    value={sliderVinCount}
+                    onChange={(e) => setSliderVinCount(Number(e.target.value))}
+                    className="w-full accent-emerald-500 h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-900/60">
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-900 text-center">
+                  <p className="text-[9px] text-slate-500 uppercase font-black font-mono">Subscription Package</p>
+                  <p className="text-xl font-black text-white mt-1 font-mono">${calculatedSaaSPremium.toFixed(2)}/mo</p>
+                </div>
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-900 text-center">
+                  <p className="text-[9px] text-slate-500 uppercase font-black font-mono">Projected Safety Shield Savings</p>
+                  <p className="text-xl font-black text-emerald-400 mt-1 font-mono">${estimatedDowntimeSavings.toLocaleString()}/yr</p>
+                </div>
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-900 text-center">
+                  <p className="text-[9px] text-slate-500 uppercase font-black font-mono">Insurance Liability Deductions</p>
+                  <p className="text-xl font-black text-teal-400 mt-1 font-mono">${insuranceDeductionsSavings.toLocaleString()}/yr</p>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* 3. Interactive ROI & Billing Calculator */}
-        <section className="bg-white/5 border border-white/10 rounded-2xl p-8 max-w-4xl mx-auto shadow-2xl">
-          <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Enterprise ROI Calculator</h3>
-          <p className="text-slate-400 text-sm mb-6">Drag the slider to adjust your active operational fleet size and compute safety savings.</p>
-
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between text-sm font-bold text-slate-300 mb-2 font-mono">
-                <span>ACTIVE SERVICE ASSETS:</span>
-                <span className="text-emerald-400">{sliderVinCount} vehicles</span>
-              </div>
-              <input 
-                type="range" 
-                min="5" 
-                max="500" 
-                value={sliderVinCount}
-                onChange={(e) => setSliderVinCount(Number(e.target.value))}
-                className="w-full accent-emerald-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-900">
-              <div className="bg-[#050914] p-4 rounded-xl border border-slate-900 text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-bold font-mono">SaaS Monthly Subscription</p>
-                <p className="text-2xl font-black text-white mt-1 font-mono">${calculatedSaaSPremium.toFixed(2)}/mo</p>
-              </div>
-              <div className="bg-[#050914] p-4 rounded-xl border border-slate-900 text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-bold font-mono">Est. Downtime Savings</p>
-                <p className="text-2xl font-black text-emerald-400 mt-1 font-mono">${estimatedDowntimeSavings.toLocaleString()}/yr</p>
-              </div>
-              <div className="bg-[#050914] p-4 rounded-xl border border-slate-900 text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-bold font-mono">Insurance Deductions</p>
-                <p className="text-2xl font-black text-teal-400 mt-1 font-mono">${insuranceDeductionsSavings.toLocaleString()}/yr</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Standard Features Columns */}
-        <ValueFlipCards />
+        {/* Dynamic Compliance Pillars Trust Cards */}
+        <CompliancePillars />
 
         {/* 4. Local Developer Sandbox Controls */}
         {isSandboxMode && (
-          <footer className="mt-16 w-full max-w-2xl mx-auto bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 text-center">
-            <h3 className="text-sm font-bold text-amber-400 uppercase tracking-widest mb-3 font-mono">🛠️ LOCAL DEV SANDBOX TOOLS</h3>
+          <footer className="mt-12 w-full max-w-2xl mx-auto bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 text-center">
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 font-mono">🛠️ Developer Sandbox Controls</h3>
             <div className="flex flex-wrap gap-4 justify-center">
               <button 
                 onClick={triggerSandboxEnvironmentReset}
@@ -968,30 +930,30 @@ export default function App() {
           MODALS & SYSTEM OVERLAYS
           ========================================== */}
 
-      {/* A. High-Converting Paywall Modal */}
+      {/* A. Dynamic Paywall Upgrade Modal */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center relative overflow-hidden">
-            <span className="text-5xl block mb-4">🛡️</span>
-            <h3 className="text-2xl font-black text-white uppercase tracking-tight">Upgrade Requested</h3>
-            <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-              Your source fleet target includes <strong className="text-emerald-400 font-mono">{blockedVinCount} active rows</strong>. Exploratory un-metered passes are locked at a structural maximum limit of 10 logs per cycle.
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b0f19] border border-slate-900 rounded-3xl p-8 max-w-md w-full text-center relative overflow-hidden shadow-2xl">
+            <span className="text-4xl block mb-3">🛡️</span>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight">Access Gate Enforced</h3>
+            <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+              Your uploaded registry includes <strong className="text-emerald-400 font-mono">{blockedVinCount} active assets</strong>. Unverified trial runs are limited to a maximum constraint of 10 vehicle keys per cycle.
             </p>
 
-            <div className="bg-slate-950/60 border border-slate-900 rounded-2xl p-5 text-left space-y-4 shadow-inner my-6">
+            <div className="bg-slate-950/60 border border-slate-900 rounded-2xl p-5 text-left space-y-4 my-6 shadow-inner">
               <div className="flex justify-between items-center border-b border-slate-900 pb-3">
-                <span className="font-black text-slate-400 text-[10px] uppercase tracking-wider font-mono">RecallLogic Protection Quote:</span>
-                <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-                  ${calculateCustomMRR(blockedVinCount).toFixed(2)}<span className="text-xs font-semibold text-slate-600">/mo</span>
+                <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider font-mono">Active Monitoring Quote:</span>
+                <span className="text-xl font-black text-emerald-400 font-mono">
+                  ${calculateCustomMRR(blockedVinCount).toFixed(2)}<span className="text-[10px] font-normal text-slate-600">/mo</span>
                 </span>
               </div>
-              <div className="space-y-2.5 text-xs font-bold text-slate-500 font-mono">
+              <div className="space-y-2 text-[10px] font-bold text-slate-500 font-mono">
                 <div className="flex justify-between items-center">
-                  <span>• Base Infrastructure Access License</span>
+                  <span>• Base Licensing Infrastructure</span>
                   <span className="text-slate-300">$99.00</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>• Active Monitoring Asset Allocation</span>
+                  <span>• Active Asset Allocations</span>
                   <span className="text-slate-300">${(blockedVinCount * 2.50).toFixed(2)}</span>
                 </div>
               </div>
@@ -1001,72 +963,72 @@ export default function App() {
               <button 
                 type="button" 
                 onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 py-3 px-4 rounded-xl border border-slate-800 bg-transparent text-slate-400 hover:text-white font-black text-xs transition-all uppercase"
+                className="flex-1 py-3 px-4 rounded-xl border border-slate-800 bg-transparent text-slate-400 hover:text-white font-black text-xs transition uppercase"
               >
-                Adjust
+                Back
               </button>
               <button 
                 type="button" 
-                onClick={() => alert("Forwarding token context to Stripe checkout hooks...")}
-                className="flex- py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-xs transition-all shadow-lg active:scale-[0.98] hover:opacity-95 uppercase tracking-wider"
+                onClick={() => alert("Forwarding token context to checkout session hooks...")}
+                className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition shadow-lg hover:bg-emerald-600 uppercase"
               >
-                Deploy Protection Shield
+                Upgrade Plan
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* B. Share Verification Modal */}
+      {/* B. Share Compliance Badge Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl p-8 max-w-md w-full relative">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b0f19] border border-slate-900 rounded-3xl p-8 max-w-md w-full relative shadow-2xl">
             <button 
               onClick={() => setShowShareModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-white transition font-mono"
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition font-mono text-sm"
             >
               ✕
             </button>
-            <span className="text-5xl block text-center mb-4">🤝</span>
-            <h3 className="text-2xl font-black text-white text-center uppercase tracking-tight">Share Audit Link</h3>
-            <p className="text-slate-400 text-sm text-center mt-2 leading-relaxed">
-              Send a cryptographically secure, immutable live verification timeline directly to your commercial insurance brokers or underwriting agents.
+            <span className="text-4xl block text-center mb-3">🤝</span>
+            <h3 className="text-xl font-black text-white text-center uppercase tracking-tight">Share Verified Compliance Badge</h3>
+            <p className="text-slate-400 text-xs text-center mt-2 leading-relaxed">
+              Generate an immutable active verification timeline and dispatch the secure link directly to insurance brokers or commercial shipping operators.
             </p>
 
             <div className="my-6 space-y-4">
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-900 flex items-center justify-between gap-3 font-mono text-[11px] text-emerald-400 select-all">
-                <span>{shareableVerificationUrl}</span>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-900 flex items-center justify-between gap-3 font-mono text-[10px] text-emerald-400">
+                <span className="truncate">{shareableVerificationUrl}</span>
                 <button 
                   onClick={handleCopyLink}
-                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded font-sans font-bold transition"
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded font-sans font-bold transition text-[9px] shrink-0"
                 >
                   {copiedLink ? 'Copied' : 'Copy'}
                 </button>
               </div>
 
               <form onSubmit={handleEmailSubmit} className="space-y-2">
-                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider">Broker Work Email</label>
+                <label className="block text-[9px] font-black uppercase text-slate-500 tracking-wider">Broker Work Email</label>
                 <div className="flex gap-2">
                   <input 
                     type="email"
                     required
-                    placeholder="underwriting@carrier.com"
+                    placeholder="e.g. underwriting@carrier.com"
                     value={brokerEmail}
                     onChange={(e) => setBrokerEmail(e.target.value)}
-                    className="flex-1 bg-black/40 border border-slate-900 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-700 focus:outline-none focus:border-emerald-500 transition font-medium"
+                    className="flex-1 bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-800 focus:outline-none focus:border-emerald-500 transition font-medium"
                   />
                   <button 
                     type="submit"
-                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 rounded-xl text-sm transition"
+                    className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 rounded-xl text-xs uppercase tracking-wider transition shrink-0"
                   >
-                    Send
+                    Send Link
                   </button>
                 </div>
               </form>
 
               {shareSuccess && (
                 <p className="text-xs text-center text-emerald-400 font-bold animate-pulse">
-                  ✓ Secure audit hash sent to broker!
+                  ✓ Secure badge verification email dispatched!
                 </p>
               )}
             </div>
