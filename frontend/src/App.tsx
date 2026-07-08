@@ -437,7 +437,7 @@ function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
 // ========================================== //
 
 export default function App() {
-  // Existing States [cite: 10, 11]
+  // Existing States [cite: 11]
   const [metrics, setMetrics] = useState<GlobalMetrics | null>({
     total_vins: 25041,
     processed_vins: 1420,
@@ -458,21 +458,21 @@ export default function App() {
   const [showUploadNotification, setShowUploadNotification] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ROI Calculator State Tracking [cite: 676]
+  // ROI Calculator State Tracking [cite: 12]
   const [sliderVinCount, setSliderVinCount] = useState<number>(25);
 
-  // Active Hook Integration [cite: 11]
+  // Active Hook Integration [cite: 12]
   const { lead, loading: leadLoading, error: leadError } = useLeadData();
 
-  // Sandbox States [cite: 11]
+  // Sandbox States [cite: 12]
   const [sandboxResetStatus, setSandboxResetStatus] = useState<string>('');
   const [sandboxWebhookLogs, setSandboxWebhookLogs] = useState<string>('');
 
-  const mockReferenceToken = "RL-2026-NKT82X"; // [cite: 11]
-  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`; // [cite: 11]
-  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; // [cite: 11]
+  const mockReferenceToken = "RL-2026-NKT82X"; // [cite: 12]
+  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`; // [cite: 12]
+  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; // [cite: 12]
 
-  // Existing Handlers [cite: 12]
+  // Existing Handlers [cite: 13]
   const fetchGlobalMetrics = () => {
     axios.get('http://127.0.0.1:8000/api/metrics/global')
       .then(res => {
@@ -521,7 +521,7 @@ export default function App() {
     }, 800);
   };
 
-  // Sandbox Orchestrators: Automated Reset Actions [cite: 13]
+  // Sandbox Orchestrators: Automated Reset Actions [cite: 15]
   const triggerSandboxEnvironmentReset = async () => {
     setSandboxResetStatus('Resetting Replica State...');
     try {
@@ -535,7 +535,7 @@ export default function App() {
     }
   };
 
-  // Sandbox Mock stripe upgrader [cite: 14]
+  // Sandbox Mock stripe upgrader [cite: 16]
   const simulateSandboxSubscriptionUpgrade = async () => {
     setSandboxWebhookLogs('Generating signed token payload...');
     try {
@@ -550,7 +550,7 @@ export default function App() {
     }
   };
 
-  // Full processing logic [cite: 15]
+  // Full processing logic [cite: 17]
   const processManifestLines = async (rawLines: Array<string>) => {
     const cleanedLines = rawLines
       .map(line => line.trim())
@@ -561,7 +561,7 @@ export default function App() {
       return;
     }
 
-    // Standard Freemium 10-VIN Gate [cite: 192, 205]
+    // Standard Freemium 10-VIN Gate
     if (cleanedLines.length > 10) {
       setBlockedVinCount(cleanedLines.length);
       setShowUpgradeModal(true);
@@ -577,7 +577,7 @@ export default function App() {
         const parts = line.split(',').map(p => p.trim());
         if (parts.length < 3) continue;
 
-        // Bracket-safe extraction
+        // Bracket-safe extraction using native .at()
         const make = parts.at(0) || '';
         const model = parts.at(1) || '';
         const year = parts.at(2) || '';
@@ -612,7 +612,7 @@ export default function App() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method [cite: 17]
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -647,7 +647,7 @@ export default function App() {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe `.item(0)` method [cite: 18]
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -730,7 +730,7 @@ export default function App() {
                 <p className="text-xl font-black text-white font-mono mt-1">{metrics.total_vins.toLocaleString()}</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Processed Swaps</p>
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Processed Sweeps</p>
                 <p className="text-xl font-black text-emerald-400 font-mono mt-1">{metrics.processed_vins.toLocaleString()}</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
@@ -1008,7 +1008,7 @@ export default function App() {
               <button 
                 type="button" 
                 onClick={() => alert("Forwarding token context to Stripe checkout hooks...")}
-                className="flex-[2] py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-xs transition-all shadow-lg active:scale-[0.98] hover:opacity-95 uppercase tracking-wider"
+                className="flex- py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-xs transition-all shadow-lg active:scale-[0.98] hover:opacity-95 uppercase tracking-wider"
               >
                 Deploy Protection Shield
               </button>
