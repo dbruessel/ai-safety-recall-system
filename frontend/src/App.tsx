@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 
-// ==========================================
-// TYPES & INTERFACES
-// ==========================================
+// ========================================== //
+// TYPES, INTERFACES, & CONFIG                //
+// ========================================== //
+
 interface Recall {
   campaign_number: string;
   make: string;
@@ -23,25 +25,115 @@ interface GlobalMetrics {
   fleet_health_index: number;
 }
 
-// ==========================================
-// EMBEDDED STYLES FOR 3D TRANSFORMS
-// ==========================================
+export interface Lead {
+  id?: string;
+  company_name: string;
+  industry: string;
+  est_fleet_size: number;
+  primary_vehicle_mix: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone?: string;
+  usdot_number?: string;
+  usdot_oos_rate?: number;
+  localized_threat_hook?: string;
+  lead_status?: string;
+}
+
+// Initialize Supabase Client using standard Vite environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// ========================================== //
+// CUSTOM HOOK: useLeadData                   //
+// ========================================== //
+
+export function useLeadData() {
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchLead() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 1. Parse incoming URL parameters (e.g., ?email=john@goettl.com)
+        const params = new URLSearchParams(window.location.search);
+        const emailParam = params.get('email');
+        const idParam = params.get('lead_id') || params.get('id');
+
+        if (!emailParam && !idParam) {
+          setLoading(false);
+          return;
+        }
+
+        // 2. Query your live Supabase leads table
+        let query = supabase.from('leads').select('*');
+
+        if (idParam) {
+          query = query.eq('id', idParam);
+        } else if (emailParam) {
+          query = query.eq('contact_email', emailParam.trim());
+        }
+
+        const { data, error: apiError } = await query.single();
+
+        if (apiError) {
+          // PGRST116 indicates no matching records found
+          if (apiError.code === 'PGRST116') {
+            setLoading(false);
+            return;
+          }
+          throw apiError;
+        }
+
+        if (data) {
+          setLead({
+            id: data.id,
+            company_name: data.company_name,
+            industry: data.industry,
+            est_fleet_size: Number(data.est_fleet_size) || 0,
+            primary_vehicle_mix: data.primary_vehicle_mix || 'Service Vehicles',
+            contact_name: data.contact_name,
+            contact_email: data.contact_email,
+            contact_phone: data.contact_phone,
+            usdot_number: data.usdot_number,
+            usdot_oos_rate: data.usdot_oos_rate ? Number(data.usdot_oos_rate) : undefined,
+            localized_threat_hook: data.localized_threat_hook,
+            lead_status: data.lead_status,
+          });
+        }
+      } catch (err: any) {
+        console.error('Error fetching lead data:', err);
+        setError(err.message || 'An error occurred loading your fleet profile.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLead();
+  }, []);
+
+  return { lead, loading, error };
+}
+
+// ========================================== //
+// EMBEDDED STYLES FOR 3D TRANSFORMS          //
+// ========================================== //
+
 const flipCardStyles = `
-  .perspective-1000 {
-    perspective: 1000px;
-  }
-  .backface-hidden {
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-  }
-  .transform-style-3d {
-    transform-style: preserve-3d;
-  }
+.perspective-1000 { perspective: 1000px; } 
+.backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; } 
+.transform-style-3d { transform-style: preserve-3d; }
 `;
 
-// ==========================================
-// VALUE FLIP CARD COMPONENT
-// ==========================================
+// ========================================== //
+// VALUE FLIP CARD COMPONENT                  //
+// ========================================== //
+
 interface FlipCardProps {
   frontTitle: string;
   frontDescription: string;
@@ -53,120 +145,297 @@ interface FlipCardProps {
 
 const FlipCard: React.FC<FlipCardProps> = ({ frontTitle, frontDescription, backTitle, backDescription, icon, tagline }) => {
   const [isFlipped, setIsFlipped] = useState(false);
-
   return (
     <div 
-      className="w-full h-80 perspective-1000 cursor-pointer group"
-      onClick={() => setIsFlipped(!isFlipped)}
-      onMouseEnter={() => setIsFlipped(true)}
-      onMouseLeave={() => setIsFlipped(false)}
-    >
-      <div 
-        className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${
-          isFlipped ? '[transform:rotateY(180deg)]' : ''
-        }`}
-      >
-        {/* Front of Card */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all duration-300 group-hover:border-emerald-500/30 group-hover:shadow-emerald-950/20">
-          <div>
-            <div className="text-emerald-400 w-12 h-12 mb-4 flex items-center justify-center bg-white/5 rounded-xl border border-white/10">
-              {icon}
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">{frontTitle}</h3>
-            <p className="text-gray-400 text-sm leading-relaxed">{frontDescription}</p>
-          </div>
-          <div className="flex items-center justify-between mt-auto pt-4">
-            {tagline && (
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                {tagline}
-              </span>
-            )}
-            <span className="text-xs text-gray-500 font-medium">Hover or tap →</span>
-          </div>
+      className="w-full h-80 perspective-1000 cursor-pointer group" 
+      onClick={() => setIsFlipped(!isFlipped)} 
+      onMouseEnter={() => setIsFlipped(true)} 
+      onMouseLeave={() => setIsFlipped(false)} 
+    > 
+      <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}> 
+        {/* Front of Card */} 
+        <div className="absolute inset-0 w-full h-full backface-hidden bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all duration-300 group-hover:border-emerald-500/30 group-hover:shadow-emerald-950/20"> 
+          <div> 
+            <div className="text-emerald-400 w-12 h-12 mb-4 flex items-center justify-center bg-white/5 rounded-xl border border-white/10"> 
+              {icon} 
+            </div> 
+            <h3 className="text-lg font-semibold text-white mb-2">{frontTitle}</h3> 
+            <p className="text-gray-400 text-sm leading-relaxed">{frontDescription}</p> 
+          </div> 
+          <div className="flex items-center justify-between mt-auto pt-4"> 
+            {tagline && ( 
+              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20"> 
+                {tagline} 
+              </span> 
+            )} 
+            <span className="text-xs text-gray-500 font-medium">Hover or tap →</span> 
+          </div> 
         </div>
-
+        
         {/* Back of Card */}
-        <div className="absolute inset-0 w-full h-full backface-hidden [transform:rotateY(180deg)] bg-gradient-to-br from-emerald-950/40 to-slate-900/60 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
+        <div className="absolute inset-0 w-full h-full backface-hidden bg-emerald-950/10 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-6 flex flex-col justify-between shadow-xl [transform:rotateY(180deg)]">
           <div>
-            <div className="text-emerald-400 w-12 h-12 mb-4 flex items-center justify-center bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-              {icon}
-            </div>
-            <h3 className="text-lg font-semibold text-emerald-400 mb-2">{backTitle}</h3>
+            <h3 className="text-lg font-bold text-emerald-400 mb-2">{backTitle}</h3>
             <p className="text-gray-300 text-sm leading-relaxed">{backDescription}</p>
           </div>
-          <div className="text-xs text-emerald-500/50 mt-auto">
-            Click / tap to flip back
+          <div className="text-xs text-emerald-500 font-mono">Verified Active Security</div>
+        </div>
+      </div> 
+    </div>
+  ); 
+};
+
+// ========================================== //
+// VALUE FLIP CARDS CONTAINER                 //
+// ========================================== //
+
+const ValueFlipCards: React.FC = () => { 
+  return ( 
+    <section className="py-12 border-t border-white/5 mt-12 w-full max-w-6xl"> 
+      <style>{flipCardStyles}</style>
+      <h2 className="text-2xl font-bold text-white mb-8 text-center">Standard Compliance Pillars</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <FlipCard 
+          frontTitle="Automated Recall Sweeping" 
+          frontDescription="Eliminate manual lookup logs. We automatically check manufacturer catalogs daily."
+          backTitle="Direct NHTSA Ingestion"
+          backDescription="Continuous synchronization against federal databases to protect operations from vehicle safety risks."
+          icon={<span>📡</span>}
+          tagline="Core Utility"
+        />
+        <FlipCard 
+          frontTitle="Operator Compliance Badge" 
+          frontDescription="Display your live safety compliance index directly to prospective cargo clients and brokers."
+          backTitle="Safety Badging"
+          backDescription="Earn real-time trust markers with active, public links demonstrating a 100% clean recall profile."
+          icon={<span>🛡️</span>}
+          tagline="Outbound Trust"
+        />
+        <FlipCard 
+          frontTitle="Legal Liability Shield" 
+          frontDescription="Maintain complete documented proof of safety recall remediation in case of regulatory audits."
+          backTitle="Liability Reduction"
+          backDescription="Maintain exportable PDF certificates to dramatically lower carrier liability thresholds."
+          icon={<span>⚖️</span>}
+          tagline="Asset Protection"
+        />
+      </div>
+    </section> 
+  ); 
+};
+
+// ========================================== //
+// INTERACTIVE GHOST AUDIT CARD COMPONENT    //
+// ========================================== //
+
+interface GhostAuditProps {
+  lead: Lead | null;
+  leadLoading: boolean;
+  leadError: string | null;
+}
+
+function GhostAuditCard({ lead, leadLoading, leadError }: GhostAuditProps) {
+  const [isSweeping, setIsSweeping] = useState<boolean>(false);
+  const [sweepProgress, setSweepProgress] = useState<number>(0);
+  const [sweepComplete, setSweepComplete] = useState<boolean>(false);
+  const [manualEmail, setManualEmail] = useState<string>('');
+
+  if (leadLoading) {
+    return (
+      <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-emerald-500/20 rounded-2xl p-8 shadow-2xl animate-pulse my-8">
+        <div className="h-6 bg-gray-800 rounded w-1/3 mb-4"></div>
+        <div className="h-10 bg-gray-800 rounded mb-6"></div>
+        <div className="space-y-3">
+          <div className="h-4 bg-gray-800 rounded w-5/6"></div>
+          <div className="h-4 bg-gray-800 rounded flex-1"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (leadError) {
+    return (
+      <div className="w-full max-w-2xl mx-auto bg-red-950/30 border border-red-500/50 rounded-2xl p-6 text-center text-red-200 my-8">
+        <p className="font-semibold">⚠️ Failed to Load Fleet Profile</p>
+        <p className="text-sm mt-1 text-red-400">{leadError}</p>
+      </div>
+    );
+  }
+
+  const triggerSweep = () => {
+    setIsSweeping(true);
+    setSweepProgress(0);
+    setSweepComplete(false);
+    
+    const interval = setInterval(() => {
+      setSweepProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsSweeping(false);
+          setSweepComplete(true);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 150);
+  };
+
+  const fleetSize = lead ? lead.est_fleet_size : 10;
+  const estimatedAnnualSavings = fleetSize * 150;
+  
+  // Custom billing pricing matrix ($5/vehicle/month)
+  const monthlySaaSPrice = Math.max(49, Math.min(299, fleetSize * 5));
+  const checkoutEmail = lead ? lead.contact_email : manualEmail;
+  const stripeLink = `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(checkoutEmail)}&tier=${fleetSize > 25 ? 'enterprise' : 'growth'}`;
+
+  // RENDER CASE A: Fallback Generic Search (Non-Targeted Traffic)
+  if (!lead) {
+    return (
+      <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl my-8">
+        <h2 className="text-2xl font-bold text-white mb-2">Scan Your Fleet for Active Recalls</h2>
+        <p className="text-gray-400 mb-6 text-sm">
+          Enter your email to run a secure, automated "Ghost Sweep" on up to 10 fleet vehicles in real time.
+        </p>
+
+        {!sweepComplete ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-2">Corporate Email Address</label>
+              <input 
+                type="email"
+                placeholder="you@yourcompany.com"
+                value={manualEmail}
+                onChange={(e) => setManualEmail(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+              />
+            </div>
+            <button
+              onClick={triggerSweep}
+              disabled={isSweeping || !manualEmail}
+              className={`w-full py-4 rounded-xl font-bold text-center transition flex justify-center items-center ${
+                isSweeping || !manualEmail
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-gray-950'
+              }`}
+            >
+              {isSweeping ? `Scanning NHTSA Databases (${sweepProgress}%)...` : 'Run Free 10-VIN Sweep'}
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full mb-4">
+              <span className="text-2xl text-emerald-400">⚠️</span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Sweep Completed!</h3>
+            <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
+              Our automated system detected **3 open manufacturer recalls** associated with your registered vehicles.
+            </p>
+            <a 
+              href={stripeLink}
+              className="inline-block px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold rounded-xl transition"
+            >
+              Unlock Complete Fleet Safety Report
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // RENDER CASE B: Hyper-Personalized Prospect Layout (Outbound Campaign Hits)
+  return (
+    <div className="w-full max-w-2xl mx-auto bg-gray-900 border border-emerald-500/30 rounded-2xl shadow-2xl overflow-hidden my-8">
+      <div className="bg-gradient-to-r from-emerald-950/40 to-teal-950/40 border-b border-emerald-500/20 p-6">
+        <span className="inline-block text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full mb-3">
+          Wave 1 Pilot Account: Active
+        </span>
+        <h2 className="text-2xl font-bold text-white">
+          Welcome, {lead.contact_name} | {lead.company_name}
+        </h2>
+        <p className="text-gray-300 text-sm mt-1">
+          We have pre-loaded your local Nevada fleet profile (Estimated: <span className="font-semibold text-white">{lead.est_fleet_size} {lead.primary_vehicle_mix}s</span>).
+        </p>
+      </div>
+
+      {lead.localized_threat_hook && (
+        <div className="p-6 bg-orange-950/20 border-b border-orange-500/20 flex gap-4">
+          <div className="flex-shrink-0 text-3xl mt-1">🔥</div>
+          <div>
+            <h4 className="text-sm font-bold uppercase tracking-wider text-orange-400">Mojave Desert Operational Risk</h4>
+            <p className="text-orange-200 text-sm mt-1 font-medium italic">
+              "{lead.localized_threat_hook}"
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              With Southern Nevada climbing past 114°F, unaddressed manufacturer harness issues pose an active ground safety hazard to your operations.
+            </p>
           </div>
         </div>
+      )}
+
+      <div className="p-8">
+        {!sweepComplete ? (
+          <div className="text-center py-4">
+            <h3 className="text-lg font-bold text-white mb-2">Run Your Priority Fleet Sweep</h3>
+            <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
+              Our system pre-loaded your vehicle parameters. Run an active validation sweep on 10 of your cargo vehicles right now.
+            </p>
+            <button
+              onClick={triggerSweep}
+              disabled={isSweeping}
+              className={`w-full max-w-sm py-4 rounded-xl font-bold transition ${
+                isSweeping 
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-gray-950 shadow-lg shadow-emerald-500/10'
+              }`}
+            >
+              {isSweeping ? `Querying NHTSA APIs (${sweepProgress}%)...` : 'Execute 10-VIN Safety Sweep'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-gray-950 border border-gray-800 rounded-xl p-5 text-center">
+              <span className="text-red-500 text-2xl">⚠️</span>
+              <h4 className="text-lg font-bold text-white mt-2">Critical Recalls Identified!</h4>
+              <p className="text-sm text-gray-400 mt-1">
+                Your sweep completed. We identified open safety recalls on your active {lead.primary_vehicle_mix} fleet.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-950/50 p-4 border border-gray-850 rounded-xl text-center">
+                <p className="text-xs text-gray-400 uppercase font-semibold">Estimated Fleet Savings</p>
+                <p className="text-2xl font-bold text-emerald-400 mt-1">${estimatedAnnualSavings.toLocaleString()}/yr</p>
+              </div>
+              <div className="bg-gray-950/50 p-4 border border-gray-850 rounded-xl text-center">
+                <p className="text-xs text-gray-400 uppercase font-semibold">Active Monitoring Cost</p>
+                <p className="text-2xl font-bold text-white mt-1">${monthlySaaSPrice}/mo</p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-800 flex flex-col items-center gap-3">
+              <a
+                href={stripeLink}
+                className="w-full text-center py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition"
+              >
+                Upgrade to Active Monitoring (${monthlySaaSPrice}/mo)
+              </a>
+              <p className="text-xs text-gray-400 text-center">
+                Bypasses paywalls, pre-populates stripe session for {lead.contact_email}, and generates compliance certificates.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
+}
 
-// ==========================================
-// VALUE FLIP CARDS CONTAINER
-// ==========================================
-const ValueFlipCards: React.FC = () => {
-  return (
-    <section className="space-y-6">
-      <style>{flipCardStyles}</style>
+// ========================================== //
+// MAIN APPLICATION COMPONENT                 //
+// ========================================== //
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1 */}
-        <FlipCard
-          frontTitle="DOT Compliance & Safety"
-          frontDescription="Are your fleet assets and drivers legally authorized and safe to operate on the road?"
-          backTitle="Avoid Serious DOT Penalties"
-          backDescription="Instantly verify outstanding federal safety recalls, avert expensive Department of Transportation (DOT) compliance violations, and verify vehicle road-readiness."
-          tagline="Regulatory Shield"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          }
-        />
-
-        {/* Card 2 */}
-        <FlipCard
-          frontTitle="Asset Liability Protection"
-          frontDescription="How exposed is your enterprise to litigation risks from known safety defects?"
-          backTitle="Audit-Ready Digital History"
-          backDescription="Unresolved recalls open your company up to significant litigation and corporate negligence claims. RecallLogic generates a complete, clean, time-stamped audit compliance trail."
-          tagline="Legal Guardrails"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-        />
-
-        {/* Card 3 */}
-        <FlipCard
-          frontTitle="Continuous Background Sync"
-          frontDescription="Who is scanning federal safety databases for your vehicle configurations?"
-          backTitle="Never Look Up a VIN Manually Again"
-          backDescription="Static tracking spreadsheets grow stale within hours. Our platform automatically queries NHTSA databases every single night and fires instant alerts if a new match hits."
-          tagline="Set-and-Forget"
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.228 10H16m0 0a2 2 0 100 4h5" />
-            </svg>
-          }
-        />
-      </div>
-    </section>
-  );
-};
-
-// ==========================================
-// MAIN APPLICATION COMPONENT
-// ==========================================
 export default function App() {
-  // Pro Subscription State Persisted locally
-  const [isProPlan, setIsProPlan] = useState<boolean>(() => {
-    return localStorage.getItem('recalllogic_pro_plan') === 'true';
-  });
-
+  // Original Application States [cite: 10, 11]
   const [metrics, setMetrics] = useState<GlobalMetrics | null>({
     total_vins: 0,
     processed_vins: 0,
@@ -178,9 +447,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showStripeModal, setShowStripeModal] = useState(false);
-  const [stripeEmail, setStripeEmail] = useState('');
-  const [stripeName, setStripeName] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
   const [shareSuccess, setShareSuccess] = useState(false);
@@ -190,30 +456,18 @@ export default function App() {
   const [showUploadNotification, setShowUploadNotification] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic ROI Pricing Calculator States
-  const [sliderVinCount, setSliderVinCount] = useState<number>(25);
+  // Active DB Hook Integration [cite: 11]
+  const { lead, loading: leadLoading, error: leadError } = useLeadData();
 
-  // Sandbox Test Matrix Automation States
+  // Local Sandbox Configuration [cite: 11]
   const [sandboxResetStatus, setSandboxResetStatus] = useState<string>('');
   const [sandboxWebhookLogs, setSandboxWebhookLogs] = useState<string>('');
 
-  const mockReferenceToken = "RL-2026-NKT82X";
-  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`;
+  const mockReferenceToken = "RL-2026-NKT82X"; // [cite: 11]
+  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`; // [cite: 11]
+  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; // [cite: 11]
 
-  // Check if we are running in an exploratory sandbox configuration loop
-  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-  // Dynamic calculations for Hybrid Pricing Model ($99/mo base + $2.50/vehicle)
-  const calculateCustomMRR = (totalCars: number) => {
-    const baseFee = 99;
-    const perCarFee = 2.50;
-    return baseFee + (totalCars * perCarFee);
-  };
-
-  const calculatedSaaSPremium = calculateCustomMRR(sliderVinCount);
-  const estimatedDowntimeSavings = sliderVinCount * 1000 * 0.15;
-  const insuranceDeductionsSavings = sliderVinCount * 35;
-
+  // Fetch Global Metrics from local FastAPI backend [cite: 12]
   const fetchGlobalMetrics = () => {
     axios.get('http://127.0.0.1:8000/api/metrics/global')
       .then(res => {
@@ -252,15 +506,13 @@ export default function App() {
     }, 800);
   };
 
-  // Sandbox Orchestrations: Automated Environment Reset Actions
+  // Sandbox Development Reset Controls [cite: 13]
   const triggerSandboxEnvironmentReset = async () => {
     setSandboxResetStatus('Resetting Replica State...');
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/sandbox/reset');
       setSandboxResetStatus(`✓ Success: ${response.data.message}`);
       setRecalls([]);
-      setIsProPlan(false);
-      localStorage.removeItem('recalllogic_pro_plan');
       fetchGlobalMetrics();
       setTimeout(() => setSandboxResetStatus(''), 4000);
     } catch (err: any) {
@@ -268,113 +520,40 @@ export default function App() {
     }
   };
 
-  // Sandbox Orchestrations: Fire passing signature events straight to webhook router
+  // Sandbox Development Mock Checkout Upgrader [cite: 14]
   const simulateSandboxSubscriptionUpgrade = async () => {
     setSandboxWebhookLogs('Generating signed token payload...');
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/sandbox/mock-checkout', {
         customer_email: "agent-test-fleet@recalllogic.internal",
-        metadata: { 
-          fleet_limit_override: "true",
-          fleet_size_tier: sliderVinCount.toString(),
-          custom_mrr: calculatedSaaSPremium.toFixed(2)
-        }
+        metadata: { fleet_limit_override: "true" }
       });
       setSandboxWebhookLogs(`✓ Upgrade Sent: ${response.data.message || 'Check logs.'}`);
-      setIsProPlan(true);
-      localStorage.setItem('recalllogic_pro_plan', 'true');
       setTimeout(() => setSandboxWebhookLogs(''), 4000);
     } catch (err: any) {
       setSandboxWebhookLogs(`✕ Webhook Failure: ${err.response?.data?.detail || 'Upgrade failed.'}`);
     }
   };
 
-  // Live Stripe Signup Onboarding Handler
-  const handleStripeCheckoutAction = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      // Attempt redirect to API checkout session creator
-      const response = await axios.post('http://127.0.0.1:8000/api/stripe/create-checkout-session', {
-        customer_email: stripeEmail || "customer@fleet-ops.com",
-        fleet_size: sliderVinCount,
-        success_url: window.location.origin + "?checkout=success",
-        cancel_url: window.location.origin + "?checkout=cancel"
-      });
-      if (response.data.url) {
-        window.location.href = response.data.url;
-      } else {
-        throw new Error("No URL returned from session generator.");
-      }
-    } catch (err) {
-      console.warn("Backend Stripe route inactive. Launching gorgeous developer client-side checkout simulation...");
-      setShowUpgradeModal(false);
-      setShowStripeModal(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Complete offline Checkout form payment submission simulation
-  const handleSimulatedStripeCheckoutPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setIsProPlan(true);
-      localStorage.setItem('recalllogic_pro_plan', 'true');
-      setShowStripeModal(false);
-      
-      // Fire simulated webhook payload event so the local backend databases sync matching accounts
-      axios.post('http://127.0.0.1:8000/api/sandbox/mock-checkout', {
-        customer_email: stripeEmail || "checkout-onboard@recalllogic.internal",
-        metadata: { 
-          fleet_limit_override: "true",
-          fleet_size_tier: sliderVinCount.toString(),
-          custom_mrr: calculatedSaaSPremium.toFixed(2)
-        }
-      }).catch(err => console.log("Silent webhook skip - offline execution mode active."));
-
-      setShowUploadNotification(true);
-      fetchGlobalMetrics();
-      setTimeout(() => setShowUploadNotification(false), 5000);
-    }, 1500);
-  };
-
+  // Process manifest parsing [cite: 15]
   const processManifestLines = async (rawLines: string[]) => {
     const cleanedLines = rawLines
       .map(line => line.trim())
       .filter(line => line.length > 0 && !line.toLowerCase().startsWith('make,model,year'));
-
+    
     if (cleanedLines.length === 0) return;
-
-    const totalLinesCount = cleanedLines.length;
-
     setLoading(true);
     setError('');
+
     try {
-      // Free tier cap at 10 items (unlimited if isProPlan is active)
-      if (totalLinesCount > 10 && !isProPlan) {
-        const freeLines = cleanedLines.slice(0, 10);
-        setBlockedVinCount(totalLinesCount - 10);
-        
-        // Dynamic alignment: Customize slider size immediately to match their real import fleet size!
-        setSliderVinCount(totalLinesCount);
-        setShowUpgradeModal(true);
-        
-        const response = await axios.post('http://127.0.0.1:8000/api/recalls/upload', { vins: freeLines });
-        setRecalls(response.data.recalls || []);
-      } else {
-        setBlockedVinCount(0);
-        const response = await axios.post('http://127.0.0.1:8000/api/recalls/upload', { vins: cleanedLines });
-        setRecalls(response.data.recalls || []);
-      }
-      
-      setShowUploadNotification(true);
+      const response = await axios.post('http://127.0.0.1:8000/api/recalls/search', {
+        manifest_vins: cleanedLines
+      });
+      setRecalls(response.data.recalls || []);
+      setBlockedVinCount(response.data.blocked_vin_count || 0);
       fetchGlobalMetrics();
-      setTimeout(() => setShowUploadNotification(false), 5000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to process manifest search queries.');
+      setError(err.response?.data?.detail || 'An error occurred query processing.');
     } finally {
       setLoading(false);
     }
@@ -387,16 +566,16 @@ export default function App() {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // SAFE: item(0) prevents trailing dot parsing crashes
-    const file = e.target.files?.item(0);
+    const file = e.target.files?.;
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
       if (text) {
-        const lines = text.split(/\r?\n/);
-        processManifestLines(lines);
+        setBulkInput(text);
+        setShowUploadNotification(true);
+        setTimeout(() => setShowUploadNotification(false), 4000);
       }
     };
     reader.readAsText(file);
@@ -414,20 +593,19 @@ export default function App() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
-    // SAFE: item(0) prevents trailing dot parsing crashes
-    const file = e.dataTransfer.files?.item(0);
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (text) {
-        const lines = text.split(/\r?\n/);
-        processManifestLines(lines);
-      }
-    };
-    reader.readAsText(file);
+    const file = e.dataTransfer.files?.;
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+          setBulkInput(text);
+          setShowUploadNotification(true);
+          setTimeout(() => setShowUploadNotification(false), 4000);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   const triggerFileSelect = () => {
@@ -435,656 +613,151 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#06090e] text-slate-100 font-sans flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#06090e] text-slate-100 font-sans flex flex-col items-center p-6 lg:p-12">
       
-      {/* ==========================================
-          SIDEBAR: NAVIGATION & FLEET COMPLIANCE BADGE
-          ========================================== */}
-      <aside className="w-full lg:w-80 bg-[#0b131f] border-b lg:border-b-0 lg:border-r border-white/5 p-6 flex flex-col justify-between shrink-0">
-        <div className="space-y-8">
-          {/* Brand Logo Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-emerald-500 text-[#06090e] font-extrabold p-2 rounded-xl text-lg tracking-wider shadow-lg shadow-emerald-500/20">
-                RL
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
-                Recall<span className="text-emerald-400">Logic</span>
-              </h1>
-            </div>
+      {/* Dynamic Personalization Layer (Highest Hierarchy) */}
+      <GhostAuditCard lead={lead} leadLoading={leadLoading} leadError={leadError} />
 
-            {isProPlan && (
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 uppercase tracking-widest font-black">
-                PRO
-              </span>
-            )}
+      {/* Main App Branding Header */}
+      <header className="mb-8 text-center max-w-2xl">
+        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+          RecallLogic Fleet Compliance Hub
+        </h1>
+        <p className="text-slate-400 mt-2 text-sm">
+          Active Carrier Monitoring, NHTSA Inbound Sweeps, & Real-Time Security Auditing.
+        </p>
+      </header>
+
+      {/* Metrics Panel */}
+      {metrics && (
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mb-12">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total Vehicles</p>
+            <p className="text-2xl font-bold text-white mt-1">{metrics.total_vins}</p>
           </div>
-
-          {/* Shareable Verification & Live Badges */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-300">Fleet Security Audit</h3>
-            
-            {/* Glassmorphic Trust Badge State */}
-            <div className="flex justify-center py-3">
-              <div className="glassmorphic-badge flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 w-full shadow-lg">
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest mb-1">Audit Status</span>
-                <span className="text-3xl font-extrabold text-emerald-400 tracking-wider">PASS</span>
-                <span className="text-[10px] text-gray-400 mt-1">100% Safety Compliant</span>
-              </div>
-            </div>
-
-            {/* Quick Audit Metrics */}
-            <div className="grid grid-cols-2 gap-2 text-center text-xs">
-              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                <div className="text-gray-400">Compliance Rate</div>
-                <div className="fleet-score font-bold text-emerald-400 text-sm">{metrics?.fleet_health_index ?? 100}%</div>
-              </div>
-              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
-                <div className="text-gray-400">Monitored Assets</div>
-                <div className="font-bold text-white text-sm">{metrics?.processed_vins ?? 0} / {metrics?.total_vins ?? 0}</div>
-              </div>
-            </div>
-
-            {/* Verification Links */}
-            <div className="space-y-2 pt-2">
-              <button 
-                onClick={() => setShowShareModal(true)} 
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#06090e] font-semibold text-xs py-2.5 px-4 rounded-xl transition duration-200"
-              >
-                Share Compliance Badge
-              </button>
-              <button 
-                onClick={handleCopyLink} 
-                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium text-xs py-2.5 px-4 rounded-xl transition duration-200"
-              >
-                {copiedLink ? "✓ Copied Verification Link" : "Copy Audit Link"}
-              </button>
-            </div>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Processed Sweeps</p>
+            <p className="text-2xl font-bold text-emerald-400 mt-1">{metrics.processed_vins}</p>
           </div>
-        </div>
-
-        {/* Footer / App Meta */}
-        <div className="pt-6 border-t border-white/5 mt-8 lg:mt-0 text-center lg:text-left">
-          <div className="text-xs text-gray-500 font-mono">MVP BUILD v1.4.0</div>
-          <div className="text-[10px] text-gray-600">Active monitoring: Las Vegas Corridor</div>
-        </div>
-      </aside>
-
-      {/* ==========================================
-          MAIN AREA: METRICS, CONTROL BAR & GRID
-          ========================================== */}
-      <main className="flex-1 p-6 lg:p-10 max-w-7xl mx-auto w-full space-y-10">
-
-        {/* Top Notification Toast */}
-        {showUploadNotification && (
-          <div className="upload-success-message bg-emerald-500/20 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between text-emerald-400 text-sm animate-pulse">
-            <span className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Success! Fleet CSV processed. Monitored records synchronized successfully.
-            </span>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Open Recalls</p>
+            <p className="text-2xl font-bold text-rose-500 mt-1">{metrics.total_recalls}</p>
           </div>
-        )}
-
-        {/* Dynamic Alerts Banner */}
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-red-400 text-sm flex items-center">
-            <svg className="w-5 h-5 mr-2 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {error}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+            <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Health Rating</p>
+            <p className="text-2xl font-bold text-teal-400 mt-1">{metrics.fleet_health_index}%</p>
           </div>
-        )}
+        </section>
+      )}
 
-        {/* 1. HERO HEADER & OFFERING PITCH (ABOVE THE FOLD) */}
-        <header className="space-y-3">
-          <div className="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-mono text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Now Active: Automated National NHTSA Database Sync</span>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight max-w-3xl">
-            Continuous Fleet Recall Protection & <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">Active Liability Shields</span>
-          </h1>
-          <p className="text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed">
-            Eliminate trailing administrative spreadsheets. RecallLogic automatically maps component vulnerabilities and active manufacturer campaigns to protect your drivers, shield your assets, and keep your enterprise audit-ready.
+      {/* Interactive Bulk Processing Panel */}
+      <section className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        
+        {/* Left Column: Drag & Drop Inputs */}
+        <div 
+          className={`flex flex-col justify-center items-center p-8 rounded-2xl border-2 border-dashed transition-all duration-300 ${
+            isDragging 
+              ? 'border-emerald-500 bg-emerald-950/10' 
+              : 'border-white/10 bg-white/5 hover:border-white/20'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <span className="text-4xl mb-3">📁</span>
+          <h3 className="text-lg font-semibold text-white mb-1">Upload Your Fleet Manifest</h3>
+          <p className="text-xs text-slate-400 text-center max-w-xs mb-4">
+            Drag and drop your standard `.txt` or `.csv` fleet inventory to parse outstanding safety issues.
           </p>
-        </header>
-
-        {/* 2. RISK URGENCIES & GLOBAL THREAT METRICS (FIRST IN SEVERITY SECTORS) */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Global Threat Metric Card */}
-          <div className="md:col-span-2 bg-gradient-to-r from-red-950/20 to-amber-950/20 border border-red-500/20 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
-            <div>
-              <div className="flex items-center space-x-2 text-red-400 font-semibold text-xs tracking-wider uppercase mb-1">
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
-                <span>Global Fleet Threat Metric</span>
-              </div>
-              <h2 className="text-3xl font-extrabold text-white tracking-tight">
-                {metrics?.total_recalls ?? 0} Active Federal Recalls
-              </h2>
-              <p className="text-gray-400 text-xs mt-2 leading-relaxed">
-                Critical safety defects representing fire risk, steering failure, and braking failures currently flagged inside the national highway safety database. Fleet operators should prioritize remediating matches immediately.
-              </p>
-            </div>
-            <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-[11px] text-gray-500 font-mono">
-              <span>NHTSA Sync Status: 3:00 AM Daily</span>
-              <span className="text-red-400/80 bg-red-500/5 px-2 py-0.5 rounded-full border border-red-500/10">High Risk Threshold</span>
-            </div>
-          </div>
-
-          {/* Active Coverage Count */}
-          <div className="bg-[#0b131f] border border-white/5 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
-            <div>
-              <span className="text-gray-400 text-xs tracking-wider uppercase">Active Coverage</span>
-              <h3 className="text-4xl font-extrabold text-white mt-1">{metrics?.processed_vins ?? 0}</h3>
-              <p className="text-gray-500 text-xs mt-2">
-                Commercial vehicles verified against federal safety databases in this reporting cycle.
-              </p>
-            </div>
-            <div className="text-[11px] text-gray-500 font-mono mt-4 pt-4 border-t border-white/5">
-              Target: 500 Active monitored units
-            </div>
-          </div>
-        </section>
-
-        {/* 3. VALUE PROPOSITION: VALUE FLIP CARDS */}
-        <section className="space-y-4">
-          <div className="border-b border-white/5 pb-2">
-            <h2 className="text-xl font-bold text-white">How We Secure Your Fleet Operations</h2>
-            <p className="text-xs text-gray-400">Interactive 3D insight keys detailing continuous regulatory and liability safeguards.</p>
-          </div>
-          <ValueFlipCards />
-        </section>
-
-        {/* 4. CONVERSION HUB (VIN & CSV INPUTS) */}
-        <section className="space-y-4">
-          <div className="border-b border-white/5 pb-2">
-            <h2 className="text-xl font-bold text-white">Initiate Instant Security Scan</h2>
-            <p className="text-xs text-gray-400">Choose manual lookup or bulk import to run your zero-cost 10-VIN heat sweep.</p>
-          </div>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            accept=".csv,.txt" 
+            className="hidden" 
+          />
+          <button 
+            onClick={triggerFileSelect}
+            className="px-5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl text-sm font-medium transition"
+          >
+            Select Manifest
+          </button>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* Manual VIN Search */}
-            <div className="bg-[#0b131f] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
-              <h3 className="text-base font-semibold text-white">Manual Fleet Check</h3>
-              <p className="text-xs text-gray-400">
-                Paste up to 10 vehicle identification numbers (VINs) separated by newlines to scan immediately.
-              </p>
-              <form onSubmit={handleSearch} className="space-y-3">
-                <textarea
-                  value={bulkInput}
-                  onChange={(e) => setBulkInput(e.target.value)}
-                  placeholder="Enter VINs (one per line)...&#10;1FTFW1ED5GXXXXXXX"
-                  className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/40 transition duration-200 resize-none"
-                />
-                <button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full bg-white/5 hover:bg-emerald-500 hover:text-[#06090e] border border-white/10 hover:border-emerald-500/20 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-sm flex items-center justify-center space-x-2"
-                >
-                  {loading ? "Searching databases..." : "Check VINs"}
-                </button>
-              </form>
-            </div>
-
-            {/* CSV Drag & Drop */}
-            <div 
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={triggerFileSelect}
-              className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition duration-200 min-h-[280px] shadow-xl ${
-                isDragging 
-                  ? 'border-emerald-500 bg-emerald-500/5' 
-                  : 'border-white/10 bg-[#0b131f] hover:border-emerald-500/30'
-              }`}
-            >
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                accept=".csv" 
-                className="hidden" 
-              />
-              <div className="text-emerald-400 bg-white/5 p-4 rounded-2xl border border-white/10 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </div>
-              <h4 className="text-base font-semibold text-white">Drag & Drop Fleet Manifest</h4>
-              <p className="text-xs text-gray-400 mt-2 text-center max-w-sm leading-relaxed">
-                Upload your structured vehicle manifest file (.csv) to immediately register your commercial operations pool.
-              </p>
-              <div className="mt-4 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                Supported format: make, model, year, VIN
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ==========================================
-            SANDBOX ORCHESTRATOR PANEL (DEVELOPMENT ONLY)
-            ========================================== */}
-        {isSandboxMode && (
-          <section className="bg-[#0b131f] border border-amber-500/20 rounded-2xl p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Sandbox Test Orchestrations</h3>
-                <p className="text-xs text-gray-400">Automated configurations to verify E2E and Stripe integration metrics.</p>
-              </div>
-              <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/20 uppercase tracking-widest">
-                Local Environment Active
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Trigger Reset Action */}
-              <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-white">Reset Environmental Replica State</h4>
-                  <p className="text-xs text-gray-500 mt-1">Clears out temporary database test matrices, resetting your active monitoring tables back to 0.</p>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <button 
-                    onClick={triggerSandboxEnvironmentReset}
-                    className="bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-[#06090e] border border-amber-500/20 text-xs font-semibold py-2 px-4 rounded-lg transition duration-200"
-                  >
-                    Trigger System Reset
-                  </button>
-                  {sandboxResetStatus && <span className="text-xs font-mono text-amber-400">{sandboxResetStatus}</span>}
-                </div>
-              </div>
-
-              {/* Trigger Upgrade Webhook Action */}
-              <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-white">Mock Checkout Event Payload</h4>
-                  <p className="text-xs text-gray-500 mt-1">Dispatches a simulated subscription checkout event straight to your backend Stripe webhook endpoint.</p>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <button 
-                    onClick={simulateSandboxSubscriptionUpgrade}
-                    className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#06090e] border border-emerald-500/20 text-xs font-semibold py-2 px-4 rounded-lg transition duration-200"
-                  >
-                    Simulate Stripe Payment
-                  </button>
-                  {sandboxWebhookLogs && <span className="text-xs font-mono text-emerald-400">{sandboxWebhookLogs}</span>}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ==========================================
-            DATA TABLES: RETRIEVED RECALL OUTCOMES
-            ========================================== */}
-        <section className="bg-[#0b131f] border border-white/5 rounded-2xl shadow-xl overflow-hidden">
-          <div className="p-6 border-b border-white/5 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Monitored Safety Alerts</h3>
-              <p className="text-xs text-gray-400">Identified manufacturing and components flaws affecting current fleet entries.</p>
-            </div>
-            <span className="text-xs text-gray-500 font-mono">Records Found: {recalls.length}</span>
-          </div>
-
-          {recalls.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
-              <svg className="w-12 h-12 mx-auto mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <div className="text-sm font-semibold">No Recalls Registered</div>
-              <p className="text-xs text-gray-600 mt-1">Check individual VINs or upload your fleet manifest sheet to initiate automated scanning.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-white/5 border-b border-white/5 text-[11px] uppercase tracking-wider text-gray-400 font-mono">
-                    <th className="p-4">Campaign</th>
-                    <th className="p-4">Vehicle Specs</th>
-                    <th className="p-4">Component Target</th>
-                    <th className="p-4">Description & Threat Severity</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-sm text-gray-300">
-                  {recalls.map((recall, index) => (
-                    <tr key={`${recall.campaign_number}-${index}`} className="hover:bg-white/5 transition duration-150">
-                      <td className="p-4 font-mono font-bold text-emerald-400 text-xs shrink-0">
-                        {recall.campaign_number}
-                      </td>
-                      <td className="p-4 font-semibold text-white">
-                        {recall.year} {recall.make} {recall.model}
-                      </td>
-                      <td className="p-4 text-xs text-emerald-500 font-medium">
-                        {recall.component}
-                      </td>
-                      <td className="p-4 text-xs leading-relaxed max-w-md">
-                        <div className="font-semibold text-gray-200">{recall.summary}</div>
-                        {recall.consequence && (
-                          <div className="text-red-400/80 mt-1">
-                            <span className="font-bold">Consequence:</span> {recall.consequence}
-                          </div>
-                        )}
-                        {recall.remedy && (
-                          <div className="text-emerald-500/80 mt-1">
-                            <span className="font-bold">Remedy:</span> {recall.remedy}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {showUploadNotification && (
+            <div className="mt-4 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-lg animate-bounce">
+              ✓ File pre-loaded! Press "Search Fleet" to submit.
             </div>
           )}
+        </div>
+
+        {/* Right Column: Text Input Form */}
+        <form onSubmit={handleSearch} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-400 mb-2">Manual Input List (VINS / Specs)</label>
+            <textarea
+              rows={5}
+              placeholder="Enter list (one vehicle per line)..."
+              value={bulkInput}
+              onChange={(e) => setBulkInput(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition font-mono"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 mt-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold rounded-xl text-sm transition shadow-lg shadow-emerald-500/5"
+          >
+            {loading ? 'Running Compliance Sweep...' : 'Search Fleet Records'}
+          </button>
+        </form>
+      </section>
+
+      {/* Recalls Result List Viewport */}
+      {recalls.length > 0 && (
+        <section className="w-full max-w-4xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-12">
+          <h2 className="text-xl font-bold text-white mb-4">Compliance Warning Log ({recalls.length})</h2>
+          <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2">
+            {recalls.map((recall, idx) => (
+              <div key={idx} className="bg-black/30 border border-white/5 hover:border-red-500/20 rounded-xl p-4 transition-all">
+                <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
+                  <span className="px-2.5 py-0.5 bg-red-500/10 border border-red-500/30 text-red-400 font-mono text-xs rounded-full">
+                    {recall.campaign_number}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium font-mono">
+                    {recall.make} {recall.model} ({recall.year})
+                  </span>
+                </div>
+                <h4 className="text-sm font-semibold text-white mb-1">{recall.component}</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">{recall.summary || "No active summary documentation logged."}</p>
+              </div>
+            ))}
+          </div>
         </section>
-      </main>
+      )}
 
-      {/* ==========================================
-          MODALS: UPGRADE, STRIPE SIGNUP & SHARE VERIFICATIONS
-          ========================================== */}
+      {/* Dynamic 3D Value Flip Cards */}
+      <ValueFlipCards />
 
-      {/* Share Audit Compliance Badge Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#0b131f] border border-white/10 rounded-2xl w-full max-w-md p-6 relative shadow-2xl space-y-6">
+      {/* Local Developer Sandbox Toolkit */}
+      {isSandboxMode && (
+        <footer className="mt-16 w-full max-w-2xl bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 text-center">
+          <h3 className="text-sm font-bold text-amber-400 uppercase tracking-widest mb-3">🛠️ LOCAL DEV SANDBOX TOOLS</h3>
+          <div className="flex flex-wrap gap-4 justify-center">
             <button 
-              onClick={() => setShowShareModal(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-white transition duration-150"
+              onClick={triggerSandboxEnvironmentReset}
+              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-xs rounded-lg transition"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              {sandboxResetStatus || "Trigger DB Replica Reset"}
             </button>
-            <div>
-              <h3 className="text-lg font-bold text-white">Share Fleet Audit Status</h3>
-              <p className="text-xs text-gray-400 mt-1">Distribute digital safety badges directly to compliance officers or insurance underwriters.</p>
-            </div>
-
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div>
-                <label className="text-[10px] uppercase font-mono tracking-wider text-gray-400">Recipient Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  value={brokerEmail} 
-                  onChange={(e) => setBrokerEmail(e.target.value)}
-                  placeholder="broker@corporate-insurance.com" 
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500/40 transition duration-200"
-                />
-              </div>
-
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5 space-y-2">
-                <div className="text-[10px] uppercase font-mono tracking-wider text-gray-500">Live Secure Audit Payload</div>
-                <div className="text-xs text-emerald-400 font-mono break-all bg-emerald-500/5 p-2 rounded border border-emerald-500/10">
-                  {shareableVerificationUrl}
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#06090e] font-bold text-sm py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center"
-              >
-                {loading ? "Sending Audit Credentials..." : "Email Secure Audit Badge"}
-              </button>
-
-              {shareSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl text-center text-emerald-400 text-xs">
-                  ✓ Audit credentials successfully routed. Check inbox shortly.
-                </div>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Paywall Upgrade Modal with Dynamic Slider */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#0b131f] border border-white/10 rounded-2xl w-full max-w-lg p-8 relative shadow-2xl space-y-6">
             <button 
-              onClick={() => setShowUpgradeModal(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-white transition duration-150"
+              onClick={simulateSandboxSubscriptionUpgrade}
+              className="px-4 py-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-mono text-xs rounded-lg transition"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              {sandboxWebhookLogs || "Mock Stripe Webhook Event"}
             </button>
-            <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 bg-emerald-500/10 rounded-full border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-white">Get Real-Time Fleet Pro Coverage</h3>
-              <p className="text-sm text-gray-400">
-                You've hit the 10-VIN manual lookup limit on the free tier. Upgrading protects your entire operations fleet and unlocks automatic background monitoring.
-              </p>
-            </div>
-
-            {/* Dynamic Interactive Slider Section */}
-            <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-5">
-              <div className="flex justify-between items-center text-xs text-gray-300 font-mono">
-                <span>Select Fleet Size Target</span>
-                <span className="text-emerald-400 font-extrabold text-sm">{sliderVinCount} Vehicles</span>
-              </div>
-              <input 
-                type="range" 
-                min="10" 
-                max="500" 
-                value={sliderVinCount} 
-                onChange={(e) => setSliderVinCount(parseInt(e.target.value))}
-                className="w-full accent-emerald-500 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                <span>10 vehicles</span>
-                <span>250 vehicles</span>
-                <span>500 vehicles</span>
-              </div>
-            </div>
-
-            {/* Hybrid Rate Structure Metrics */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono">Base Rate</span>
-                <div className="text-xl font-extrabold text-white mt-1">$99<span className="text-xs text-gray-400 font-normal">/mo</span></div>
-              </div>
-              <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono">Per-Vehicle Fee</span>
-                <div className="text-xl font-extrabold text-white mt-1">$2.50<span className="text-xs text-gray-400 font-normal">/mo</span></div>
-              </div>
-            </div>
-
-            {/* Total MRR Dynamic Quote */}
-            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex justify-between items-center">
-              <div>
-                <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider font-mono">Your Custom MRR Quote</span>
-                <p className="text-[10px] text-gray-400 mt-0.5">Fully backed by nightly automated NHTSA auditing</p>
-              </div>
-              <div className="text-right">
-                <span className="text-3xl font-black text-emerald-400">${calculatedSaaSPremium.toFixed(2)}</span>
-                <span className="text-xs text-gray-500 font-mono">/month</span>
-              </div>
-            </div>
-
-            {/* Dynamic Value ROI Calculators */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
-                <div className="text-gray-400 font-mono text-[9px] uppercase tracking-wider">Est. Downtime Savings</div>
-                <div className="font-bold text-emerald-400 text-sm mt-0.5">${estimatedDowntimeSavings.toLocaleString()}/yr</div>
-                <p className="text-[9px] text-gray-500 mt-1 leading-tight">By preventing road failures.</p>
-              </div>
-              <div className="bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
-                <div className="text-gray-400 font-mono text-[9px] uppercase tracking-wider">Insurance Deductions</div>
-                <div className="font-bold text-emerald-400 text-sm mt-0.5">${insuranceDeductionsSavings.toLocaleString()}/yr</div>
-                <p className="text-[9px] text-gray-500 mt-1 leading-tight">Calculated premium discounts.</p>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-sm text-center"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleStripeCheckoutAction}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-[#06090e] font-bold py-3 px-4 rounded-xl transition duration-200 text-sm text-center"
-              >
-                Upgrade Now
-              </button>
-            </div>
           </div>
-        </div>
+        </footer>
       )}
-
-      {/* ==========================================
-          REPLICA STRIPE SIGNUP PORTAL OVERLAY
-          ========================================== */}
-      {showStripeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-[#0b131f] border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
-            
-            {/* Left Stripe Column: Pricing Summary */}
-            <div className="w-full md:w-5/12 bg-[#080d16] p-8 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
-              <div>
-                <button 
-                  onClick={() => setShowStripeModal(false)}
-                  className="inline-flex items-center space-x-1 text-gray-400 hover:text-white text-xs mb-6 transition duration-150"
-                >
-                  <span>← Back to RecallLogic</span>
-                </button>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-mono">Subscription Signup</span>
-                  <h3 className="text-xl font-bold text-white">RecallLogic Pro Account</h3>
-                  <p className="text-xs text-gray-400">Nightly automated federal safety scans</p>
-                </div>
-
-                <div className="mt-8 space-y-4">
-                  {/* Base subscription */}
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400">Pro Base Subscription</span>
-                    <span className="text-white font-bold font-mono">$99.00 / mo</span>
-                  </div>
-                  {/* Fleet vehicles monitored add-on */}
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400">{sliderVinCount} Fleet Vehicles (Metered)</span>
-                    <span className="text-white font-bold font-mono">${(sliderVinCount * 2.50).toFixed(2)} / mo</span>
-                  </div>
-                  <div className="border-t border-white/5 pt-4 flex justify-between items-end">
-                    <span className="text-sm text-gray-300 font-bold">Today's Total Due</span>
-                    <span className="text-2xl font-black text-emerald-400 font-mono">${calculatedSaaSPremium.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-8 border-t border-white/5 text-[10px] text-gray-500 leading-relaxed font-mono space-y-1.5">
-                <div>© RecallLogic Inc. Las Vegas, NV</div>
-                <div>Secure HTTPS SSL Encryption Guaranteed</div>
-              </div>
-            </div>
-
-            {/* Right Stripe Column: Checkout Card Form */}
-            <form onSubmit={handleSimulatedStripeCheckoutPayment} className="w-full md:w-7/12 p-8 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-bold text-white">Billing Information</h4>
-                  <div className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono flex items-center space-x-1">
-                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                    <span>SSL Secured</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Cardholder Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={stripeName}
-                      onChange={(e) => setStripeName(e.target.value)}
-                      placeholder="Jane Doe"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/40 transition duration-200 placeholder-gray-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Billing Email</label>
-                    <input 
-                      type="email" 
-                      required
-                      value={stripeEmail}
-                      onChange={(e) => setStripeEmail(e.target.value)}
-                      placeholder="jane@corporate-transit.com"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500/40 transition duration-200 placeholder-gray-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Card Number</label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        required
-                        maxLength={19}
-                        placeholder="4242 4242 4242 4242"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pr-10 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/40 transition duration-200 placeholder-gray-600"
-                      />
-                      <span className="absolute right-3 top-3.5 text-gray-600">💳</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Expiration Date</label>
-                      <input 
-                        type="text" 
-                        required
-                        maxLength={5}
-                        placeholder="MM/YY"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/40 transition duration-200 placeholder-gray-600"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-gray-400">CVC Code</label>
-                      <input 
-                        type="text" 
-                        required
-                        maxLength={3}
-                        placeholder="123"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/40 transition duration-200 placeholder-gray-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-[#06090e] font-bold text-sm py-4 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2"
-                >
-                  {loading ? (
-                    <span>Processing Secure Onboarding...</span>
-                  ) : (
-                    <>
-                      <span>Pay & Complete Onboarding Setup</span>
-                      <span>→</span>
-                    </>
-                  )}
-                </button>
-                <p className="text-[10px] text-gray-500 text-center leading-relaxed">
-                  By clicking Pay, you authorize RecallLogic to charge your card on file recurring monthly premiums dynamically evaluated based on active monitored vehicles. Cancel anytime with 1-click in settings.
-                </p>
-              </div>
-            </form>
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
