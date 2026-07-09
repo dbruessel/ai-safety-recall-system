@@ -44,7 +44,7 @@ export interface Lead {
   lead_status?: string;
 }
 
-// Safe initialization prevents module-level crashes if environment variables are unconfigured
+// 🛡️ Self-healing initialization ensures the build loads even without .env variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -69,13 +69,12 @@ export function useLeadData() {
         setLoading(true);
         setError(null);
 
-        // Self-heal fallback: if database configuration is missing, run in local offline mode
+        // 🛡️ Bypasses database queries gracefully if variables are unconfigured
         if (!isSupabaseConfigured) {
           setLoading(false);
           return;
         }
 
-        // Parse search query variables bracket-free to protect compiling
         const params = new URLSearchParams(window.location.search);
         const emailParam = params.get('email');
         const idParam = params.get('lead_id') || params.get('id');
@@ -96,7 +95,7 @@ export function useLeadData() {
         const { data, error: apiError } = await query.single();
 
         if (apiError) {
-          if (apiError.code === 'PGRST116') {
+          if (apiError.code === 'PGRST116') { // PGRST116 indicates no row found
             setLoading(false);
             return;
           }
@@ -134,7 +133,7 @@ export function useLeadData() {
 }
 
 // ========================================== //
-// VALUE CARDS COMPONENT                      //
+// COMPLIANCE TRUST PILLARS COMPONENT         //
 // ========================================== //
 
 interface PillarCardProps {
@@ -192,14 +191,14 @@ const CompliancePillars: React.FC = () => {
 };
 
 // ========================================== //
-// MAIN APPLICATION COMPONENT                 //
+// MAIN APPLICATION DASHBOARD                 //
 // ========================================== //
 
 export default function App() {
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<'scanner' | 'roi'>('scanner');
 
-  // Application States
+  // Application Telemetry States
   const [metrics, setMetrics] = useState<GlobalMetrics | null>({
     total_vins: 25041,
     processed_vins: 1420,
@@ -211,11 +210,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Closing States (Move to Close Flow)
+  // Frictionless Lead Conversion States
   const [sweepExecuted, setSweepExecuted] = useState(false);
   const [closeEmail, setCloseEmail] = useState('');
   const [closeSubmitted, setCloseSubmitted] = useState(false);
 
+  // Overlay & Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
@@ -232,15 +232,15 @@ export default function App() {
   // Active Hook Integration
   const { lead, loading: leadLoading, error: leadError } = useLeadData();
 
-  // Sandbox States
+  // Sandbox State Logs
   const [sandboxResetStatus, setSandboxResetStatus] = useState<string>('');
   const [sandboxWebhookLogs, setSandboxWebhookLogs] = useState<string>('');
 
-  const mockReferenceToken = "RL-2026-NKT82X";
-  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`;
-  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const mockReferenceToken = "RL-2026-NKT82X"; 
+  const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`; 
+  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; 
 
-  // Fetch Global Metrics
+  // Fetch Global Telemetry Metrics
   const fetchGlobalMetrics = () => {
     axios.get('http://127.0.0.1:8000/api/metrics/global')
       .then(res => {
@@ -261,6 +261,7 @@ export default function App() {
     fetchGlobalMetrics();
   }, []);
 
+  // MRR & Pricing Quoters
   const calculateCustomMRR = (totalCars: number) => {
     const baseFee = 99;
     const perCarFee = 2.50;
@@ -289,7 +290,7 @@ export default function App() {
     }, 800);
   };
 
-  // Generic lead conversion submission handler
+  // Convert Prospect Email Submission Flow
   const handleConversionClose = (e: React.FormEvent) => {
     e.preventDefault();
     if (!closeEmail.trim()) return;
@@ -302,7 +303,7 @@ export default function App() {
     }, 1000);
   };
 
-  // Sandbox Reset
+  // Sandbox Orchestrators
   const triggerSandboxEnvironmentReset = async () => {
     setSandboxResetStatus('Resetting Replica State...');
     try {
@@ -319,7 +320,7 @@ export default function App() {
     }
   };
 
-  // Sandbox Subscription Mock
+  // Sandbox Subscriptions Mock Webhook
   const simulateSandboxSubscriptionUpgrade = async () => {
     setSandboxWebhookLogs('Generating signed token payload...');
     try {
@@ -334,7 +335,7 @@ export default function App() {
     }
   };
 
-  // Processing Manifest Registry Lines
+  // Advanced Hybrid "VIN-First" Parser Engine
   const processManifestLines = async (rawLines: Array<string>) => {
     const cleanedLines = rawLines
       .map(line => line.trim())
@@ -357,27 +358,37 @@ export default function App() {
 
     try {
       for (const line of cleanedLines) {
-        const parts = line.split(',').map(p => p.trim());
-        if (parts.length < 3) continue;
+        // Alphanumeric validation to check if the line is a 17-digit VIN key
+        const isVinPattern = /^[A-HJ-NPR-Z0-9]{17}$/i.test(line);
 
-        // Bracket-safe native .at() calls protect system compilation
-        const make = parts.at(0) || '';
-        const model = parts.at(1) || '';
-        const year = parts.at(2) || '';
+        if (isVinPattern) {
+          // Direct API VIN Lookup (Hitting your newly appended backend router route)
+          const response = await axios.get(`http://127.0.0.1:8000/api/recalls/vin/${line}`);
+          if (Array.isArray(response.data)) {
+            aggregatedResults.push(...response.data);
+          }
+        } else {
+          // Legacy Comma-delimited (Make, Model, Year) Fallback Ingestion (Re-aligned to /recalls/search) [cite: 22]
+          const parts = line.split(',').map(p => p.trim());
+          if (parts.length >= 3) {
+            const make = parts.at(0) || '';
+            const model = parts.at(1) || '';
+            const year = parts.at(2) || '';
 
-        const response = await axios.get('http://127.0.0.1:8000/api/recalls', {
-          params: { make, model, year }
-        });
-
-        if (Array.isArray(response.data)) {
-          aggregatedResults.push(...response.data);
+            const response = await axios.get('http://127.0.0.1:8000/api/recalls/search', {
+              params: { make, model, year }
+            });
+            if (Array.isArray(response.data)) {
+              aggregatedResults.push(...response.data);
+            }
+          }
         }
       }
 
       setRecalls(aggregatedResults);
       setSweepExecuted(true);
       if (aggregatedResults.length === 0) {
-        setError('Scan Complete: Clean telemetry across all targeted assets.');
+        setError('Scan Complete: Clean safety telemetry across all validated assets.');
       }
     } catch (err: any) {
       console.error(err);
@@ -396,7 +407,7 @@ export default function App() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe native FileList item fetching
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe FileList indexing
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -431,7 +442,7 @@ export default function App() {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    const file = files ? files.item(0) : null; // ✅ Bracket-safe native FileList item fetching
+    const file = files ? files.item(0) : null; // ✅ Bracket-safe FileList indexing
     if (!file) return;
     setError('');
     setRecalls([]);
@@ -457,11 +468,11 @@ export default function App() {
     fileInputRef.current?.click();
   };
 
-  // Personalized Lead Parameter Calculation
+  // Personalized lead evaluations
   const isPersonalizedLead = lead !== null;
-  const leadSavings = lead ? lead.est_fleet_size * 150 : 0;
-  const leadPrice = lead ? Math.max(49, Math.min(299, lead.est_fleet_size * 5)) : 0;
-  const leadStripeLink = lead ? `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(lead.contact_email)}&tier=${lead.est_fleet_size > 25 ? 'enterprise' : 'growth'}` : '';
+  const leadSavings = lead ? lead.est_fleet_size * 150 : 0; 
+  const leadPrice = lead ? Math.max(49, Math.min(299, lead.est_fleet_size * 5)) : 0; 
+  const leadStripeLink = lead ? `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(lead.contact_email)}&tier=${lead.est_fleet_size > 25 ? 'enterprise' : 'growth'}` : ''; 
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -542,10 +553,10 @@ export default function App() {
             </div>
 
             {lead.localized_threat_hook && (
-              <div className="px-6 py-4 bg-orange-950/10 border-b border-slate-900 flex gap-4 items-start">
+              <div className="px-6 py-4 bg-orange-950/10 border-b border-slate-900 flex gap-4 items-start animate-fadeIn">
                 <span className="text-lg mt-0.5">☀️</span>
                 <div>
-                  <h4 className="text-[10px] font-black uppercase tracking-wider text-orange-400">Mojave Climate Hazard Trigger</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-orange-400">Mojave Desert Operational Risk</h4>
                   <p className="text-slate-300 text-xs mt-1 leading-normal italic">
                     "{lead.localized_threat_hook}"
                   </p>
@@ -588,7 +599,7 @@ export default function App() {
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
-              📊 Unlocked Fleet Scanner
+              📊 Frictionless Fleet Scanner
             </button>
             <button
               onClick={() => setActiveTab('roi')}
@@ -611,10 +622,10 @@ export default function App() {
                 <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
                 
                 <h3 className="text-base font-black text-white uppercase tracking-tight mb-2 text-center md:text-left">
-                  Upload Manifest to Scan Telemetry
+                  Paste Vehicle Parameters or Drop Registry File
                 </h3>
                 <p className="text-slate-500 text-xs max-w-xl mb-6 text-center md:text-left">
-                  Paste vehicle parameters directly or drop a registry spreadsheet. Our federal NHTSA sync verifies up to 10 cars with zero upfront signup friction.
+                  Type 17-digit VIN keys or list Make, Model, Year coordinates. Try scanning up to 10 fleet vehicles for free to test open safety threat registries.
                 </p>
 
                 <form onSubmit={handleSearch} className="space-y-4">
@@ -648,7 +659,7 @@ export default function App() {
                     <div className="md:col-span-2 relative">
                       <textarea
                         rows={4}
-                        placeholder="Paste rows: MAKE, MODEL, YEAR...&#10;Example:&#10;FORD, TRANSIT-250, 2022&#10;CHEVROLET, BOLT EV, 2021"
+                        placeholder="Accepts 17-character VIN keys OR raw comma details...&#10;Examples:&#10;1FTFW1RG4Kxxxxxxx&#10;FORD, TRANSIT-250, 2022"
                         value={bulkInput}
                         onChange={(e) => setBulkInput(e.target.value)}
                         className="w-full h-full min-h-[120px] p-4 text-xs rounded-2xl border border-slate-900 bg-slate-950/90 text-emerald-400 font-mono outline-none focus:border-emerald-500/60 transition-all placeholder:text-slate-800 resize-none"
@@ -682,7 +693,7 @@ export default function App() {
 
               {/* DYNAMIC CONVERSION CLOSE (Only displays after prospect runs their first sweep) */}
               {sweepExecuted && recalls.length > 0 && (
-                <div className="w-full bg-[#051111]/80 border border-emerald-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden text-center md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="w-full bg-[#051111]/80 border border-emerald-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden text-center md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fadeIn">
                   <div className="space-y-2">
                     <span className="text-red-500 font-mono text-xs font-bold uppercase tracking-wider">⚠️ Threats Active</span>
                     <h3 className="text-lg md:text-xl font-black text-white uppercase tracking-tight">
@@ -712,7 +723,7 @@ export default function App() {
                     </form>
                   ) : (
                     <div className="text-center md:text-right shrink-0 bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 rounded-xl">
-                      <span className="text-xs text-emerald-400 font-black uppercase tracking-wider block">✓ Forwarded Context</span>
+                      <span className="text-xs text-emerald-400 font-black uppercase tracking-wider block">✓ Forwarding Context</span>
                       <p className="text-[10px] text-slate-500 mt-1">Stripe Checkout session loading...</p>
                     </div>
                   )}

@@ -119,6 +119,87 @@ async def share_compliance_badge(payload: BadgeShareRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to share badge: {str(e)}")
+    
+# =====================================================================
+# ENDPOINT 5: DIRECT VIN DECODING & RECALL THREAT SCANNER
+# =====================================================================
+@router.get("/recalls/vin/{vin}", response_model=List[RecallResponse])
+async def get_recalls_by_vin(vin: str):
+    """
+    Asynchronously decodes a 17-digit VIN using the public NHTSA vPIC API,
+    resolves Make, Model, and Year, and queries Supabase for matching recalls.
+    """
+    # 1. Enforce strict format standards
+    clean_vin = vin.strip().upper()
+    if len(clean_vin) != 17:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid VIN structure. Must be exactly 17 alphanumeric characters."
+        )
+
+    # 2. Query NHTSA's public vPIC decoder (httpx is already imported in recalls.py)
+    vpic_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{clean_vin}?format=json"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            vpic_response = await client.get(vpic_url, timeout=5.0)
+            vpic_response.raise_for_status()
+            vpic_data = vpic_response.json()
+            
+        results = vpic_data.get("Results", [])
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="VIN could not be decoded by the federal registry."
+            )
+            
+        decoded = results
+        make = decoded.get("Make", "").strip()
+        model = decoded.get("Model", "").strip()
+        year_str = decoded.get("ModelYear", "").strip()
+        
+        if not make or not model or not year_str:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Incomplete vehicle attributes resolved from this VIN."
+            )
+            
+        year = int(year_str)
+        
+    except httpx.HTTPError as e:
+        logger.error(f"NHTSA vPIC API handshake failure: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="External federal VIN decoder is temporarily offline."
+        )
+    except (ValueError, IndexError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Failed to parse model year returned from federal decoder."
+        )
+
+    # 3. Query your central Supabase recall catalog using resolved attributes
+    try:
+        from supabase import create_client, Client
+        sb: Client = create_client(settings.supabase_url, settings.supabase_service_key) [cite: 22]
+        
+        # Execute case-insensitive queries against your existing database
+        query = sb.table("recalls").select("*") \
+            .ilike("make", make) \
+            .ilike("model", model) \
+            .eq("year", str(year))
+            
+        db_response = query.execute()
+        recalls_data = db_response.data or []
+        
+        return recalls_data
+        
+    except Exception as e:
+        logger.error(f"Database query failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal database operation failed."
+        )
 
 # =====================================================================
 # BACKGROUND WORKER & SCHEDULER ENTRY POINT (ADMINISTRATIVE) [4]
