@@ -192,211 +192,6 @@ const CompliancePillars: React.FC = () => {
 };
 
 // ========================================== //
-// HIGH-CONVERTING CENTERPIECE COMPONENT      //
-// ========================================== //
-
-interface GhostAuditProps {
-  lead: Lead | null;
-  leadLoading: boolean;
-  leadError: string | null;
-  onRunSweep: () => void;
-}
-
-function CenterpieceUploader({ lead, leadLoading, leadError, onRunSweep }: GhostAuditProps) {
-  const [isSweeping, setIsSweeping] = useState<boolean>(false);
-  const [sweepProgress, setSweepProgress] = useState<number>(0);
-  const [sweepComplete, setSweepComplete] = useState<boolean>(false);
-  const [manualEmail, setManualEmail] = useState<string>('');
-
-  if (leadLoading) {
-    return (
-      <div className="w-full max-w-3xl mx-auto bg-slate-900/40 border border-slate-800 rounded-2xl p-8 shadow-2xl animate-pulse my-4">
-        <div className="h-6 bg-slate-800 rounded w-1/4 mb-4"></div>
-        <div className="h-10 bg-slate-800 rounded mb-6"></div>
-        <div className="h-4 bg-slate-800 rounded w-5/6"></div>
-      </div>
-    );
-  }
-
-  if (leadError) {
-    return (
-      <div className="w-full max-w-3xl mx-auto bg-red-950/20 border border-red-500/30 rounded-2xl p-6 text-center text-red-400 my-4">
-        <p className="font-semibold text-sm">⚠️ Configuration Interrupted</p>
-        <p className="text-xs mt-1 text-slate-500">{leadError}</p>
-      </div>
-    );
-  }
-
-  const triggerSweep = () => {
-    setIsSweeping(true);
-    setSweepProgress(0);
-    setSweepComplete(false);
-    
-    const interval = setInterval(() => {
-      setSweepProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsSweeping(false);
-          setSweepComplete(true);
-          onRunSweep();
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 150);
-  };
-
-  const fleetSize = lead ? lead.est_fleet_size : 10;
-  const estimatedAnnualSavings = fleetSize * 150;
-  const monthlySaaSPrice = Math.max(49, Math.min(299, fleetSize * 5));
-  const checkoutEmail = lead ? lead.contact_email : manualEmail;
-  const stripeLink = `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(checkoutEmail)}&tier=${fleetSize > 25 ? 'enterprise' : 'growth'}`;
-
-  // SCENARIO A: Generic Prospect Visitor Flow
-  if (!lead) {
-    return (
-      <div className="w-full max-w-3xl mx-auto bg-gradient-to-b from-[#0b0f19] to-[#040812] border border-slate-900 rounded-3xl p-8 md:p-10 shadow-2xl text-center relative overflow-hidden my-4">
-        <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-        
-        <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight mb-2">Scan Your Fleet For Active Safety Recalls</h3>
-        <p className="text-slate-400 text-xs md:text-sm max-w-md mx-auto mb-8 leading-relaxed">
-          Unlock your free, automated safety report. Instantly cross-reference active manufacturer safety records across up to 10 vehicles in real-time.
-        </p>
-
-        {!sweepComplete ? (
-          <div className="max-w-md mx-auto space-y-4">
-            <div className="relative">
-              <input 
-                type="email"
-                placeholder="Enter your corporate email address..."
-                value={manualEmail}
-                onChange={(e) => setManualEmail(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-950/80 border border-slate-800 rounded-xl text-xs md:text-sm text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/80 transition-all shadow-inner"
-              />
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-700 text-xs">🔒</div>
-            </div>
-            
-            <button
-              onClick={triggerSweep}
-              disabled={isSweeping || !manualEmail}
-              className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-lg ${
-                isSweeping || !manualEmail
-                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-slate-950 shadow-emerald-500/10'
-              }`}
-            >
-              {isSweeping ? `Scanning NHTSA Registers (${sweepProgress}%)...` : 'Deploy Free Fleet Sweep'}
-            </button>
-          </div>
-        ) : (
-          <div className="py-4 space-y-6 animate-fadeIn">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full mb-2">
-              <span className="text-2xl text-emerald-400">⚠️</span>
-            </div>
-            <h4 className="text-lg font-bold text-white uppercase tracking-tight">Vulnerabilities Detected</h4>
-            <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-              Our background scan identified unaddressed federal safety recalls matches across your vehicles. Upgrade to unlock complete mitigation reports.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xs mx-auto">
-              <a 
-                href={stripeLink}
-                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-lg transition shadow-md"
-              >
-                Access Threat Shield
-              </a>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // SCENARIO B: Hyper-Personalized Client Portal Flow
-  return (
-    <div className="w-full max-w-3xl mx-auto bg-[#0b0f19] border border-emerald-500/20 rounded-3xl overflow-hidden shadow-2xl my-4">
-      <div className="bg-gradient-to-b from-emerald-950/20 to-transparent p-6 md:p-8 border-b border-slate-900">
-        <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full mb-3">
-          Authenticated Pilot Link
-        </span>
-        <h2 className="text-xl md:text-2xl font-bold text-white">
-          Welcome back, {lead.contact_name}
-        </h2>
-        <p className="text-slate-400 text-xs mt-1">
-          Pre-loaded Nevada registry for <span className="text-slate-200 font-semibold">{lead.company_name}</span> (Estimated: {lead.est_fleet_size} {lead.primary_vehicle_mix}s).
-        </p>
-      </div>
-
-      {lead.localized_threat_hook && (
-        <div className="px-6 py-4 bg-orange-950/10 border-b border-slate-900 flex gap-4 items-start">
-          <span className="text-lg mt-0.5">☀️</span>
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-wider text-orange-400">Mojave Climate Hazard Trigger</h4>
-            <p className="text-slate-300 text-xs mt-1 leading-normal italic">
-              "{lead.localized_threat_hook}"
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="p-8">
-        {!sweepComplete ? (
-          <div className="text-center py-4 space-y-5">
-            <h3 className="text-base font-bold text-white uppercase tracking-tight">Active Ingestion Portal Standby</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-              Your regional parameters have been cached. Click below to verify active vehicle compliance logs against live NHTSA manufacturer registries.
-            </p>
-            <button
-              onClick={triggerSweep}
-              disabled={isSweeping}
-              className={`px-8 py-3.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 ${
-                isSweeping 
-                  ? 'bg-slate-900 text-slate-600 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-lg shadow-emerald-500/10'
-              }`}
-            >
-              {isSweeping ? `Connecting NHTSA Server (${sweepProgress}%)...` : 'Execute Priority Safety Sweep'}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="bg-slate-950/60 border border-slate-900 rounded-xl p-5 text-center">
-              <span className="text-rose-500 text-xl">⚠️</span>
-              <h4 className="text-sm font-black text-white uppercase tracking-wider mt-2">Active Vehicle Threat Vectors Detected</h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Security scanners flagged open recalls associated with your active {lead.primary_vehicle_mix} fleet.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-black font-mono">Projected Annual Savings</p>
-                <p className="text-lg font-black text-emerald-400 mt-1">${estimatedAnnualSavings.toLocaleString()}/yr</p>
-              </div>
-              <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-black font-mono">Platform SaaS Pricing</p>
-                <p className="text-lg font-black text-white mt-1">${monthlySaaSPrice}/mo</p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-900 text-center space-y-4">
-              <a
-                href={stripeLink}
-                className="inline-block w-full max-w-xs py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-lg shadow-lg hover:opacity-95 transition"
-              >
-                Access Mitigation Matrix (${monthlySaaSPrice}/mo)
-              </a>
-              <p className="text-[10px] text-slate-500 leading-normal">
-                Bypasses testing limit gates, configures active webhook tracking, and publishes live Compliance Badges.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ========================================== //
 // MAIN APPLICATION COMPONENT                 //
 // ========================================== //
 
@@ -415,6 +210,12 @@ export default function App() {
   const [recalls, setRecalls] = useState<Array<Recall>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Closing States (Move to Close Flow)
+  const [sweepExecuted, setSweepExecuted] = useState(false);
+  const [closeEmail, setCloseEmail] = useState('');
+  const [closeSubmitted, setCloseSubmitted] = useState(false);
+
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [brokerEmail, setBrokerEmail] = useState('');
@@ -488,6 +289,19 @@ export default function App() {
     }, 800);
   };
 
+  // Generic lead conversion submission handler
+  const handleConversionClose = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!closeEmail.trim()) return;
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setCloseSubmitted(true);
+      const tier = recalls.length > 5 ? 'enterprise' : 'growth';
+      window.open(`https://checkout.recalllogic.com/pay?email=${encodeURIComponent(closeEmail)}&tier=${tier}`, '_blank');
+    }, 1000);
+  };
+
   // Sandbox Reset
   const triggerSandboxEnvironmentReset = async () => {
     setSandboxResetStatus('Resetting Replica State...');
@@ -495,6 +309,9 @@ export default function App() {
       const response = await axios.post('http://127.0.0.1:8000/api/sandbox/reset');
       setSandboxResetStatus('✓ Success: ' + (response.data.message || 'Replica reset.'));
       setRecalls([]);
+      setSweepExecuted(false);
+      setCloseSubmitted(false);
+      setCloseEmail('');
       fetchGlobalMetrics();
       setTimeout(() => setSandboxResetStatus(''), 4000);
     } catch (err: any) {
@@ -558,6 +375,7 @@ export default function App() {
       }
 
       setRecalls(aggregatedResults);
+      setSweepExecuted(true);
       if (aggregatedResults.length === 0) {
         setError('Scan Complete: Clean telemetry across all targeted assets.');
       }
@@ -639,11 +457,11 @@ export default function App() {
     fileInputRef.current?.click();
   };
 
-  const simulateSuccessFromCenterpiece = () => {
-    // Fills uploader placeholder rows on sweep completion
-    setBulkInput("FORD, TRANSIT-250, 2022\nCHEVROLET, BOLT EV, 2021");
-    processManifestLines(["FORD, TRANSIT-250, 2022", "CHEVROLET, BOLT EV, 2021"]);
-  };
+  // Personalized Lead Parameter Calculation
+  const isPersonalizedLead = lead !== null;
+  const leadSavings = lead ? lead.est_fleet_size * 150 : 0;
+  const leadPrice = lead ? Math.max(49, Math.min(299, lead.est_fleet_size * 5)) : 0;
+  const leadStripeLink = lead ? `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(lead.contact_email)}&tier=${lead.est_fleet_size > 25 ? 'enterprise' : 'growth'}` : '';
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -701,15 +519,63 @@ export default function App() {
           </div>
         </section>
 
-        {/* Value-First Personalized Welcome or Ghost Sweep */}
-        <section>
-          <CenterpieceUploader 
-            lead={lead} 
-            leadLoading={leadLoading} 
-            leadError={leadError} 
-            onRunSweep={simulateSuccessFromCenterpiece} 
-          />
-        </section>
+        {/* Personalized Welcome Layer for Pre-Qualified Leads */}
+        {leadLoading && (
+          <div className="w-full max-w-3xl mx-auto bg-[#0b0f19]/40 border border-slate-900 rounded-3xl p-8 shadow-2xl animate-pulse">
+            <div className="h-6 bg-slate-800 rounded w-1/4 mb-4"></div>
+            <div className="h-10 bg-slate-800 rounded mb-6"></div>
+          </div>
+        )}
+
+        {isPersonalizedLead && (
+          <section className="w-full max-w-3xl mx-auto bg-[#0b0f19] border border-emerald-500/20 rounded-3xl overflow-hidden shadow-2xl my-4">
+            <div className="bg-gradient-to-b from-emerald-950/20 to-transparent p-6 md:p-8 border-b border-slate-900">
+              <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full mb-3">
+                Authenticated Pilot Link
+              </span>
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                Welcome back, {lead.contact_name}
+              </h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Pre-loaded Nevada registry for <span className="text-slate-200 font-semibold">{lead.company_name}</span> (Estimated: {lead.est_fleet_size} {lead.primary_vehicle_mix}s).
+              </p>
+            </div>
+
+            {lead.localized_threat_hook && (
+              <div className="px-6 py-4 bg-orange-950/10 border-b border-slate-900 flex gap-4 items-start">
+                <span className="text-lg mt-0.5">☀️</span>
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-orange-400">Mojave Climate Hazard Trigger</h4>
+                  <p className="text-slate-300 text-xs mt-1 leading-normal italic">
+                    "{lead.localized_threat_hook}"
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-8 text-center space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
+                  <p className="text-[10px] text-slate-500 uppercase font-black font-mono">Projected Annual Savings</p>
+                  <p className="text-lg font-black text-emerald-400 mt-1">${leadSavings.toLocaleString()}/yr</p>
+                </div>
+                <div className="bg-slate-950/30 p-4 border border-slate-900 rounded-xl text-center">
+                  <p className="text-[10px] text-slate-500 uppercase font-black font-mono">SaaS Pricing Tiers</p>
+                  <p className="text-lg font-black text-white mt-1">${leadPrice}/mo</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-900 text-center space-y-4">
+                <a
+                  href={leadStripeLink}
+                  className="inline-block w-full max-w-xs py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-lg shadow-lg hover:opacity-95 transition"
+                >
+                  Access Mitigation Matrix (${leadPrice}/mo)
+                </a>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Tabbed Interactive Control Hub */}
         <section className="space-y-6">
@@ -722,7 +588,7 @@ export default function App() {
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
-              📊 Interactive Fleet Scanner
+              📊 Unlocked Fleet Scanner
             </button>
             <button
               onClick={() => setActiveTab('roi')}
@@ -739,65 +605,117 @@ export default function App() {
           {/* TAB A: Technical Fleet Scanner Ingestion */}
           {activeTab === 'scanner' && (
             <div className="space-y-6 animate-fadeIn">
-              <form onSubmit={handleSearch} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
-                  {/* CSV Drag Drop */}
-                  <div 
-                    onClick={triggerFileSelect}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`p-6 border border-dashed rounded-2xl text-center cursor-pointer flex flex-col items-center justify-center transition-all duration-300 relative group ${
-                      isDragging  
-                        ? 'border-emerald-500 bg-emerald-950/10'  
-                        : 'border-slate-800 bg-[#0b0f19]/10 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="text-2xl mb-2">📥</span>
-                    <span className="text-slate-200 font-bold text-xs block">Manifest File Registry</span>
-                    <span className="text-slate-500 text-[10px] mt-1 block">Drop raw .csv or .txt spreadsheet matrices</span>
-                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv,.txt" className="hidden" />
+              
+              {/* Frictionless Scanner Card (Zero upfront registration) */}
+              <div className="w-full bg-gradient-to-b from-[#0b0f19] to-[#040812] border border-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+                
+                <h3 className="text-base font-black text-white uppercase tracking-tight mb-2 text-center md:text-left">
+                  Upload Manifest to Scan Telemetry
+                </h3>
+                <p className="text-slate-500 text-xs max-w-xl mb-6 text-center md:text-left">
+                  Paste vehicle parameters directly or drop a registry spreadsheet. Our federal NHTSA sync verifies up to 10 cars with zero upfront signup friction.
+                </p>
+
+                <form onSubmit={handleSearch} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     
-                    {showUploadNotification && (
-                      <div className="mt-3 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] rounded animate-bounce">
-                        File loaded! Run sweep below to process.
-                      </div>
-                    )}
+                    {/* CSV Drag Drop */}
+                    <div 
+                      onClick={triggerFileSelect}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`p-6 border border-dashed rounded-2xl text-center cursor-pointer flex flex-col items-center justify-center transition-all duration-300 relative group ${
+                        isDragging  
+                          ? 'border-emerald-500 bg-emerald-950/10'  
+                          : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">📥</span>
+                      <span className="text-slate-200 font-bold text-xs block">Spreadsheet Matrix</span>
+                      <span className="text-slate-500 text-[10px] mt-1 block">Drop .csv / .txt files</span>
+                      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv,.txt" className="hidden" />
+                      
+                      {showUploadNotification && (
+                        <div className="mt-3 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] rounded animate-bounce">
+                          File loaded! Click run below.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Console Paste Terminal */}
+                    <div className="md:col-span-2 relative">
+                      <textarea
+                        rows={4}
+                        placeholder="Paste rows: MAKE, MODEL, YEAR...&#10;Example:&#10;FORD, TRANSIT-250, 2022&#10;CHEVROLET, BOLT EV, 2021"
+                        value={bulkInput}
+                        onChange={(e) => setBulkInput(e.target.value)}
+                        className="w-full h-full min-h-[120px] p-4 text-xs rounded-2xl border border-slate-900 bg-slate-950/90 text-emerald-400 font-mono outline-none focus:border-emerald-500/60 transition-all placeholder:text-slate-800 resize-none"
+                      />
+                      <div className="absolute bottom-3 right-3 text-[8px] font-mono text-slate-700 bg-slate-950 px-2 py-0.5 rounded border border-slate-900/60">Console_Input_Override</div>
+                    </div>
+
                   </div>
 
-                  {/* PowerShell Terminal Paste */}
-                  <div className="md:col-span-2 relative">
-                    <textarea
-                      rows={4}
-                      placeholder="Paste comma-delimited registry arrays row-by-row...&#10;Example:&#10;FORD, TRANSIT-250, 2022&#10;CHEVROLET, BOLT EV, 2021"
-                      value={bulkInput}
-                      onChange={(e) => setBulkInput(e.target.value)}
-                      className="w-full h-full min-h-[120px] p-4 text-xs rounded-2xl border border-slate-900 bg-slate-950/80 text-emerald-400 font-mono outline-none focus:border-emerald-500/60 transition-all placeholder:text-slate-800 resize-none"
-                    />
-                    <div className="absolute bottom-3 right-3 text-[8px] font-mono text-slate-700 bg-slate-950 px-2 py-0.5 rounded border border-slate-900/60">Registry_Override_Console</div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                    <div className="text-slate-600 text-[10px] max-w-md leading-normal">
+                      ⚠️ Sandbox Rule: Exploratory checks are capped at 10 vehicle matrix components per evaluation wave.
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-white text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg disabled:opacity-40"
+                    >
+                      {loading ? 'Interrogating Registers...' : 'Run Safety Threat Sweep'}
+                    </button>
                   </div>
-
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-                  <div className="text-slate-600 text-[10px] max-w-md leading-normal">
-                    ⚠️ Evaluation Wave Guard: Testing sandboxes have an execution pipeline limit restricted to 10 vehicles per sweep pass.
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-white text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg disabled:opacity-40"
-                  >
-                    {loading ? 'Analyzing Registers...' : 'Run Safety Scanner'}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
 
               {/* Ingestion Errors Banner */}
               {error && (
                 <div className="text-emerald-400 p-4 bg-emerald-950/10 border border-emerald-900/30 rounded-xl font-mono text-xs flex items-center gap-2">
                   <span>📡</span> {error}
+                </div>
+              )}
+
+              {/* DYNAMIC CONVERSION CLOSE (Only displays after prospect runs their first sweep) */}
+              {sweepExecuted && recalls.length > 0 && (
+                <div className="w-full bg-[#051111]/80 border border-emerald-500/20 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden text-center md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <span className="text-red-500 font-mono text-xs font-bold uppercase tracking-wider">⚠️ Threats Active</span>
+                    <h3 className="text-lg md:text-xl font-black text-white uppercase tracking-tight">
+                      {recalls.length} Open Recalls Detected in Fleet
+                    </h3>
+                    <p className="text-slate-400 text-xs max-w-xl leading-relaxed">
+                      Secure your exportable PDF Compliance Certificates and claim your authenticated Broker-Ready Live Badge to insulate operations.
+                    </p>
+                  </div>
+
+                  {!closeSubmitted ? (
+                    <form onSubmit={handleConversionClose} className="shrink-0 w-full md:max-w-xs space-y-2">
+                      <input 
+                        type="email"
+                        required
+                        placeholder="your-email@company.com"
+                        value={closeEmail}
+                        onChange={(e) => setCloseEmail(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-emerald-500 transition font-medium text-center"
+                      />
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg"
+                      >
+                        Claim PDF Report & Badge
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="text-center md:text-right shrink-0 bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 rounded-xl">
+                      <span className="text-xs text-emerald-400 font-black uppercase tracking-wider block">✓ Forwarded Context</span>
+                      <p className="text-[10px] text-slate-500 mt-1">Stripe Checkout session loading...</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -814,7 +732,7 @@ export default function App() {
                     return (
                       <div 
                         key={index}
-                        className={`border rounded-2xl p-6 transition-all bg-slate-950/40 relative overflow-hidden ${
+                        className={`border rounded-2xl p-6 transition-all bg-[#0b0f19]/20 relative overflow-hidden ${
                           isHazardous ? 'border-red-500/20 shadow-red-950/5' : 'border-slate-900'
                         }`}
                       >
