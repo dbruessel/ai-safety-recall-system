@@ -1,83 +1,77 @@
-import os
+import logging
 import stripe
 from fastapi import APIRouter, Request, Header, HTTPException, status
+from supabase import create_client, Client
 from app.config import settings
 
-# Preserving your exact prefix configurations to align perfectly with the Stripe CLI testing path: 
-# stripe listen --forward-to localhost:8000/payments/webhook
+logger = logging.getLogger("webhook-router")
+
 router = APIRouter(prefix="/payments", tags=["webhooks"])
 
-@router.post("/webhook", status_code=status.HTTP_200_OK)
-async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+@router.post("/webhook")
+async def stripe_webhook_listener(request: Request, stripe_signature: str = Header(None)):
     """
-    Production-ready server-to-server webhook destination for Stripe infrastructure.
-    Captures completed checkout events to dynamically clear database premium asset limits.
+    Asynchronously processes signed incoming Stripe webhooks [cite: 4, 13].
+    Upgrades paid fleet tiers in Supabase upon successful subscription [cite: 4, 29].
     """
-    # Initialize keys based on your unified settings attributes
-    stripe.api_key = getattr(settings, "stripe_secret_key", getattr(settings, "STRIPE_SECRET_KEY", None))
-    endpoint_secret = getattr(settings, "stripe_webhook_secret", getattr(settings, "STRIPE_WEBHOOK_SECRET", None))
-    
-    if not stripe.api_key or not endpoint_secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Stripe configurations are missing on the server backend."
-        )
+    if not stripe_signature:
+        raise HTTPException(status_code=400, detail="Missing required signature header.")
 
-    # 1. Get raw request body (Required for cryptographic signature verification)
-    raw_body = await request.body()
+    raw_body = await request.body() [cite: 13]
     
-    # 2. Verify signature 
     try:
+        # Verify event authenticity using your local webhook secret key [cite: 4, 13]
         event = stripe.Webhook.construct_event(
-            payload=raw_body,
-            sig_header=stripe_signature,
-            secret=endpoint_secret
-        )
+            raw_body, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
+        ) [cite: 13]
     except stripe.error.SignatureVerificationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature verification.")
+        logger.error(f"Invalid signature verification: {str(e)}")
+        raise HTTPException(status_code=400, detail="Cryptographic verification failed.")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Webhook event construction parsing failure: {str(e)}")
+        logger.error(f"Webhook body processing failure: {str(e)}")
+        raise HTTPException(status_code=400, detail="Bad payload parser format.")
 
-    # 3. Handle the live completion event
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        customer_email = session.get("customer_details", {}).get("email")
-        client_ref_id = session.get("client_reference_id") # Retrieves user/profile row mapping token
-        metadata = session.get("metadata", {})
-        vin_count = metadata.get("vinCount", "0")
+    # Intercept transaction completion events [cite: 4, 13]
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        
+        user_id = session.get("client_reference_id") # Resolves who made the purchase [cite: 5]
+        stripe_customer_id = session.get("customer")
+        stripe_subscription_id = session.get("subscription")
 
-        print(f"🔄 Stripe event verified. Unlocking Premium access for Email: {customer_email}, Reference ID: {client_ref_id}")
+        if not user_id:
+            logger.error("Ignored Event: checkout.session.completed missing client_reference_id metadata.")
+            return {"status": "ignored", "reason": "No user ID link attached."}
 
-        # 4. Direct Relational Upsert into Supabase
-        if client_ref_id:
-            try:
-                from supabase import create_client, Client
-                
-                # Fetching credentials from backend context
-                sb_url = getattr(settings, "supabase_url", getattr(settings, "SUPABASE_URL", None))
-                sb_key = getattr(settings, "supabase_key", getattr(settings, "SUPABASE_KEY", None))
-                
-                if sb_url and sb_key:
-                    supabase: Client = create_client(sb_url, sb_key)
-                    
-                    # Update the user profile matching the unique client identifier
-                    db_response = supabase.table("profiles").update({
-                        "is_premium_active": True,
-                        "subscription_status": "pro",
-                        "max_vin_capacity": int(vin_count) if vin_count.isdigit() and int(vin_count) > 0 else 1000
-                    }).eq("id", client_ref_id).execute()
-                    
-                    print(f"✅ Supabase successfully updated for user {client_ref_id}. Sync status: {db_response.data}")
-                else:
-                    print("❌ Failure: Supabase environment credentials could not be resolved within the webhook handler loop.")
-            except Exception as database_error:
-                print(f"❌ Database execution crashed while provisioning webhook permissions: {str(database_error)}")
-                # Return 500 so Stripe infrastructure knows to retry the synchronization ping gracefully later
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Database storage layer synchronization tracking error."
-                )
-        else:
-            print("⚠️ Warning: checkout.session.completed received but was completely missing a 'client_reference_id' map.")
+        # Query the exact price ID associated with the transaction to determine their plan
+        try:
+            line_items = stripe.checkout.Session.list_line_items(session["id"])
+            price_id = line_items["data"]["price"]["id"]
+        except Exception as e:
+            logger.error(f"Failed to extract product price lineage: {str(e)}")
+            price_id = None
+
+        # Determine tier matching your database conventions [cite: 21, 29]
+        tier = "starter"
+        if price_id == "price_professional_249_flat_id":
+            tier = "professional"
+        elif price_id == "price_enterprise_499_flat_id":
+            tier = "enterprise"
+
+        # Update Supabase user profile & activate their workspace permissions [cite: 29]
+        try:
+            sb: Client = create_client(settings.supabase_url, settings.supabase_service_key) [cite: 49]
+            
+            # Update user profile tier status [cite: 29]
+            sb.table("profiles").update({
+                "subscription_tier": tier,
+                "stripe_customer_id": stripe_customer_id,
+                "stripe_subscription_id": stripe_subscription_id
+            }).eq("id", user_id).execute() [cite: 49]
+
+            logger.info(f"Successfully upgraded user {user_id} to {tier.upper()} status.") [cite: 29]
+        except Exception as e:
+            logger.error(f"Failed to sync Supabase user profile record: {str(e)}")
+            raise HTTPException(status_code=500, detail="Database write operation failed.")
 
     return {"status": "success"}
