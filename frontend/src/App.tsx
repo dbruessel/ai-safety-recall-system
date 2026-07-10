@@ -396,7 +396,7 @@ export default function App() {
   const [sandboxResetStatus, setSandboxResetStatus] = useState<string>('');
   const [sandboxWebhookLogs, setSandboxWebhookLogs] = useState<string>('');
 
-  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; [cite: 12]
+  const isSandboxMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   // 1. Fetch live metrics from local backend [cite: 13]
   const fetchGlobalMetrics = () => {

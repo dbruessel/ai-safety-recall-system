@@ -50,14 +50,14 @@ async def create_checkout_session(request: CheckoutRequest):
                 'quantity': 1,
             }],
             mode='subscription',
-            return_url=f"{settings.FRONTEND_URL}/return?session_id={{CHECKOUT_SESSION_ID}}", [cite: 66]
+            return_url=f"{settings.FRONTEND_URL}/return?session_id={{CHECKOUT_SESSION_ID}}",
         )
         return {"clientSecret": session.client_secret} [cite: 66]
     except Exception as e:
         logger.error(f"Stripe Session Creation Failure: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) [cite: 66]
-2. 📡 The Backend Webhook: backend/app/routers/webhook_router.py
-This route handles Stripe’s asynchronous server-to-server notifications [cite: 117]. When a payment clears, it reads the client_reference_id (the user's database profile ID) [cite: 5] and automatically upgrades their account status in Supabase so their full workspace instantly unlocks [cite: 4, 29]!
+#2. 📡 The Backend Webhook: backend/app/routers/webhook_router.py
+#This route handles Stripe’s asynchronous server-to-server notifications [cite: 117]. When a payment clears, it reads the client_reference_id (the user's database profile ID) [cite: 5] and automatically upgrades their account status in Supabase so their full workspace instantly unlocks [cite: 4, 29]!
 import logging
 import stripe
 from fastapi import APIRouter, Request, Header, HTTPException, status
