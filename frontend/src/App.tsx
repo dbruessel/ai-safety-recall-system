@@ -151,10 +151,6 @@ export default function App() {
   const [scanResults, setScanResults] = useState<Array<CheckedVinResult>>([]);
   const [totalRecallsFound, setTotalRecallsFound] = useState(0);
 
-  // Conversion Input State
-  const [closeEmail, setCloseEmail] = useState('');
-  const [closeSubmitted, setCloseSubmitted] = useState(false);
-
   // Overlay, File, & Drag-Drop States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -181,17 +177,19 @@ export default function App() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // Direct Lead Upgrade Handler
-  const handleLeadUpgradeRedirect = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!closeEmail.trim()) return;
+  // ⚡ frictionless 1-Click Stripe Checkout Redirect
+  const handleDirectStripeCheckout = () => {
     setLoading(true);
+    // If we have recall threats active, route to 'remediation' checkout; otherwise route to 'badge' verification checkout
+    const tier = totalRecallsFound > 0 ? 'remediation' : 'badge';
+    
+    // Pass pre-loaded lead email parameter to pre-fill the Stripe form if available
+    const emailParam = lead?.contact_email ? `&email=${encodeURIComponent(lead.contact_email)}` : '';
+    
     setTimeout(() => {
       setLoading(false);
-      setCloseSubmitted(true);
-      const tier = totalRecallsFound > 0 ? 'remediation' : 'badge';
-      window.open(`https://checkout.recalllogic.com/pay?email=${encodeURIComponent(closeEmail)}&tier=${tier}`, '_blank');
-    }, 1000);
+      window.open(`https://checkout.recalllogic.com/pay?tier=${tier}${emailParam}`, '_blank');
+    }, 500);
   };
 
   // Sandbox DB Reset Action
@@ -203,8 +201,6 @@ export default function App() {
       setScanResults([]);
       setSweepExecuted(false);
       setTotalRecallsFound(0);
-      setCloseSubmitted(false);
-      setCloseEmail('');
       setBulkInput('');
       setTimeout(() => setSandboxResetStatus(''), 4000);
     } catch (err: any) {
@@ -575,7 +571,7 @@ export default function App() {
                   <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
                   
                   <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">🛡️</span>
+                    <span className="text-3xl animate-pulse">🛡️</span>
                   </div>
 
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 font-mono">Compliance Audit Complete</span>
@@ -594,32 +590,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Move to Close Form */}
+                  {/* High-Converting Frictionless Direct Purchase Block */}
                   <div className="pt-6 border-t border-slate-900/60 mt-8 max-w-sm mx-auto space-y-4">
-                    {!closeSubmitted ? (
-                      <form onSubmit={handleLeadUpgradeRedirect} className="space-y-2">
-                        <label className="block text-[9px] font-black uppercase text-slate-500 tracking-wider text-left">Your Business Email</label>
-                        <input 
-                          type="email"
-                          required
-                          placeholder="e.g. logistics@fleetops.com"
-                          value={closeEmail}
-                          onChange={(e) => setCloseEmail(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-emerald-500 transition font-medium"
-                        />
-                        <button
-                          type="submit"
-                          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg"
-                        >
-                          Generate & Claim Compliance Badge
-                        </button>
-                      </form>
-                    ) : (
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 rounded-xl">
-                        <span className="text-xs text-emerald-400 font-black uppercase tracking-wider block">✓ Badge Registered</span>
-                        <p className="text-[10px] text-slate-500 mt-1">Connecting payment window...</p>
-                      </div>
-                    )}
+                    <button
+                      onClick={handleDirectStripeCheckout}
+                      disabled={loading}
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"
+                    >
+                      {loading ? 'Routing to SECURE PORTAL...' : '🔒 Generate & Claim Compliance Badge'}
+                    </button>
+                    <p className="text-[9px] text-slate-500 text-center leading-normal">
+                      Instant direct setup via Stripe. You'll specify account delivery coordinates on Stripe's secure billing screen.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -630,7 +612,7 @@ export default function App() {
                   
                   <div className="text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-900/60">
                     <div className="space-y-2">
-                      <span className="text-red-500 font-mono text-xs font-bold uppercase tracking-wider">⚠️ Threats Active</span>
+                      <span className="text-red-500 font-mono text-xs font-bold uppercase tracking-wider animate-pulse">⚠️ Threats Active</span>
                       <h3 className="text-2xl font-black text-white uppercase tracking-tight">
                         Critical Safety Threats Flagged ({totalRecallsFound})
                       </h3>
@@ -696,30 +678,16 @@ export default function App() {
 
                   {/* Conversion Direct Paywall Close Form */}
                   <div className="pt-6 border-t border-slate-900/60 mt-8 max-w-sm mx-auto space-y-4">
-                    {!closeSubmitted ? (
-                      <form onSubmit={handleLeadUpgradeRedirect} className="space-y-2">
-                        <label className="block text-[9px] font-black uppercase text-slate-500 tracking-wider text-left">Your Business Email</label>
-                        <input 
-                          type="email"
-                          required
-                          placeholder="e.g. logistics@fleetops.com"
-                          value={closeEmail}
-                          onChange={(e) => setCloseEmail(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-red-500 transition font-medium"
-                        />
-                        <button
-                          type="submit"
-                          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg"
-                        >
-                          Unlock All Threat Details & PDF Reports
-                        </button>
-                      </form>
-                    ) : (
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 px-6 py-4 rounded-xl text-center">
-                        <span className="text-xs text-emerald-400 font-black uppercase tracking-wider block">✓ Access Authorized</span>
-                        <p className="text-[10px] text-slate-500 mt-1">Stripe Checkout session loading...</p>
-                      </div>
-                    )}
+                    <button
+                      onClick={handleDirectStripeCheckout}
+                      disabled={loading}
+                      className="w-full py-4 bg-red-500 hover:bg-red-400 text-white text-xs font-black uppercase tracking-wider rounded-xl transition shadow-lg shadow-red-500/10 flex items-center justify-center gap-2"
+                    >
+                      {loading ? 'Routing to SECURE PORTAL...' : '🔒 Unlock All Threat Details & PDF Reports'}
+                    </button>
+                    <p className="text-[9px] text-slate-500 text-center leading-normal">
+                      Instant direct setup via Stripe. Technical campaign codes, remedies, and compliance logs will be unlocked instantly.
+                    </p>
                   </div>
                 </div>
               )}
@@ -793,7 +761,7 @@ export default function App() {
               </button>
               <button 
                 type="button" 
-                onClick={() => alert("Forwarding token context to checkout session hooks...")}
+                onClick={handleDirectStripeCheckout}
                 className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition shadow-lg hover:bg-emerald-600 uppercase"
               >
                 Upgrade Plan

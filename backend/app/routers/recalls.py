@@ -47,7 +47,7 @@ class RecallResponse(BaseModel):
     executive_action_directive: Optional[str] = None
 
 # =====================================================================
-# ENDPOINT 1: PRIMARY VEHICLE RECALL LOOKUP ENGINE
+# ENDPOINT 1: PRIMARY VEHICLE RECALL LOOKUP ENGINE (FIXED MAPPING)
 # =====================================================================
 @router.get("/recalls/search", response_model=List[RecallResponse])
 def search_vehicle_recalls(
@@ -63,7 +63,8 @@ def search_vehicle_recalls(
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
     try:
-        query = sb.table("recalls").select("*") \
+        # 🔑 FIXED: Pointed to 'recall_results' instead of 'recalls'
+        query = sb.table("recall_results").select("*") \
             .ilike("make", make) \
             .ilike("model", model) \
             .eq("year", str(year))
@@ -144,7 +145,7 @@ async def share_compliance_badge(payload: BadgeShareRequest):
         raise HTTPException(status_code=500, detail=f"Failed to share badge: {str(e)}")
 
 # =====================================================================
-# ENDPOINT 5: DIRECT VIN DECODING & RECALL THREAT SCANNER
+# ENDPOINT 5: DIRECT VIN DECODING & RECALL THREAT SCANNER (FIXED MAPPING)
 # =====================================================================
 @router.get("/recalls/vin/{vin}", response_model=List[RecallResponse])
 async def get_recalls_by_vin(vin: str):
@@ -176,8 +177,8 @@ async def get_recalls_by_vin(vin: str):
                 detail="VIN could not be decoded by the federal registry."
             )
             
-        # 🔑 THE ACTUAL FIX: Index the first dictionary object out of the list results
-        decoded = results
+        # Extract the first dictionary object out of the list results
+        decoded = results.pop(0)
         
         make = decoded.get("Make", "").strip()
         model = decoded.get("Model", "").strip()
@@ -208,8 +209,8 @@ async def get_recalls_by_vin(vin: str):
         from supabase import create_client, Client
         sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
         
-        # Execute case-insensitive queries against your existing database
-        query = sb.table("recalls").select("*") \
+        # 🔑 FIXED: Pointed to 'recall_results' instead of 'recalls'
+        query = sb.table("recall_results").select("*") \
             .ilike("make", make) \
             .ilike("model", model) \
             .eq("year", str(year))
