@@ -1,137 +1,201 @@
 import logging
 import stripe
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
-from app.config import settings
-
-logger = logging.getLogger("payment-router")
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-router = APIRouter(prefix="/payments", tags=["payments"])
-
-# =====================================================================
-# REQUEST SCHEMAS
-# =====================================================================
-class CheckoutRequest(BaseModel):
-    plan_type: str  # "starter", "professional", or "enterprise" [cite: 21, 65]
-    user_id: str    # The Supabase profile ID to link this checkout [cite: 29]
-
-# =====================================================================
-# ENDPOINT: CREATE EMBEDDED CHECKOUT SESSION
-# =====================================================================
-@router.post("/create-checkout-session")
-async def create_checkout_session(request: CheckoutRequest):
-    """
-    Spins up a secure Stripe Checkout Session in embedded mode [cite: 1, 66].
-    Injects the user's database ID as a client reference token [cite: 5].
-    """
-    # 🔑 MAP YOUR SANDBOX FLAT-RATE PRICE IDs HERE:
-    price_map = {
-        "starter": "price_starter_99_flat_id",         # Up to 15 vehicles [cite: 21]
-        "professional": "price_professional_249_flat_id", # 16 to 100 vehicles [cite: 21]
-        "enterprise": "price_enterprise_499_flat_id"     # 101+ vehicles [cite: 21]
-    }
-    
-    price_id = price_map.get(request.plan_type.lower())
-    if not price_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Invalid RecallLogic subscription tier requested."
-        )
-
-    try:
-        # Create a clean flat-rate subscription session [cite: 2, 66]
-        session = stripe.checkout.Session.create(
-            ui_mode='embedded', # Keeps the customer on your local domain [cite: 1, 66]
-            client_reference_id=request.user_id, # Passes database context to webhook [cite: 5]
-            line_items=[{
-                'price': price_id,
-                'quantity': 1,
-            }],
-            mode='subscription',
-            return_url=f"{settings.FRONTEND_URL}/return?session_id={{CHECKOUT_SESSION_ID}}",
-        )
-        return {"clientSecret": session.client_secret} [cite: 66]
-    except Exception as e:
-        logger.error(f"Stripe Session Creation Failure: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) [cite: 66]
-#2. 📡 The Backend Webhook: backend/app/routers/webhook_router.py
-#This route handles Stripe’s asynchronous server-to-server notifications [cite: 117]. When a payment clears, it reads the client_reference_id (the user's database profile ID) [cite: 5] and automatically upgrades their account status in Supabase so their full workspace instantly unlocks [cite: 4, 29]!
-import logging
-import stripe
 from fastapi import APIRouter, Request, Header, HTTPException, status
+from pydantic import BaseModel
 from supabase import create_client, Client
 from app.config import settings
 
-logger = logging.getLogger("webhook-router")
+# Setup structured module logging
+logger = logging.getLogger("payment-router")
 
-router = APIRouter(prefix="/payments", tags=["webhooks"])
+# Initialize Stripe and Supabase clients with workspace settings
+stripe.api_key = settings.STRIPE_SECRET_KEY
+supabase_client: Client = create_client(settings.supabase_url, settings.supabase_service_key)
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+# Price ID Mapping - Maps front-end subscription plans to your active Stripe dashboard products
+# Replace these with your real price IDs from Stripe (e.g., 'price_1Pabc123XYZ')
+PRICE_MAP = {
+    "starter": "price_starter_99_flat_id",         # Starter: Up to 15 assets ($99/mo)
+    "professional": "price_professional_249_flat_id", # Growth/Professional: Up to 100 assets ($249/mo)
+    "enterprise": "price_enterprise_499_flat_id"     # Scale/Enterprise: Unlimited assets ($499/mo)
+}
+
+
+class CheckoutRequest(BaseModel):
+    plan_type: str  # "starter", "professional", or "enterprise"
+    user_id: str    # The Supabase profile ID (UUID) to link to this subscription
+
+
+@router.post("/create-checkout-session")
+async def create_checkout_session(request: CheckoutRequest):
+    """
+    Spins up a secure, Stripe Embedded Checkout Session on the backend.
+    Passes client_reference_id to associate the completed subscription with the correct Supabase user.
+    """
+    if request.plan_type not in PRICE_MAP:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid plan type '{request.plan_type}'. Must be one of: {list(PRICE_MAP.keys())}"
+        )
+
+    try:
+        # Create an Embedded Checkout Session in subscription mode
+        session = stripe.checkout.Session.create(
+            ui_mode="embedded",
+            mode="subscription",
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price": PRICE_MAP[request.plan_type],
+                    "quantity": 1,
+                }
+            ],
+            client_reference_id=request.user_id,
+            # Vite frontend will listen to this callback on successful payment
+            return_url=f"{settings.FRONTEND_URL}/return?session_id={{CHECKOUT_SESSION_ID}}",
+            metadata={
+                "plan_type": request.plan_type,
+                "supabase_user_id": request.user_id
+            }
+        )
+
+        logger.info(f"Created checkout session {session.id} for user {request.user_id}")
+        return {"clientSecret": session.client_secret}
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe session creation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Stripe API Error: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected checkout session error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to initiate secure checkout process."
+        )
+
+
+@router.get("/session-status")
+async def get_session_status(session_id: str):
+    """
+    Retrieves the actual payment status and session details for the frontend success callback page.
+    This lets the user know immediately if their payment cleared.
+    """
+    if not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required query parameter: 'session_id'"
+        )
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        return {
+            "status": session.status,
+            "payment_status": session.payment_status,
+            "customer_email": session.customer_details.email if session.customer_details else None,
+            "plan_type": session.metadata.get("plan_type")
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Failed to retrieve Stripe session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Stripe error: {str(e)}"
+        )
+
 
 @router.post("/webhook")
 async def stripe_webhook_listener(request: Request, stripe_signature: str = Header(None)):
     """
-    Asynchronously processes signed incoming Stripe webhooks [cite: 4, 13].
-    Upgrades paid fleet tiers in Supabase upon successful subscription [cite: 4, 29].
+    Secure Webhook Listener: Acts on Stripe server-to-server notifications.
+    Verifies signatures to prevent spoofing and upgrades/downgrades user subscription tiers in Supabase.
     """
     if not stripe_signature:
-        raise HTTPException(status_code=400, detail="Missing required signature header.")
+        logger.warning("Webhook request missing Stripe-Signature header")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required signature header."
+        )
 
-    raw_body = await request.body() [cite: 13]
-    
+    # Read the raw request body to verify the cryptographic signature
+    payload = await request.body()
+    webhook_secret = settings.STRIPE_WEBHOOK_SECRET
+
     try:
-        # Verify event authenticity using your local webhook secret key [cite: 4, 13]
         event = stripe.Webhook.construct_event(
-            raw_body, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
-        ) [cite: 13]
+            payload, stripe_signature, webhook_secret
+        )
+    except ValueError:
+        logger.error("Invalid raw webhook payload received")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload.")
     except stripe.error.SignatureVerificationError as e:
-        logger.error(f"Invalid signature verification: {str(e)}")
-        raise HTTPException(status_code=400, detail="Cryptographic verification failed.")
-    except Exception as e:
-        logger.error(f"Webhook body processing failure: {str(e)}")
-        raise HTTPException(status_code=400, detail="Bad payload parser format.")
+        logger.error(f"Webhook signature verification failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Signature mismatch.")
 
-    # Intercept transaction completion events [cite: 4, 13]
-    if event["type"] == "checkout.session.completed":
+    event_type = event["type"]
+    logger.info(f"Processing Stripe Webhook Event: {event_type}")
+
+    # =====================================================================
+    # CASE 1: Checkout Session Completed (New Subscriptions)
+    # =====================================================================
+    if event_type == "checkout.session.completed":
         session = event["data"]["object"]
-        
-        user_id = session.get("client_reference_id") # Resolves who made the purchase [cite: 5]
-        stripe_customer_id = session.get("customer")
+        user_id = session.get("client_reference_id")
+        plan_type = session.get("metadata", {}).get("plan_type", "starter")
         stripe_subscription_id = session.get("subscription")
+        stripe_customer_id = session.get("customer")
 
         if not user_id:
-            logger.error("Ignored Event: checkout.session.completed missing client_reference_id metadata.")
-            return {"status": "ignored", "reason": "No user ID link attached."}
+            logger.error("Checkout completed but client_reference_id (Supabase User ID) was not found.")
+            return {"status": "ignored", "error": "Missing client_reference_id"}
 
-        # Query the exact price ID associated with the transaction to determine their plan
         try:
-            line_items = stripe.checkout.Session.list_line_items(session["id"])
-            price_id = line_items["data"]["price"]["id"]
-        except Exception as e:
-            logger.error(f"Failed to extract product price lineage: {str(e)}")
-            price_id = None
-
-        # Determine tier matching your database conventions [cite: 21, 29]
-        tier = "starter"
-        if price_id == "price_professional_249_flat_id":
-            tier = "professional"
-        elif price_id == "price_enterprise_499_flat_id":
-            tier = "enterprise"
-
-        # Update Supabase user profile & activate their workspace permissions [cite: 29]
-        try:
-            sb: Client = create_client(settings.supabase_url, settings.supabase_service_key) [cite: 49]
+            logger.info(f"Provisioning subscription '{plan_type}' for user ID {user_id}")
             
-            # Update user profile tier status [cite: 29]
-            sb.table("profiles").update({
-                "subscription_tier": tier,
+            # Upgrade user tier and bind their stripe IDs in Supabase profiles table.
+            # Using Supabase Service Role Key bypasses normal RLS write restrictions.
+            db_response = supabase_client.table("profiles").update({
+                "tier": plan_type,
                 "stripe_customer_id": stripe_customer_id,
-                "stripe_subscription_id": stripe_subscription_id
-            }).eq("id", user_id).execute() [cite: 49]
+                "stripe_subscription_id": stripe_subscription_id,
+                "status": "active"
+            }).eq("id", user_id).execute()
 
-            logger.info(f"Successfully upgraded user {user_id} to {tier.upper()} status.") [cite: 29]
+            logger.info(f"Successfully upgraded user {user_id} to plan {plan_type} in database.")
+            return {"status": "success", "provisioned": True}
+
         except Exception as e:
-            logger.error(f"Failed to sync Supabase user profile record: {str(e)}")
-            raise HTTPException(status_code=500, detail="Database write operation failed.")
+            logger.error(f"Failed to synchronize subscription to database for user {user_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database sync error during user provisioning."
+            )
 
-    return {"status": "success"}
+    # =====================================================================
+    # CASE 2: Subscription Canceled / Expired
+    # =====================================================================
+    elif event_type in ["customer.subscription.deleted", "customer.subscription.updated"]:
+        subscription = event["data"]["object"]
+        
+        # If deleted, downgrade user back to free trial
+        if event_type == "customer.subscription.deleted":
+            stripe_customer_id = subscription.get("customer")
+            try:
+                logger.info(f"Revoking subscription tier for customer {stripe_customer_id}")
+                supabase_client.table("profiles").update({
+                    "tier": "free",
+                    "status": "canceled"
+                }).eq("stripe_customer_id", stripe_customer_id).execute()
+
+                return {"status": "success", "revoked": True}
+            except Exception as e:
+                logger.error(f"Failed to revoke tier in database for Stripe customer {stripe_customer_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database sync error during plan cancellation."
+                )
+
+    # Acknowledge other event types with a clean 200 OK
+    return {"status": "acknowledged", "event_type": event_type}
