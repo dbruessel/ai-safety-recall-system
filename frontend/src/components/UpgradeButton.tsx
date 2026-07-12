@@ -1,55 +1,84 @@
-"use client";
-
-import { useState } from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import CheckoutForm from './checkoutform';
 
 interface UpgradeButtonProps {
-  vinCount: number;
+  planType: 'starter' | 'professional' | 'enterprise';
+  className?: string;
 }
 
-export default function UpgradeButton({ vinCount }: UpgradeButtonProps) {
-  const [showCheckout, setShowCheckout] = useState(false);
+export default function UpgradeButton({ planType, className }: UpgradeButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const initiatePayment = async () => {
+  const handleUpgradeClick = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // Requests a secure transaction session from your FastAPI backend proxy layer
-      const res = await fetch('http://127.0.0.1:8000/payments/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_count: vinCount || 10 }),
+      // 1. Resolve lead email context from current page URL search parameters [cite: 3]
+      const params = new URLSearchParams(window.location.search);
+      const emailParam = params.get('email') || 'anonymous_prospect';
+
+      // 2. Provision secure embedded checkout session from your FastAPI backend [cite: 27, 28]
+      const response = await axios.post('http://127.0.0.1:8000/payments/create-checkout-session', {
+        plan_type: planType,
+        user_id: emailParam // Map lead context as user reference key [cite: 27, 28]
       });
-      
-      const data = await res.json();
-      if (data.url) {
-        // Redirect directly to the secure Stripe-hosted portal link
-        window.location.href = data.url;
-      } else if (data.clientSecret) {
-        setShowCheckout(true);
+
+      if (response.data?.clientSecret) {
+        setClientSecret(response.data.clientSecret);
+        setShowModal(true);
+      } else {
+        throw new Error('No clientSecret returned from payment gateway server.');
       }
-    } catch (error) {
-      console.error("RecallLogic Engine Payment Interruption:", error);
+    } catch (err: any) {
+      console.error('Stripe initiation failed:', err);
+      setError(err.response?.data?.detail || err.message || 'Payment engine offline.');
     } finally {
       setLoading(false);
     }
   };
 
+  const buttonLabel = loading ? 'Connecting...' : `Activate RecallLogic ${planType === 'starter' ? 'Standard' : planType === 'professional' ? 'Pro' : 'Enterprise'}`;
+
   return (
-    <div className="w-full">
-      {!showCheckout ? (
-        <button 
-          onClick={initiatePayment}
+    <>
+      <div className="w-full">
+        <button
+          onClick={handleUpgradeClick}
           disabled={loading}
-          className="w-full bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-black text-xs py-3.5 px-6 rounded-xl transition duration-200 uppercase tracking-wider shadow-lg shadow-cyan-500/10"
+          className={
+            className ||
+            `w-full py-3.5 px-6 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-xs tracking-wider transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed`
+          }
         >
-          {loading ? 'Securing Portal Link...' : 'Activate RecallLogic Shield'}
+          {buttonLabel}
         </button>
-      ) : (
-        <div className="p-6 border border-slate-900 rounded-2xl bg-slate-950 text-slate-200">
-          <h3 className="text-sm font-bold uppercase font-mono tracking-wider mb-2">Secure Checkout Enabled</h3>
-          <p className="text-xs text-slate-500">Processing infrastructure payload encryption...</p>
+
+        {error && (
+          <p className="text-red-400 text-[10px] font-mono mt-2 text-center">
+            ⚠️ {error}
+          </p>
+        )}
+      </div>
+
+      {/* 🛡️ STRIPE CHECKOUT EMBEDDED IFRAME OVERLAY MODAL */}
+      {showModal && clientSecret && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl my-8">
+            <CheckoutForm 
+              clientSecret={clientSecret} 
+              onClose={() => {
+                setShowModal(false);
+                setClientSecret(null);
+              }} 
+            />
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

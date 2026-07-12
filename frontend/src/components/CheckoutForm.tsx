@@ -2,7 +2,7 @@ import React from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
 
-// Initialize Stripe securely using Vite's environment variables [cite: 2, 26]
+// Initialize Stripe securely using Vite environment keys [cite: 2, 26]
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
 const stripePromise = loadStripe(stripePublishableKey);
 
@@ -12,7 +12,6 @@ interface CheckoutFormProps {
 }
 
 export default function CheckoutForm({ clientSecret, onClose }: CheckoutFormProps) {
-  // RENDER CASE A: Loader displayed while provisioning session secret from FastAPI
   if (!clientSecret) {
     return (
       <div className="w-full max-w-lg mx-auto bg-[#0b0f19]/80 border border-slate-900 rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl backdrop-blur-md">
@@ -24,10 +23,8 @@ export default function CheckoutForm({ clientSecret, onClose }: CheckoutFormProp
     );
   }
 
-  // RENDER CASE B: Fully mounted PCI DSS Compliant Embedded Checkout Panel [cite: 26]
   return (
     <div className="w-full max-w-3xl mx-auto bg-[#0b0f19] border border-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
-      {/* Subtle background glow effect */}
       <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent pointer-events-none" />
       
       <header className="flex justify-between items-center border-b border-slate-900 pb-4 mb-6 relative z-10">
@@ -47,7 +44,7 @@ export default function CheckoutForm({ clientSecret, onClose }: CheckoutFormProp
         )}
       </header>
 
-      {/* Embedded Iframe Container [cite: 26] */}
+      {/* PCI-DSS Compliant Embedded Checkout Panel [cite: 26] */}
       <div className="relative z-10 text-slate-100 bg-[#050914] border border-slate-950/80 rounded-2xl p-4 md:p-6 shadow-inner min-h-[400px]">
         <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret }}>
           <EmbeddedCheckout />
