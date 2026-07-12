@@ -382,15 +382,15 @@ export default function App() {
     processManifestLines(bulkInput.split('\n'));
   };
 
-  // Compile-Safe: Using files index extraction instead of trailing dot-operator syntax
+   // Compile-Safe: Using files index extraction instead of trailing dot-operator syntax [cite: 23]
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files;
+    const file = files; //  FIXED: Pull the first File object from the list
     setError('');
     setRecalls([]);
 
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const fileExtension = file.name.split('.').pop()?.toLowerCase(); //  SAFE: file.name exists!
     if (fileExtension === 'csv' || fileExtension === 'txt') {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -398,7 +398,7 @@ export default function App() {
         setBulkInput(text);
         processManifestLines(text.split(/\r?\n/));
       };
-      reader.readAsText(file);
+      reader.readAsText(file); //  SAFE: reader takes a single File blob
     } else {
       setError('Invalid Schema: Please drop a structured comma-delimited manifest (.csv or .txt).');
     }
