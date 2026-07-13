@@ -50,16 +50,16 @@ def create_app() -> FastAPI:
     app.include_router(recalls.router, prefix="/api")
     
     # 2. Interactive Fleet & Safety Task Board Router
-    app.include_router(dashboard_router.router, prefix="/api")
+    app.include_router(dashboard_router.router)
     
     # 3. SaaS Monetization & Automated Checkout Router
-    app.include_router(payment_router.router, prefix="/api")
+    app.include_router(payment_router.router)
     
     # 4. Sandbox Testing Controls [cite: 2]
     app.include_router(sandbox.router, prefix="/api")
     
     # 5. Standalone Webhook Listener Router [cite: 2]
-    app.include_router(webhook_router.router, prefix="/api")
+    app.include_router(webhook_router.router)
 
     return app
 
