@@ -235,7 +235,7 @@ const OfferingCards: React.FC = () => {
             </ul>
           </div>
           <div className="pt-6">
-            <UpgradeButton planType="starter" />
+            <UpgradeButton planType="standard" />
           </div>
         </div>
 
@@ -404,7 +404,7 @@ export default function App() {
     }
   };
 
-  const activePlanType = blockedVinCount <= 15 ? "starter" : blockedVinCount <= 100 ? "professional" : "enterprise";
+  const activePlanType = blockedVinCount <= 15 ? "standard" : blockedVinCount <= 100 ? "professional" : "enterprise";
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
