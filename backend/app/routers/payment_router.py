@@ -12,7 +12,6 @@ logger = logging.getLogger("payment-router")
 try:
     settings = get_settings()
 except Exception:
-    # Fallback to direct import if application factory isn't used [cite: 74]
     from app.config import settings
 
 # Initialize Stripe API Client with Private Secret Key [cite: 74]
@@ -25,18 +24,17 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 # REQUEST SCHEMAS
 # =====================================================================
 class CheckoutRequest(BaseModel):
-    # Aligned with "standard" tier preference instead of "starter" [cite: 74]
-    plan_type: str  # Must be "standard", "professional", or "enterprise"
+    plan_type: str  # Must be "standard", "professional", or "enterprise" [cite: 74]
     user_id: str    # The user email or database ID to link this checkout session [cite: 74]
 
 
 # =====================================================================
-# ENDPOINT: CREATE SECURE EMBEDDED CHECKOUT SESSION
+# ENDPOINT: CREATE SECURE STRIPE-HOSTED CHECKOUT SESSION
 # =====================================================================
 @router.post("/create-checkout-session")
 async def create_checkout_session(request: CheckoutRequest):
     """
-    Spins up a secure Stripe Checkout Session in embedded_page mode [cite: 75].
+    Spins up a secure Stripe Checkout Session in Hosted Redirect mode.
     Binds the local user ID metadata to verify and provision accounts asynchronously [cite: 75].
     """
     logger.info(f"Initiating subscription provisioning for plan: {request.plan_type} (User: {request.user_id})")
@@ -44,7 +42,7 @@ async def create_checkout_session(request: CheckoutRequest):
     # 🔑 MAP YOUR ACTIVE STRIPE TEST PRICE IDs HERE:
     # Replace these placeholders with your actual 'price_...' keys copied from Stripe Developer Tools!
     price_map = {
-        "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",      # Up to 15 vehicles [cite: 9]
+        "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",         # Up to 15 vehicles [cite: 9]
         "professional": "price_1TsR6jDXs4xycz0ohAfewQgk", # 16 to 100 vehicles [cite: 9, 75]
         "enterprise": "price_1TrlFxDXs4xycz0ofyuV70Rf"      # 101+ vehicles [cite: 9, 75]
     }
@@ -69,7 +67,6 @@ async def create_checkout_session(request: CheckoutRequest):
         )
 
     # 🛡️ DEFENSIVE FRONTEND ORIGIN RESOLUTION:
-    # Gracefully prevents 'Settings object has no attribute' errors if FRONTEND_ORIGIN is omitted from config.py [cite: 74]
     frontend_url = getattr(settings, "FRONTEND_ORIGIN", None) or getattr(settings, "FRONTEND_URL", None)
     if not frontend_url:
         frontend_url = os.getenv("FRONTEND_ORIGIN") or os.getenv("FRONTEND_URL") or "http://localhost:5173"
@@ -77,9 +74,8 @@ async def create_checkout_session(request: CheckoutRequest):
     frontend_url = frontend_url.rstrip("/")
 
     try:
-        # Create an Embedded Checkout Session with subscription mechanics [cite: 75]
+        # Create a Hosted Checkout Session (Default UI Mode is Redirect)
         session = stripe.checkout.Session.create(
-            ui_mode="embedded_page",  # ✅ Fixed: Changed from 'embedded' to 'embedded_page' to meet Stripe API support requirements
             mode="subscription",
             payment_method_types=["card"],
             line_items=[
@@ -90,13 +86,15 @@ async def create_checkout_session(request: CheckoutRequest):
             ],
             # Anchor client_reference_id to trace payment success back to Supabase profiles [cite: 74, 76]
             client_reference_id=request.user_id,
-            # Redirect back to user's dashboard with the unique Stripe session token [cite: 75]
-            return_url=f"{frontend_url}/?session_id={{CHECKOUT_SESSION_ID}}",
+            # Success redirects back to dashboard with the session ID
+            success_url=f"{frontend_url}/?session_id={{CHECKOUT_SESSION_ID}}",
+            # Cancel redirects back to the plain dashboard
+            cancel_url=f"{frontend_url}/",
         )
 
-        logger.info(f"Stripe Checkout Session created successfully: {session.id}")
+        logger.info(f"Stripe Hosted Checkout Session created successfully: {session.id}")
         return {
-            "clientSecret": session.client_secret,
+            "url": session.url,
             "sessionId": session.id
         }
 

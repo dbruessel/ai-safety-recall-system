@@ -63,7 +63,7 @@ export function useLeadData() {
         
         if (emailParam) {
           const { data, error: sbError } = await supabase
-            .table('leads')
+            .from('leads')
             .select('*')
             .eq('contact_email', emailParam)
             .single();
