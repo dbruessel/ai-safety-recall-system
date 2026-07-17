@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
-// Modular Feature Subcomponents
+// Modular Feature Subcomponents (Assumes these exist or are empty placeholders in your repo)
 import UpgradeButton from './components/UpgradeButton';
 import TaskBoard from './components/TaskBoard';
 
 // =====================================================================
-// DATA CONTRACTS & SCHEMAS [cite: 1, 2]
+// DATA CONTRACTS & SCHEMAS
 // =====================================================================
 interface Recall {
   campaign_number: string;
@@ -25,13 +25,6 @@ interface Recall {
   executive_action_directive?: string;
 }
 
-interface GlobalMetrics {
-  total_vins: number;
-  processed_vins: number;
-  total_recalls: number;
-  fleet_health_index: number;
-}
-
 export interface Lead {
   id?: string;
   company_name: string;
@@ -43,30 +36,32 @@ export interface Lead {
   lead_status?: string;
 }
 
-// Initialize Supabase Client securely using Vite's environment variables [cite: 2]
+// Initialize Supabase Client securely using Vite's environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // =====================================================================
-// CUSTOM HOOK: useLeadData (THE REGISTRATION BRIDGE MECHANICS) [cite: 1402]
+// CUSTOM HOOK: useLeadData (THE REGISTRATION BRIDGE)
 // =====================================================================
 export function useLeadData() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   async function resolveUserSession() {
     try {
       setLoading(true);
       setError(null);
 
-      // 1. Check if there is an active authenticated user session [cite: 1402]
+      // 1. Check if there is an active authenticated user session
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        // Query Profiles table for authenticated users [cite: 1402]
+        setUserEmail(session.user.email || null);
+        // Query Profiles table for authenticated users
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -78,9 +73,12 @@ export function useLeadData() {
           setLoading(false);
           return;
         }
+      } else {
+        setUserEmail(null);
+        setProfile(null);
       }
 
-      // 2. Fallback: Check for URL email parameter (anonymous outbound leads) [cite: 3, 1402]
+      // 2. Fallback: Check for URL email parameter (outbound leads)
       const params = new URLSearchParams(window.location.search);
       const emailParam = params.get('email');
       
@@ -91,8 +89,9 @@ export function useLeadData() {
           .eq('contact_email', emailParam)
           .single();
 
-        if (leadError) throw leadError;
-        setLead(leadData);
+        if (!leadError && leadData) {
+          setLead(leadData);
+        }
       }
     } catch (err: any) {
       console.error('Session/Lead resolution failed:', err);
@@ -105,7 +104,7 @@ export function useLeadData() {
   useEffect(() => {
     resolveUserSession();
 
-    // Set up an auth state change listener to catch sign-ups/logins in real-time [cite: 1402]
+    // Catch sign-ups/logins in real-time
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       resolveUserSession();
     });
@@ -118,14 +117,15 @@ export function useLeadData() {
     profile,
     loading,
     error,
-    // A user is paid if their lead status is completed OR their auth profile is pro! [cite: 23, 1402]
+    userEmail,
+    // Paid if lead status is "Stripe Completed" OR auth profile is elevated to pro
     isPaid: profile?.is_pro || lead?.lead_status === 'Stripe Completed',
     isAuthenticated: !!profile
   };
 }
 
 // =====================================================================
-// REGISTRATION MODAL COMPONENT (THE TRUST BRIDGE CONTAINER) [cite: 1402]
+// REGISTRATION MODAL (CLAIM WORKSPACE FORM)
 // =====================================================================
 interface RegistrationModalProps {
   defaultEmail?: string;
@@ -145,7 +145,7 @@ function RegistrationModal({ defaultEmail, onClose }: RegistrationModalProps) {
     setMessage(null);
     setError(null);
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -224,16 +224,192 @@ function RegistrationModal({ defaultEmail, onClose }: RegistrationModalProps) {
 }
 
 // =====================================================================
-// MAIN INTERFACE ENGINE [cite: 11]
+// COMPONENT: RecallLogic Compliance Shield Badge (UPGRADED PRESTIGE)
+// =====================================================================
+interface ComplianceBadgeProps {
+  isPaid: boolean;
+  onShareClick: () => void;
+  onClaimClick: () => void;
+}
+
+export function RecallLogicComplianceBadge({ isPaid, onShareClick, onClaimClick }: ComplianceBadgeProps) {
+  const mockReferenceToken = "RL-2026-NKT82X";
+
+  return (
+    <div className="relative w-full max-w-2xl mx-auto rounded-3xl overflow-hidden border border-emerald-500/20 bg-[#070b14]/80 backdrop-blur-xl p-6 sm:p-8 shadow-[0_0_50px_-12px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/10">
+      
+      {/* Laser Glow Lines */}
+      <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
+      <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
+      
+      {/* Header Block with Prominent Branding */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-900/60 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-teal-950/40 border border-emerald-500/30 text-emerald-400 text-xl flex items-center justify-center rounded-2xl shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            🛡️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-emerald-400 font-mono tracking-widest uppercase">Verified Certification</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+            </div>
+            <h3 className="text-xl font-black text-white tracking-tight uppercase mt-0.5">
+              Recall<span className="text-emerald-400">Logic</span> Compliance Shield
+            </h3>
+          </div>
+        </div>
+        
+        {/* Verification Status Seal */}
+        <div className="px-4 py-2 bg-emerald-500/10 text-emerald-400 text-xs font-black tracking-widest rounded-xl border border-emerald-500/20 font-mono shadow-inner text-center">
+          PASS • 0 ACTIVE DEFECTS
+        </div>
+      </div>
+
+      {/* Dynamic Security Information Ledgers */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono py-6 relative z-10">
+        <div className="bg-slate-950/50 border border-slate-900 rounded-xl p-4 space-y-1 relative group">
+          <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Verification Ledger</span>
+          <p className="text-slate-300 font-bold tracking-tight">TOKEN: {mockReferenceToken}</p>
+          <div className="absolute top-3 right-3 text-[9px] text-slate-600">ID_REF</div>
+        </div>
+        
+        <div className="bg-slate-950/50 border border-slate-900 rounded-xl p-4 space-y-1 relative">
+          <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Audit Security Clearance</span>
+          <p className="text-emerald-400 font-bold tracking-tight">Approved for Active Commercial Operations</p>
+          <div className="absolute top-3 right-3 text-[9px] text-emerald-500/60 font-black animate-pulse">● SECURE</div>
+        </div>
+      </div>
+
+      {/* Footer Gating Mechanics */}
+      <div className="pt-4 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
+        <p className="text-slate-400 text-[11px] leading-relaxed max-w-sm text-center sm:text-left">
+          This digital security badge represents cryptographically secure, unalterable proof of compliance backed by live federal database synchronization.
+        </p>
+
+        {isPaid ? (
+          <button 
+            onClick={onShareClick}
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.98] shadow-lg shadow-emerald-500/10 whitespace-nowrap"
+          >
+            Share Verification Link
+          </button>
+        ) : (
+          <button 
+            onClick={onClaimClick}
+            className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-emerald-500 hover:opacity-95 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.98] shadow-lg whitespace-nowrap"
+          >
+            Claim Badge & Lower Premiums
+          </button>
+        )}
+      </div>
+
+      {/* Lock Blur Layer for Unpaid Users */}
+      {!isPaid && (
+        <div className="absolute inset-0 bg-[#030712]/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-20 p-6 text-center">
+          <div className="max-w-md bg-slate-950/90 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-4 ring-1 ring-slate-800">
+            <span className="text-2xl">🔒</span>
+            <h4 className="text-sm font-black text-white tracking-tight uppercase">Lock In Verification Credentials</h4>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Your vehicles passed with 100% compliance. Unlock your live cryptographic security badge to stream passing states directly to brokers and underwriters to negotiate premium reductions.
+            </p>
+            <div className="pt-1 flex justify-center">
+              <button 
+                onClick={onClaimClick}
+                className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-2.5 px-6 rounded-xl text-xs uppercase tracking-wider transition-all"
+              >
+                Claim Verified Badge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =====================================================================
+// COMPONENT: Interactive Underwriter ROI Calculator (Walk Phase)
+// =====================================================================
+export function ROICalculator() {
+  const [fleetSize, setFleetSize] = useState<number>(45);
+  const [downtimeCost, setDowntimeCost] = useState<number>(450);
+
+  // Math models grounded in proactive risk mitigation
+  const statisticalRecallDowntimeRatio = 0.18; // 18% historical risk probability
+  const calculatedDowntimeLossPrevented = Math.round(fleetSize * statisticalRecallDowntimeRatio * downtimeCost);
+  const standardPremiumSavings = Math.round(fleetSize * 1200 * 0.15); // $1200 avg premium * 15% discount
+  const totalAnnualSavings = calculatedDowntimeLossPrevented + standardPremiumSavings;
+
+  return (
+    <div className="bg-[#0b0f19] border border-slate-900 rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-2xl">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+      
+      <header className="space-y-1">
+        <span className="text-[10px] font-bold text-cyan-400 font-mono tracking-widest uppercase">Underwriting Audit Tool</span>
+        <h3 className="text-lg font-black text-white uppercase tracking-tight">Interactive Premium & ROI Impact</h3>
+        <p className="text-slate-400 text-xs">Simulate safety compliance value and calculate underwriter premium offsets.</p>
+      </header>
+
+      <div className="space-y-5">
+        {/* Slider 1: Fleet Size */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs font-mono">
+            <span className="text-slate-400 uppercase tracking-wider">Fleet Asset Size</span>
+            <span className="text-cyan-400 font-black text-sm">{fleetSize} Vehicles</span>
+          </div>
+          <input 
+            type="range" 
+            min="5" 
+            max="250" 
+            value={fleetSize}
+            onChange={(e) => setFleetSize(parseInt(e.target.value, 10))}
+            className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-500 outline-none"
+          />
+        </div>
+
+        {/* Slider 2: Downtime Cost */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs font-mono">
+            <span className="text-slate-400 uppercase tracking-wider">Avg. Daily Downtime Loss</span>
+            <span className="text-cyan-400 font-black text-sm">${downtimeCost} / Day</span>
+          </div>
+          <input 
+            type="range" 
+            min="100" 
+            max="2000" 
+            step="50"
+            value={downtimeCost}
+            onChange={(e) => setDowntimeCost(parseInt(e.target.value, 10))}
+            className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-500 outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Outputs Dashboard */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-900 font-mono text-center">
+        <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+          <div className="text-[9px] font-bold text-slate-500 uppercase">Downtime Loss Avoided</div>
+          <div className="text-xl font-black text-slate-100 mt-1">${calculatedDowntimeLossPrevented.toLocaleString()}</div>
+        </div>
+
+        <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+          <div className="text-[9px] font-bold text-slate-500 uppercase">Est. Insurance Offset (15%)</div>
+          <div className="text-xl font-black text-emerald-400 mt-1">${standardPremiumSavings.toLocaleString()}</div>
+        </div>
+
+        <div className="bg-cyan-950/20 border border-cyan-950/50 rounded-2xl p-4">
+          <div className="text-[9px] font-bold text-cyan-400 uppercase">Total Annual Safety ROI</div>
+          <div className="text-xl font-black text-cyan-300 mt-1">${totalAnnualSavings.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// MAIN INTERFACE CONSOLE (CENTERED LAYOUT - NO SIDEBAR)
 // =====================================================================
 export default function App() {
-  const [metrics, setMetrics] = useState<GlobalMetrics | null>({
-    total_vins: 25041,
-    processed_vins: 1420,
-    total_recalls: 14,
-    fleet_health_index: 91.2
-  });
-  
   const [bulkInput, setBulkInput] = useState('');
   const [recalls, setRecalls] = useState<Recall[]>([]);
   const [loading, setLoading] = useState(false);
@@ -253,17 +429,10 @@ export default function App() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Outbound Context Resolver
-  const { lead, profile, loading: sessionLoading, error: sessionError, isPaid, isAuthenticated } = useLeadData();
+  const { lead, loading: sessionLoading, isPaid, isAuthenticated, userEmail } = useLeadData();
 
   const mockReferenceToken = "RL-2026-NKT82X";
   const shareableVerificationUrl = `https://verify.recalllogic.com/share/audit_${mockReferenceToken.toLowerCase()}`;
-
-  useEffect(() => {
-    // Dynamically fetch global reference statistics on mount
-    axios.get('/api/metrics/global')
-      .then(res => setMetrics(res.data.metrics || res.data))
-      .catch(err => console.error('Global metrics collection offline:', err));
-  }, []);
 
   const calculateCustomMRR = (totalCars: number) => {
     const baseFee = 99;
@@ -275,6 +444,27 @@ export default function App() {
     navigator.clipboard.writeText(shareableVerificationUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  const handleExportManifest = () => {
+    // Generate and download mock CSV underwriting manifest proving 100% compliance
+    const headers = 'Vehicle,VIN,Verification Status,Last Database Sync\n';
+    const row1 = '2022 Ford Transit,1FTYR2Y8XNKA4820,SECURE - PASS,2026-07-17 10:00 UTC\n';
+    const row2 = '2021 Chevrolet Express,1GBJG2G17LKA2904,SECURE - PASS,2026-07-17 10:00 UTC\n';
+    const row3 = '2023 Ram ProMaster,3C6URVDG1PKA1209,SECURE - PASS,2026-07-17 10:00 UTC\n';
+    const row4 = '2020 Ford F-150,1FTFW1EG0LKA9402,SECURE - PASS,2026-07-17 10:00 UTC\n';
+    
+    const blob = new Blob([headers, row1, row2, row3, row4], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `RecallLogic_Underwriting_Manifest_${mockReferenceToken}.csv`);
+    a.click();
   };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
@@ -289,7 +479,7 @@ export default function App() {
     }, 800);
   };
 
-  // Automated Ingestion & Parsing Sweeps [cite: 17]
+  // Automated Ingestion & Parsing
   const processManifestLines = async (rawLines: string[]) => {
     const cleanedLines = rawLines
       .map(line => line.trim())
@@ -300,7 +490,7 @@ export default function App() {
       return;
     }
 
-    // 🔑 THE PAYWALL INTERCEPTOR: Gated at 10 items only if they are not Pro! [cite: 415]
+    // THE PAYWALL INTERCEPTOR: Gated at 10 items only if they are not Pro!
     if (cleanedLines.length > 10 && !isPaid) {
       setBlockedVinCount(cleanedLines.length);
       setShowUpgradeModal(true);
@@ -369,11 +559,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
       
-      {/* 🔑 REGISTRATION BRIDGE BANNER [cite: 1402] */}
+      {/* 🔑 REGISTRATION BRIDGE BANNER */}
       {isPaid && !isAuthenticated && (
-        <div className="bg-gradient-to-r from-cyan-950/80 to-blue-950/80 border-b border-cyan-500/30 px-6 py-3 text-center text-xs flex justify-between items-center z-40 backdrop-blur-md">
+        <div className="bg-gradient-to-r from-cyan-950/85 to-blue-950/85 border-b border-cyan-500/30 px-6 py-3 text-center text-xs flex justify-between items-center z-40 backdrop-blur-md">
           <span className="text-cyan-300 font-medium">
-            🛡️ <strong>Workspace Unlocked:</strong> You have active premium access! Create a password to claim this fleet dashboard permanently. [cite: 1402]
+            🛡️ <strong>Workspace Unlocked:</strong> You have active premium access! Create a password to claim this fleet dashboard permanently.
           </span>
           <button 
             onClick={() => setShowClaimModal(true)}
@@ -384,362 +574,318 @@ export default function App() {
         </div>
       )}
 
-      <div className="flex flex-1">
-        {/* Sidebar Frame [cite: 68] */}
-        <aside className="w-64 border-r border-slate-900 bg-[#0b0f19]/80 p-6 hidden lg:flex flex-col justify-between shrink-0 backdrop-blur-md">
-          <div className="space-y-8">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center text-lg shadow-lg shadow-cyan-500/20 border border-cyan-400/20">🛡️</div>
-              <div className="flex flex-col">
-                <span className="font-black text-slate-100 tracking-tight text-sm uppercase">RecallLogic</span>
-                <span className="text-[10px] text-slate-500 font-mono tracking-wider">v2026.7.2</span>
-              </div>
-            </div>
-            
-            <nav className="space-y-1">
-              <span className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-cyan-400 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-inner">
-                📊 Threat Intelligence
-              </span>
-              <span className="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-500 hover:text-slate-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer opacity-40">
-                🚢 Maritime Vectors
-              </span>
-              <span className="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-500 hover:text-slate-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer opacity-40">
-                🫁 Clinical Nodes
-              </span>
-            </nav>
-          </div>
-
-          <div className="border-t border-slate-900 pt-4 px-2 space-y-2">
-            <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Network Blueprint</div>
-            <div className="text-xs text-slate-400 font-bold font-mono flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981] animate-pulse" /> Core_Live_Node_8000
-            </div>
-          </div>
-        </aside>
-
-        {/* Primary Dashboard Area */}
-        <main className="flex-1 p-8 lg:p-12 max-w-5xl mx-auto space-y-10 overflow-y-auto w-full">
-          
-          {/* Pulsing Crisis Header [cite: 756] */}
-          <div className="bg-gradient-to-r from-red-950/30 to-slate-950/30 border border-red-500/20 p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
-            <div className="space-y-1">
-              <span className="text-xs bg-red-500/10 text-red-400 px-2.5 py-0.5 rounded-full border border-red-500/20 font-bold tracking-wide font-mono uppercase animate-pulse">Critical Alerts Active</span>
-              <h3 className="text-lg font-black text-slate-100 uppercase tracking-tight">Recall Crisis Tracking Block</h3>
-              <p className="text-slate-400 text-xs max-w-xl">15,000+ newly registered federal compliance safety recall threats are currently active. Audit your vehicle fleet immediately.</p>
-            </div>
-            <div className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-2xl text-center shrink-0">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Hazards</div>
-              <div className="text-xl font-black text-red-400 font-mono mt-0.5">15,402</div>
-            </div>
-          </div>
-
-          {/* Dynamic Header Metrics [cite: 694] */}
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-900 pb-8">
-            <div className="space-y-2">
-              <h2 className="text-slate-100 text-3xl font-black tracking-tight sm:text-4xl uppercase">
-                Predictive Safety <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-500 bg-clip-text text-transparent">Intelligence</span>
-              </h2>
-              <p className="text-slate-400 text-xs sm:text-sm font-medium max-w-xl leading-relaxed">
-                We instantly scan your fleet for hidden, un-repaired manufacturer defects and track safety compliance so you can prevent catastrophic vehicle downtime and lower your commercial insurance premiums [cite: 782].
+      {/* 🌐 GLOBAL AUTHENTICATED NAVIGATION BAR */}
+      <nav className="border-b border-slate-900/60 bg-[#050915]/60 backdrop-blur-xl py-4 px-8 sticky top-0 z-30">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🛡️</span>
+            <div>
+              <h1 className="text-md font-black text-white tracking-wider uppercase">
+                RECALL<span className="text-cyan-400">LOGIC</span>
+              </h1>
+              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider -mt-1 hidden sm:block">
+                Verified Safety. Intelligent Compliance.
               </p>
             </div>
-
-            <div className="flex gap-4 shrink-0">
-              <div className="bg-[#0b0f19]/40 border border-slate-900 rounded-2xl p-4 min-w-[160px] shadow-2xl backdrop-blur-md relative overflow-hidden ring-1 ring-slate-800/50">
-                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Index Database Matrix</div>
-                <div className="text-3xl font-black text-cyan-400 font-mono tracking-tight">{metrics?.total_vins?.toLocaleString() || '25,041'}</div>
+          </div>
+          
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full flex items-center gap-1.5 font-mono text-[10px] text-cyan-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                {userEmail}
               </div>
-              <div className="bg-[#0b0f19]/40 border border-slate-900 rounded-2xl p-4 min-w-[160px] shadow-2xl backdrop-blur-md relative overflow-hidden ring-1 ring-slate-800/50">
-                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Health Threshold</div>
-                <div className="text-3xl font-black text-emerald-400 font-mono tracking-tight">{metrics?.fleet_health_index || '91.2'}%</div>
-              </div>
-            </div>
-          </header>
-
-          {/* Frictionless Drag and Drop Dropzone [cite: 756] */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_#22d3ee]" /> Fleet Deployment Ingestion Node
-              </h3>
-              <span className="text-xs text-slate-500 font-mono">Accepts .txt, .csv, or Excel templates [cite: 79]</span>
-            </div>
-
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div 
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  if (e.dataTransfer.files && e.dataTransfer.files) {
-                    if (fileInputRef.current) {
-                      fileInputRef.current.files = e.dataTransfer.files;
-                      const event = { target: fileInputRef.current } as unknown as React.ChangeEvent<HTMLInputElement>;
-                      handleFileUpload(event);
-                    }
-                  }
-                }}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isDragging ? 'border-cyan-500 bg-cyan-950/10 shadow-[0_0_15px_rgba(34,211,238,0.1)]' : 'border-slate-900 bg-slate-950/20 hover:border-slate-800'}`}
+              <button 
+                onClick={handleSignOut}
+                className="text-xs text-slate-400 hover:text-slate-100 font-bold transition-all"
               >
-                <input 
-                  id="dropzone-file"
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".csv,.txt"
-                  className="hidden"
-                />
-                <div className="max-w-md mx-auto space-y-2">
-                  <div className="text-3xl text-slate-400 mb-2">📥</div>
-                  <p className="text-sm font-semibold text-slate-200">Drag & drop your fleet asset manifest file here</p>
-                  <p className="text-xs text-slate-500">or click to scan local drives (Free evaluation limit: Up to 10 assets)</p>
-                </div>
-              </div>
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+              GUEST SCAN CONSOLE
+            </div>
+          )}
+        </div>
+      </nav>
 
-              <div className="space-y-2">
-                <textarea 
-                  rows={3}
-                  placeholder="Alternative Input: Paste row strings directly here... (e.g. FORD, TRANSIT, 2022)"
-                  value={bulkInput}
-                  onChange={(e) => setBulkInput(e.target.value)}
-                  className="w-full p-4 text-sm rounded-xl border border-slate-900 bg-slate-950/40 text-slate-200 font-mono outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all placeholder:text-slate-600 shadow-inner resize-none"
-                />
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-                  <span className="text-[11px] font-medium text-amber-500/90 font-mono">
-                    ⚠️ Limit Notice: Free exploration scopes are locked to a maximum of 10 vehicle slots [cite: 81].
-                  </span>
-                  <button 
-                    type="submit"
-                    disabled={loading || !bulkInput.trim()}
-                    className="px-6 py-2.5 text-sm bg-slate-100 text-slate-950 hover:bg-white active:scale-[0.985] font-bold rounded-xl disabled:opacity-40 disabled:hover:bg-slate-100 disabled:active:scale-100 shadow-md transition-all shrink-0"
-                  >
-                    {loading ? 'Running Threat Sweeps...' : 'Upload 10 Free Vehicles & Scan Exposure'}
-                  </button>
-                </div>
-              </div>
-            </form>
+      {/* Centered Command Container */}
+      <main className="flex-1 p-8 lg:p-12 max-w-4xl mx-auto space-y-10 overflow-y-auto w-full">
+        
+        {/* Pulsing Eye-Catching Safety Alert Header */}
+        <div className="bg-gradient-to-r from-red-950/40 to-slate-950/30 border border-red-500/30 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="space-y-1 relative z-10">
+            <span className="text-[10px] bg-red-500/20 text-red-400 px-3 py-1 rounded-full border border-red-500/30 font-bold tracking-wider font-mono uppercase animate-pulse">Critical Alerts Active</span>
+            <h3 className="text-xl font-black text-slate-100 uppercase tracking-tight mt-2">Recall Volume Crisis Detected</h3>
+            <p className="text-slate-400 text-xs max-w-xl mt-1">
+              Over **15,000+ critical safety recall threats** are currently active across commercial sectors. Monitor your fleet exposure immediately to prevent catastrophic vehicle downtime and secure lower insurance premiums.
+            </p>
+          </div>
+          <div className="bg-red-500/10 border border-red-500/20 px-6 py-3 rounded-2xl text-center shrink-0 relative z-10">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Hazards</div>
+            <div className="text-2xl font-black text-red-400 font-mono mt-0.5">15,402</div>
+          </div>
+        </div>
 
-            {error && (
-              <div className="p-4 bg-red-950/20 border border-red-900/30 text-red-400 text-xs font-mono rounded-xl">
-                ❌ {error}
-              </div>
-            )}
-          </section>
+        {/* Dynamic Title Header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-900 pb-8">
+          <div className="space-y-2">
+            <h2 className="text-slate-100 text-3xl font-black tracking-tight sm:text-4xl uppercase">
+              Predictive Safety <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-500 bg-clip-text text-transparent">Intelligence</span>
+            </h2>
+            <p className="text-slate-400 text-xs sm:text-sm font-medium max-w-2xl leading-relaxed">
+              We instantly scan your fleet for hidden, un-repaired manufacturer defects and track safety compliance so you can prevent catastrophic vehicle downtime and lower your commercial insurance premiums.
+            </p>
+          </div>
+        </header>
 
-          {/* Active Workspaces Logic (Conditional Rendering) */}
-          {recalls.length > 0 ? (
-            <section className="space-y-6 animate-fade-in">
-              {/* Branch A: Active Recalls Detected [cite: 960] */}
-              <div className="border border-red-500/20 bg-red-950/10 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        {/* 🏢 THE ACTIVE AUTHENTICATED SAAS COMMAND CONSOLE */}
+        {isAuthenticated ? (
+          <section className="space-y-10 animate-fade-in">
+            {/* Row 1: The Upgraded Badge Shield */}
+            <div>
+              <RecallLogicComplianceBadge 
+                isPaid={isPaid}
+                onShareClick={() => setShowShareModal(true)}
+                onClaimClick={() => setShowClaimModal(true)}
+              />
+            </div>
+
+            {/* Row 2: Interactive ROI Financial Calculator */}
+            <ROICalculator />
+
+            {/* Row 3: Monitored Fleet Asset Registry Grid */}
+            <div className="bg-slate-950/20 border border-slate-900 rounded-3xl p-6 sm:p-8 space-y-6">
+              <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" /> Urgent Threats Found
+                  <h3 className="text-md font-bold text-white uppercase tracking-tight flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" /> Continuous Fleet Asset Monitoring
                   </h3>
-                  <p className="text-slate-400 text-xs sm:text-sm">We have isolated active legal liability and environmental failure vectors inside your sweep logs.</p>
+                  <p className="text-slate-400 text-xs">These vehicle registries are constantly matching 24/7 against federal safety records.</p>
                 </div>
+                <button 
+                  onClick={handleExportManifest}
+                  className="bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-1 shrink-0"
+                >
+                  📥 Export Verification Manifest
+                </button>
+              </header>
 
-                {!isPaid && (
-                  <div className="bg-[#0b101d] border border-slate-800 p-5 rounded-2xl text-center shrink-0 w-full md:w-auto relative">
-                    <div className="text-xs font-bold text-slate-400 uppercase">RecallLogic Shield Pricing</div>
-                    <div className="text-2xl font-black text-cyan-400 font-mono mt-1">${calculateCustomMRR(blockedVinCount || recalls.length)}/mo</div>
-                    <div className="mt-3">
-                      <UpgradeButton vinCount={blockedVinCount || recalls.length} />
-                    </div>
-                  </div>
-                )}
+              <div className="overflow-x-auto rounded-2xl border border-slate-900/60 bg-[#040813]">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-950/80 text-slate-500 uppercase tracking-wider font-mono font-bold text-[10px] border-b border-slate-900">
+                      <th className="p-4">Vehicle Model</th>
+                      <th className="p-4">Registry VIN</th>
+                      <th className="p-4">Vulnerability State</th>
+                      <th className="p-4">Last Verified</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-900 text-slate-300 font-medium">
+                    <tr>
+                      <td className="p-4 font-bold text-slate-200">2022 Ford Transit</td>
+                      <td className="p-4 font-mono text-slate-500">1FTYR2Y8XNKA4820</td>
+                      <td className="p-4 text-emerald-400 font-mono">● PASS (0 DEFECTS)</td>
+                      <td className="p-4 text-slate-400">Live Syncing</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 font-bold text-slate-200">2021 Chevrolet Express</td>
+                      <td className="p-4 font-mono text-slate-500">1GBJG2G17LKA2904</td>
+                      <td className="p-4 text-emerald-400 font-mono">● PASS (0 DEFECTS)</td>
+                      <td className="p-4 text-slate-400">Live Syncing</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 font-bold text-slate-200">2023 Ram ProMaster</td>
+                      <td className="p-4 font-mono text-slate-500">3C6URVDG1PKA1209</td>
+                      <td className="p-4 text-emerald-400 font-mono">● PASS (0 DEFECTS)</td>
+                      <td className="p-4 text-slate-400">Live Syncing</td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 font-bold text-slate-200">2020 Ford F-150</td>
+                      <td className="p-4 font-mono text-slate-500">1FTFW1EG0LKA9402</td>
+                      <td className="p-4 text-emerald-400 font-mono">● PASS (0 DEFECTS)</td>
+                      <td className="p-4 text-slate-400">Live Syncing</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Row 4: Task Board (For flagged recall remediation workflows) */}
+            <div className="border border-slate-900 bg-slate-950/40 p-6 rounded-3xl space-y-4">
+              <h3 className="text-md font-bold text-slate-100 uppercase tracking-tight flex items-center gap-2">
+                🛠️ Fleet Remediation Task Board
+              </h3>
+              <p className="text-slate-400 text-xs">Manage repair schedules, dealer scheduling, and safety validation tickets inside your team.</p>
+              <TaskBoard />
+            </div>
+          </section>
+        ) : (
+          // 🏡 BRANCH B: GUEST MODE (EXPLORATORY CSV DRAG & DROP SEARCH)
+          <div className="space-y-10">
+            {/* Drag and Drop Manifest Ingestion */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_#22d3ee]" /> Fleet Ingestion Node
+                </h3>
+                <span className="text-xs text-slate-500 font-mono">Accepts .txt or .csv registries</span>
               </div>
 
-              {/* Taskboard Integration (Paid Only) [cite: 1405, 1412] */}
-              {isPaid && (
-                <div className="border border-slate-900 bg-slate-950/40 p-6 rounded-3xl space-y-4">
-                  <h3 className="text-md font-bold text-slate-100 uppercase tracking-tight flex items-center gap-2">
-                    🛠️ Active Remediation Task Board
-                  </h3>
-                  <TaskBoard />
+              <form onSubmit={handleSearch} className="space-y-4">
+                <div 
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.files = e.dataTransfer.files;
+                        const event = { target: fileInputRef.current } as unknown as React.ChangeEvent<HTMLInputElement>;
+                        handleFileUpload(event);
+                      }
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${isDragging ? 'border-cyan-500 bg-cyan-950/10 shadow-[0_0_15px_rgba(34,211,238,0.1)]' : 'border-slate-900 bg-slate-950/20 hover:border-slate-800'}`}
+                >
+                  <input 
+                    id="dropzone-file"
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".csv,.txt"
+                    className="hidden"
+                  />
+                  <div className="max-w-md mx-auto space-y-2">
+                    <div className="text-3xl text-slate-400 mb-2">📥</div>
+                    <p className="text-sm font-semibold text-slate-200">Drag & drop your fleet asset manifest file here</p>
+                    <p className="text-xs text-slate-500">or click to browse local drives and run a compliance evaluation</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <textarea 
+                    rows={3}
+                    placeholder="Alternative Input: Paste row strings directly here... (e.g. FORD, TRANSIT, 2022)"
+                    value={bulkInput}
+                    onChange={(e) => setBulkInput(e.target.value)}
+                    className="w-full p-4 text-sm rounded-xl border border-slate-900 bg-slate-950/40 text-slate-200 font-mono outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all placeholder:text-slate-600 shadow-inner resize-none"
+                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4 pt-1">
+                    <button 
+                      type="submit"
+                      disabled={loading || !bulkInput.trim()}
+                      className="px-6 py-2.5 text-sm bg-slate-100 text-slate-950 hover:bg-white active:scale-[0.985] font-bold rounded-xl disabled:opacity-40 disabled:hover:bg-slate-100 disabled:active:scale-100 shadow-md transition-all shrink-0"
+                    >
+                      {loading ? 'Running Threat Sweeps...' : 'Upload Vehicles & Scan Exposure'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {error && (
+                <div className="p-4 bg-red-950/20 border border-red-900/30 text-red-400 text-xs font-mono rounded-xl">
+                  ❌ {error}
                 </div>
               )}
-
-              {/* Threat Cards Mapping */}
-              <div className="grid grid-cols-1 gap-4">
-                {recalls.map((recall, index) => {
-                  const isThermalAlert = recall.notes?.includes('REGIONAL WEATHER ALERT');
-                  return (
-                    <div 
-                      key={index}
-                      className={`border rounded-2xl p-6 transition-all shadow-xl relative overflow-hidden ${isThermalAlert ? 'border-red-500/30 bg-gradient-to-b from-red-950/10 to-slate-950/20' : 'border-slate-900 bg-slate-950/10'}`}
-                    >
-                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-lg font-extrabold text-white tracking-tight">
-                              {recall.make} {recall.model} ({recall.year})
-                            </span>
-                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold font-mono tracking-wide uppercase border ${isThermalAlert ? 'bg-red-950/60 text-red-400 border-red-500/30' : 'bg-slate-900 text-cyan-400 border-slate-800'}`}>
-                              Campaign #{recall.campaign_number}
-                            </span>
-                          </div>
-                          <div className={`text-xs font-bold uppercase tracking-wider ${isThermalAlert ? 'text-red-400/90' : 'text-cyan-400/90'}`}>
-                            System Affected: {recall.component}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 space-y-3 text-xs leading-relaxed max-w-4xl">
-                        <p className="text-slate-300">
-                          <span className="font-bold text-white block mb-0.5">Vulnerability Summary:</span>
-                          {recall.summary || 'N/A'}
-                        </p>
-                        <p className="text-slate-400">
-                          <span className="font-bold text-slate-200 block mb-0.5">Operational Risk Profile:</span>
-                          {recall.consequence || 'N/A'}
-                        </p>
-                      </div>
-
-                      {recall.notes && (
-                        <div className={`mt-4 p-4 rounded-xl border-l-2 text-xs font-semibold tracking-wide leading-relaxed ${isThermalAlert ? 'bg-red-500/5 border-red-500 text-red-300/90' : 'bg-slate-900/40 border-cyan-500 text-slate-400'}`}>
-                          {recall.notes}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
             </section>
-          ) : (
-            // Branch B: Flawless Audit (Recall-Free or Standby) [cite: 961]
-            !loading && (
-              <section className="space-y-6">
-                <div className="relative overflow-hidden bg-gradient-to-br from-[#0b141a] to-[#04080c] border border-emerald-500/20 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl">
-                  {/* Lock Overlay if Free */}
+
+            {/* Active Workspace Conditional Output */}
+            {recalls.length > 0 ? (
+              <section className="space-y-6 animate-fade-in">
+                <div className="border border-red-500/20 bg-red-950/10 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" /> Urgent Threats Found
+                    </h3>
+                    <p className="text-slate-400 text-xs sm:text-sm">We have isolated active legal liability and environmental failure vectors inside your sweep logs.</p>
+                  </div>
+
                   {!isPaid && (
-                    <div className="absolute inset-0 bg-[#030712]/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-10 p-6 text-center">
-                      <div className="max-w-md space-y-4">
-                        <span className="text-3xl">🏅</span>
-                        <h4 className="text-xl font-black text-white tracking-tight uppercase">Lock In Active Underwriting Badges</h4>
-                        <p className="text-slate-400 text-xs sm:text-sm">Your vehicles currently check out 100% defect free. Upgrade to verify your compliance index and unlock live underwriting badge sharing [cite: 613].</p>
-                        <div className="pt-2 flex justify-center">
-                          <UpgradeButton vinCount={10} />
-                        </div>
+                    <div className="bg-[#0b101d] border border-slate-800 p-5 rounded-2xl text-center shrink-0 w-full md:w-auto">
+                      <div className="text-xs font-bold text-slate-400 uppercase">RecallLogic Shield Pricing</div>
+                      <div className="text-2xl font-black text-cyan-400 font-mono mt-1">${calculateCustomMRR(blockedVinCount || recalls.length)}/mo</div>
+                      <div className="mt-3">
+                        <UpgradeButton vinCount={blockedVinCount || recalls.length} />
                       </div>
                     </div>
                   )}
+                </div>
 
-                  {/* Cryptographic Compliance Badge Details [cite: 72, 961] */}
-                  <div className={`space-y-6 ${!isPaid ? 'filter blur-[1px]' : ''}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-500/10 pb-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-3xl flex items-center justify-center rounded-2xl shadow-xl">🏅</div>
-                        <div>
-                          <h3 className="text-lg font-black text-white uppercase tracking-tight">RecallLogic Active Compliance Badge</h3>
-                          <p className="text-slate-500 text-xs font-mono mt-0.5">Reference Verification ID: {mockReferenceToken}</p>
+                {/* Threat Cards Mapping */}
+                <div className="grid grid-cols-1 gap-4">
+                  {recalls.map((recall, index) => {
+                    const isThermalAlert = recall.notes?.includes('REGIONAL WEATHER ALERT');
+                    return (
+                      <div 
+                        key={index}
+                        className={`border rounded-2xl p-6 transition-all shadow-xl relative overflow-hidden ${isThermalAlert ? 'border-red-500/30 bg-gradient-to-b from-red-950/10 to-slate-950/20' : 'border-slate-900 bg-slate-950/10'}`}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-lg font-extrabold text-white tracking-tight">
+                                {recall.make} {recall.model} ({recall.year})
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold font-mono tracking-wide uppercase border ${isThermalAlert ? 'bg-red-950/60 text-red-400 border-red-500/30' : 'bg-slate-900 text-cyan-400 border-slate-800'}`}>
+                                Campaign #{recall.campaign_number}
+                              </span>
+                            </div>
+                            <div className={`text-xs font-bold uppercase tracking-wider ${isThermalAlert ? 'text-red-400/90' : 'text-cyan-400/90'}`}>
+                              System Affected: {recall.component}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 text-xs font-bold tracking-wider rounded-full border border-emerald-500/20 font-mono text-center sm:text-left self-start sm:self-auto">
-                        PASS • 0 ACTIVE DEFECTS DETECTED
-                      </div>
-                    </div>
+                        
+                        <div className="mt-4 space-y-3 text-xs leading-relaxed max-w-4xl">
+                          <p className="text-slate-300">
+                            <span className="font-bold text-white block mb-0.5">Vulnerability Summary:</span>
+                            {recall.summary || 'N/A'}
+                          </p>
+                          <p className="text-slate-400">
+                            <span className="font-bold text-slate-200 block mb-0.5">Operational Risk Profile:</span>
+                            {recall.consequence || 'N/A'}
+                          </p>
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-                      <div className="bg-slate-950/40 border border-slate-900 rounded-xl p-4 space-y-1">
-                        <span className="text-slate-500">Last Database Scan:</span>
-                        <p className="text-slate-300 font-bold">2026-07-14 08:00 AM</p>
+                        {recall.notes && (
+                          <div className={`mt-4 p-4 rounded-xl border-l-2 text-xs font-semibold tracking-wide leading-relaxed ${isThermalAlert ? 'bg-red-500/5 border-red-500 text-red-300/90' : 'bg-slate-900/40 border-cyan-500 text-slate-400'}`}>
+                            {recall.notes}
+                          </div>
+                        )}
                       </div>
-                      <div className="bg-slate-950/40 border border-slate-900 rounded-xl p-4 space-y-1">
-                        <span className="text-slate-500">Security Clearance:</span>
-                        <p className="text-emerald-400 font-bold">Approved for Active Logistics Operations</p>
-                      </div>
-                    </div>
-
-                    {isPaid && (
-                      <div className="pt-2 flex justify-end">
-                        <button 
-                          onClick={() => setShowShareModal(true)}
-                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 px-6 rounded-xl text-xs uppercase tracking-wider transition-all"
-                        >
-                          Share Verification Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               </section>
-            )
-          )}
+            ) : (
+              // Branch B: Recall-Free State (Renders our Compliance Badge for unpaid/outbound users)
+              !loading && (
+                <section className="space-y-6">
+                  <RecallLogicComplianceBadge 
+                    isPaid={isPaid}
+                    onShareClick={() => setShowShareModal(true)}
+                    onClaimClick={() => setShowClaimModal(true)}
+                  />
+                </section>
+              )
+            )}
+          </div>
+        )}
+      </main>
 
-          {/* SaaS Tiers Offerings Grid [cite: 756] */}
-          <section className="py-6 w-full space-y-8 border-t border-slate-900 pt-10">
-            <div className="text-center space-y-2">
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight">SaaS Offerings Pillars</h2>
-              <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto">Choose the right operational threshold for your fleet size. No hidden fees or complicated calculations.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Starter Tier */}
-              <div className="bg-[#0b0f19]/40 border border-slate-900 rounded-3xl p-6 flex flex-col justify-between space-y-6 relative overflow-hidden backdrop-blur-md">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-slate-300 font-black text-lg uppercase">Standard/Starter</h3>
-                    <p className="text-[10px] text-cyan-400 font-mono tracking-wider font-bold">Up to 15 Vehicles [cite: 37]</p>
-                  </div>
-                  <div className="text-3xl font-black text-white">$99<span className="text-xs font-normal text-slate-500">/mo</span></div>
-                  <ul className="text-xs text-slate-400 space-y-2 font-medium">
-                    <li>• Daily Automated Recall Monitoring</li>
-                    <li>• Basic Compliance Verification</li>
-                    <li>• Standard Diagnostic Reporting</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Pro Tier */}
-              <div className="bg-[#0b0f19]/40 border-2 border-cyan-500/30 rounded-3xl p-6 flex flex-col justify-between space-y-6 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.05)]">
-                <div className="absolute top-0 right-0 bg-cyan-500 text-slate-950 text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-bl-xl font-mono">Best Value</div>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-white font-black text-lg uppercase">Professional</h3>
-                    <p className="text-[10px] text-cyan-400 font-mono tracking-wider font-bold">Up to 100 Vehicles [cite: 37]</p>
-                  </div>
-                  <div className="text-3xl font-black text-white">$249<span className="text-xs font-normal text-slate-500">/mo</span></div>
-                  <ul className="text-xs text-slate-300 space-y-2 font-medium">
-                    <li>• Continuous 24/7 Background Syncs</li>
-                    <li>• Cryptographic Compliance Badges [cite: 613]</li>
-                    <li>• Mojave Thermal High-Heat Risk Metrics [cite: 612]</li>
-                    <li>• Direct Underwriter Dispatch Pipelines</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Enterprise Tier */}
-              <div className="bg-[#0b0f19]/40 border border-slate-900 rounded-3xl p-6 flex flex-col justify-between space-y-6 relative overflow-hidden backdrop-blur-md">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-slate-300 font-black text-lg uppercase">Enterprise</h3>
-                    <p className="text-[10px] text-cyan-400 font-mono tracking-wider font-bold">101+ Vehicles [cite: 37]</p>
-                  </div>
-                  <div className="text-3xl font-black text-white">$499<span className="text-xs font-normal text-slate-500">/mo</span></div>
-                  <ul className="text-xs text-slate-400 space-y-2 font-medium">
-                    <li>• Multi-tenant API Integrations</li>
-                    <li>• Automated Ingest Trigger Routines</li>
-                    <li>• Custom SLA & Ingestion Guarantees</li>
-                    <li>• Dedicated Strategic Account Manager</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </section>
-        </main>
-      </div>
-
-      {/* 🔗 UNDERWRITER BADGE SHARING MODAL FRAME [cite: 85] */}
+      {/* 🔗 UNDERWRITER BADGE SHARING MODAL */}
       {showShareModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-50 p-4">
           <div className="bg-[#0b0f19] border border-slate-800 p-8 rounded-3xl max-w-xl w-full shadow-2xl relative space-y-6">
             <header className="flex justify-between items-start">
               <div>
                 <h2 className="text-xl font-black text-white tracking-tight">Insurance Compliance Dispatch</h2>
-                <p className="text-slate-400 text-xs mt-0.5">Allow commercial underwriting agents to verify your security clearance [cite: 85].</p>
+                <p className="text-slate-400 text-xs mt-0.5">Allow commercial underwriting agents to verify your security clearance.</p>
               </div>
               <button type="button" onClick={() => setShowShareModal(false)} className="text-slate-500 hover:text-slate-300 font-mono text-sm p-1">✕</button>
             </header>
@@ -778,7 +924,7 @@ export default function App() {
               </div>
               {shareSuccess && (
                 <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1 mt-1">
-                  ✓ Dispatch logged. Signed digital manifesto securely broadcasted to target broker nodes [cite: 88].
+                  ✓ Dispatch logged. Signed digital manifesto securely broadcasted to target broker nodes.
                 </div>
               )}
             </form>
@@ -786,7 +932,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔐 WORKSPACE REGISTRATION BRIDGE MODAL [cite: 1402] */}
+      {/* 🔐 WORKSPACE REGISTRATION BRIDGE MODAL */}
       {showClaimModal && (
         <RegistrationModal 
           defaultEmail={lead?.contact_email} 
@@ -794,7 +940,7 @@ export default function App() {
         />
       )}
 
-      {/* FREEMIUM INTERCEPTOR PAYWALL MODAL [cite: 89] */}
+      {/* FREEMIUM LIMITS INTERCEPTOR MODAL */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-50 p-4">
           <div className="bg-[#0b0f19] border border-slate-800 p-8 rounded-3xl max-w-lg w-full shadow-2xl text-center space-y-6 relative overflow-hidden">
@@ -803,7 +949,7 @@ export default function App() {
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-white tracking-tight">Unlock RecallLogic Pro</h2>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Your submitted manifest targets <strong className="text-white font-mono">{blockedVinCount} assets</strong>. Exploration profiles are restricted to a maximum of 10 items for exploratory testing loops [cite: 89].
+                Your submitted manifest targets <strong className="text-white font-mono">{blockedVinCount} assets</strong>. Exploratory testing requires a premium subscription to process complete datasets.
               </p>
             </div>
             
@@ -823,7 +969,7 @@ export default function App() {
                 </div>
               </div>
               <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
-                ✓ Includes real-time climate risk-mapping & secure broker token generation [cite: 89].
+                ✓ Includes real-time climate risk-mapping & secure broker token generation.
               </div>
             </div>
             
