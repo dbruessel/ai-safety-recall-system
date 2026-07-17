@@ -1,120 +1,89 @@
-import logging
-import os
-import stripe
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.config import get_settings
-
-# Initialize Logger
-logger = logging.getLogger("payment-router")
-
-# Retrieve Global SaaS Configurations [cite: 74]
-try:
-    settings = get_settings()
-except Exception:
-    # Fallback import if settings singleton is uninstantiated [cite: 74]
-    from app.config import settings
-
-# Initialize Stripe API Client with Private Secret Key [cite: 74]
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-# Register payments route group
-router = APIRouter(prefix="/payments", tags=["payments"])
+import stripe
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # =====================================================================
-# REQUEST SCHEMAS
+# LOAD LOCAL ENVIRONMENT VARIABLES
 # =====================================================================
-class CheckoutRequest(BaseModel):
-    # Aligned with your "standard" tier preference instead of "starter" [cite: 74]
-    plan_type: str  # Must be "standard", "professional", or "enterprise"
-    user_id: str    # The user email or database ID to link this checkout session [cite: 74]
+load_dotenv()
 
+STRIPE_API_KEY = os.getenv("STRIPE_SECRET_KEY", "sk_test_51P...")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ygbiurcvparmwfaqrtg.supabase.co")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Defensive Configuration Check
+if not SUPABASE_SERVICE_KEY:
+    raise ValueError(
+        "CRITICAL STARTUP ERROR: 'SUPABASE_SERVICE_ROLE_KEY' is missing from your environment variables!\n"
+        "Please ensure it is defined in your 'C:\\dev\\clean-repo\\backend\\.env' file.\n"
+        "You can find this key under Supabase -> Project Settings -> API -> service_role."
+    )
+
+# Initialize APIs
+stripe.api_key = STRIPE_API_KEY
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+router = APIRouter(prefix="/api/payments", tags=["payments"])
+
+class VerifySessionRequest(BaseModel):
+    session_id: str
 
 # =====================================================================
-# ENDPOINT: CREATE SECURE STRIPE-HOSTED CHECKOUT SESSION (Redirection)
+# ENDPOINT: SECURE AUTO-LOGIN REDIRECTION EXCHANGER
 # =====================================================================
-@router.post("/create-checkout-session")
-async def create_checkout_session(request: CheckoutRequest):
+@router.post("/verify-session")
+async def verify_session(req: VerifySessionRequest):
     """
-    Spins up a secure Stripe Checkout Session in Hosted Redirection mode [cite: 75, 84].
-    
-    🔑 STATE PRESERVATION:
-    Appends the user_id (email context) straight to success_url and cancel_url [cite: 34].
-    This ensures that when Stripe redirects back, the React frontend identifies the lead 
-    and instantly mounts their verified workspace without resetting [cite: 34, 46].
+    Called by the frontend when a user lands on the Stripe redirect success URL.
+    Polls/verifies Stripe checkout status synchronously, syncs database status,
+    and returns a one-time Supabase magic link to instantly log the user in.
     """
-    logger.info(f"Initiating hosted checkout provisioning for plan: {request.plan_type} (User: {request.user_id})")
-
-    # 🔑 MAP YOUR ACTIVE STRIPE TEST PRICE IDs HERE:
-    # Replace these placeholders with your actual 'price_...' keys copied from Stripe Developer Tools!
-    price_map = {
-        "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",         # Up to 15 vehicles [cite: 37]
-        "professional": "price_1TsR6jDXs4xycz0ohAfewQgk", # 16 to 100 vehicles [cite: 37]
-        "enterprise": "price_1TrlFxDXs4xycz0ofyuV70Rf"      # 101+ vehicles [cite: 37]
-    }
-
-    # Verify selected plan maps to an active pricing tier
-    selected_plan = request.plan_type.lower().strip()
-    if selected_plan not in price_map:
-        logger.error(f"Invalid plan selected: {request.plan_type}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid pricing tier specified. Supported: {list(price_map.keys())}"
-        )
-
-    stripe_price_id = price_map[selected_plan]
-
-    # Prevent execution blocks if price IDs have not been updated yet
-    if "your_actual" in stripe_price_id:
-        logger.warning("Unconfigured mock price ID placeholder detected. Halting execution.")
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Pricing profiles not configured. Please paste your 'price_...' keys from your Stripe Catalog."
-        )
-
-    # 🛡️ DEFENSIVE FRONTEND ORIGIN RESOLUTION:
-    # Gracefully prevents 'Settings object has no attribute' errors if FRONTEND_ORIGIN is omitted from config.py [cite: 74]
-    frontend_url = getattr(settings, "FRONTEND_ORIGIN", None) or getattr(settings, "FRONTEND_URL", None)
-    if not frontend_url:
-        frontend_url = os.getenv("FRONTEND_ORIGIN") or os.getenv("FRONTEND_URL") or "http://localhost:5173"
-    
-    frontend_url = frontend_url.rstrip("/")
-
     try:
-        # Create a Hosted Checkout Session with subscription mechanics [cite: 75, 84]
-        # (ui_mode is omitted for standard redirection checkout)
-        session = stripe.checkout.Session.create(
-            mode="subscription",
-            payment_method_types=["card"],
-            line_items=[
-                {
-                    "price": stripe_price_id,
-                    "quantity": 1,
-                }
-            ],
-            # Anchor client_reference_id to trace payment success back to Supabase profiles [cite: 74, 76]
-            client_reference_id=request.user_id,
+        # 1. Retrieve the checkout session directly from Stripe
+        session = stripe.checkout.Session.retrieve(req.session_id)
+        
+        # 2. If checkout is still pending processing, let frontend know to keep polling
+        if session.payment_status != "paid":
+            return {
+                "status": "pending",
+                "message": "Payment processing. Please hold..."
+            }
             
-            # 🔑 THE KEY FIX: Append the user email to success and cancel redirects [cite: 34]
-            success_url=f"{frontend_url}/?session_id={{CHECKOUT_SESSION_ID}}&email={request.user_id}",
-            cancel_url=f"{frontend_url}/?email={request.user_id}",
-        )
+        # 3. Extract the verified customer email
+        email = session.customer_details.email if session.customer_details else None
+        if not email:
+            raise HTTPException(status_code=400, detail="Checkout session contains no valid customer email.")
+            
+        # 4. Synchronous Fallback Sync: Ensure leads table is updated immediately
+        supabase_admin.table("leads").update({
+            "lead_status": "Stripe Completed"
+        }).eq("contact_email", email).execute()
 
-        logger.info(f"Stripe Hosted Checkout Session created successfully: {session.id}")
+        # 5. Generate secure, one-time Supabase login redirection credentials
+        frontend_redirect_url = "http://localhost:5173/?setup_password=true"
+        
+        link_response = supabase_admin.auth.admin.generate_link({
+            "type": "magiclink",
+            "email": email,
+            "options": {
+                "redirect_to": frontend_redirect_url
+            }
+        })
+        
+        login_url = link_response.properties.action_link
+        
         return {
-            "url": session.url,
-            "sessionId": session.id
+            "status": "paid",
+            "email": email,
+            "login_url": login_url
         }
-
+        
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe Communication Error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Stripe Gateway connection failed: {e.user_message or str(e)}"
-        )
+        print(f"Stripe Retrieval Error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Stripe session verification failed: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error during checkout processing: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not configure local checkout engine."
-        )
+        print(f"Internal Handshake Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate secure auto-login credentials: {str(e)}")
