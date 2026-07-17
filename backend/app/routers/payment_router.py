@@ -14,12 +14,14 @@ STRIPE_API_KEY = os.getenv("STRIPE_SECRET_KEY", "sk_test_51P...")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ygbiurcvparmwfaqrtg.supabase.co")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
+# Grab the key using either standard naming convention
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
 # Defensive Configuration Check
 if not SUPABASE_SERVICE_KEY:
     raise ValueError(
-        "CRITICAL STARTUP ERROR: 'SUPABASE_SERVICE_ROLE_KEY' is missing from your environment variables!\n"
-        "Please ensure it is defined in your 'C:\\dev\\clean-repo\\backend\\.env' file.\n"
-        "You can find this key under Supabase -> Project Settings -> API -> service_role."
+        "CRITICAL STARTUP ERROR: 'SUPABASE_SERVICE_KEY' is missing from your environment variables!\n"
+        "Please ensure it is defined in your 'C:\\dev\\clean-repo\\backend\\.env' file."
     )
 
 # Initialize APIs
