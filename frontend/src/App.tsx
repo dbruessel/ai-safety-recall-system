@@ -104,7 +104,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img 
-              src="/RecallLogic Logo (1).png" 
+              src="/recall-logo.png" 
               alt="RecallLogic Logo" 
               className="h-8 w-auto object-contain" 
             />
