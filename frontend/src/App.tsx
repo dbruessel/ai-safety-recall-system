@@ -193,7 +193,8 @@ export function useLeadData() {
           activeProfile = profileData;
           setProfile(profileData);
         } else {
-          activeProfile = { id: session.user.id, email: email, is_pro: false };
+          // UPDATED: Replaced `is_pro: false` with `tier: 'free'`
+          activeProfile = { id: session.user.id, email: email, tier: 'free' };
           setProfile(activeProfile);
         }
 
@@ -211,6 +212,7 @@ export function useLeadData() {
             status: a.status || 'SECURE - PASS',
             lastSync: 'Live Syncing'
           }));
+          setAssets(loadedAssets); // Ensures the assets state is properly populated
         }
 
         if (email) {
@@ -245,29 +247,14 @@ export function useLeadData() {
           }
         }
       }
-
-      if (loadedAssets.length === 0 && activeLead?.primary_vehicle_mix) {
-        loadedAssets = parseVehicleMix(activeLead.primary_vehicle_mix, email || activeLead.contact_email);
-      }
-
-      if (loadedAssets.length === 0) {
-        loadedAssets = [
-          { make: 'Ford', model: 'Transit', year: '2022', vin: '1FTYR2Y8XNKA4820', status: 'SECURE - PASS', lastSync: 'Live Syncing' },
-          { make: 'Chevrolet', model: 'Express', year: '2021', vin: '1GBJG2G17LKA2904', status: 'SECURE - PASS', lastSync: 'Live Syncing' },
-          { make: 'Ram', model: 'ProMaster', year: '2023', vin: '3C6URVDG1PKA1209', status: 'SECURE - PASS', lastSync: 'Live Syncing' },
-          { make: 'Ford', model: 'F-150', year: '2020', vin: '1FTFW1EG0LKA9402', status: 'SECURE - PASS', lastSync: 'Live Syncing' }
-        ];
-      }
-
-      setAssets(loadedAssets);
     } catch (err: any) {
-      console.error('Session/Lead resolution failed:', err);
-      setError(err.message || 'Unable to resolve context.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }
 
+  // Ensure session resolves on mount and auth state changes
   useEffect(() => {
     resolveUserSession();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
@@ -276,15 +263,17 @@ export function useLeadData() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return {
-    lead,
-    profile,
-    assets,
-    loading,
-    error,
-    userEmail,
-    isPaid: profile?.is_pro || lead?.lead_status === 'Stripe Completed',
-    isAuthenticated: !!userEmail || !!profile
+  // UPDATED: Added userTier export and updated isPaid array check [cite: 26, 27]
+  return { 
+    lead, 
+    profile, 
+    assets, 
+    loading, 
+    error, 
+    userEmail, 
+    userTier: profile?.tier || 'free', 
+    isPaid: ['standard', 'professional', 'enterprise'].includes(profile?.tier) || lead?.lead_status === 'Stripe Completed', 
+    isAuthenticated: !!userEmail || !!profile 
   };
 }
 

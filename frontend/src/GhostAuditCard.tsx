@@ -45,31 +45,32 @@ export function GhostAuditCard() {
     setSweepProgress(0);
     setSweepComplete(false);
     
+    // Simulate sweep progress for a frictionless visual experience
     const interval = setInterval(() => {
-      setSweepProgress((prev) => {
+      setSweepProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsSweeping(false);
           setSweepComplete(true);
           return 100;
         }
-        return prev + 10;
+        return prev + 25;
       });
-    }, 150);
+    }, 600);
   };
 
-  // 4. ROI Calculations 
-  // Est average recall cost is ~$150 per vehicle in deferred downtime and liability
-  const fleetSize = lead ? lead.est_fleet_size : 10;
-  const companyName = lead ? lead.company_name : 'Your Fleet';
-  const estimatedAnnualSavings = fleetSize * 150;
-  
-  // Dynamic pricing based on fleet size ($5/vehicle/month, capped at standard SaaS tiers)
-  const monthlySaaSPrice = Math.max(49, Math.min(299, fleetSize * 5));
+  // 4. NEW: Healthy vs Unhealthy Determination [cite: 3]
+  // In a live environment, this would evaluate the actual API response.
+  // For the MVP, we can simulate an "Unhealthy" state to drive urgency, 
+  // or a "Healthy" state to drive compliance badge adoption.
+  const fleetHealthStatus = 'unhealthy'; // Toggle to 'healthy' based on actual VIN results
 
-  // Stripe checkout routing URL
-  const checkoutEmail = lead ? lead.contact_email : manualEmail;
-  const stripeLink = `https://checkout.recalllogic.com/pay?email=${encodeURIComponent(checkoutEmail)}&tier=${fleetSize > 25 ? 'enterprise' : 'growth'}`;
+  // 5. NEW: Route to Offerings instead of direct Stripe link [cite: 3, 4]
+  const handleViewOfferings = () => {
+    // This should trigger your existing Pricing Modal to show 
+    // the $99 Standard, $249 Pro, and $499 Enterprise tiers
+    setShowUpgradeModal(true); 
+  };
 
   // ==================== RENDER CASE A: PROSPECT NOT DETECTED (Fallback Generic Mode) ====================
   if (!lead) {
