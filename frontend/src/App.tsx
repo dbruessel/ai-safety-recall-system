@@ -51,7 +51,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // =====================================================================
-// 🎨 NEW BRANDING COMPONENT: HIGH-FIDELITY VECTOR LOGO (FROM SOURCES)
+// 🎨 BRANDING COMPONENT: HIGH-FIDELITY VECTOR LOGO
 // =====================================================================
 export function RecallLogicLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
@@ -289,17 +289,14 @@ export function useLeadData() {
 }
 
 // =====================================================================
-// UNIFIED AUTH MODAL (CLAIM WORKSPACE / LOG IN TOGGLE)
+// UNIFIED PORTAL SIGN IN MODAL (PAID USERS ONLY)
 // =====================================================================
 interface AuthModalProps {
-  defaultEmail?: string;
-  initialMode: 'signup' | 'signin';
   onClose: () => void;
 }
 
-function AuthModal({ defaultEmail, initialMode, onClose }: AuthModalProps) {
-  const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
-  const [email, setEmail] = useState(defaultEmail || '');
+function AuthModal({ onClose }: AuthModalProps) {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -312,19 +309,13 @@ function AuthModal({ defaultEmail, initialMode, onClose }: AuthModalProps) {
     setError(null);
 
     try {
-      if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({ email, password });
-        if (signUpError) throw signUpError;
-        setMessage('Account created successfully! Your workspace is now secure.');
-      } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) throw signInError;
-        setMessage('Welcome back! Loading secure command console...');
-      }
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      setMessage('Authenticated successfully! Loading secure compliance console...');
       setTimeout(() => { onClose(); }, 1500);
     } catch (err: any) {
       console.error('Auth action failed:', err);
-      setError(err.message || 'Authentication failed. Please verify credentials.');
+      setError(err.message || 'Authentication failed. Please verify active subscription.');
     } finally {
       setLoading(false);
     }
@@ -334,12 +325,10 @@ function AuthModal({ defaultEmail, initialMode, onClose }: AuthModalProps) {
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-50 p-4">
       <div className="bg-[#0b0f19] border border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl relative space-y-6">
         <header className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-black text-white tracking-tight uppercase">
-              {isSignUp ? 'Claim Your Workspace' : 'Welcome Back'}
-            </h2>
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-white tracking-tight uppercase">Secure Console Login</h2>
             <p className="text-slate-400 text-xs mt-0.5">
-              {isSignUp ? 'Secure your fleet dashboard and compliance logs permanently.' : 'Sign in to access your monitored assets.'}
+              Sign in to access your registered fleet assets and un-blurred compliance shields [cite: 21].
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-300 font-mono text-sm p-1">✕</button>
@@ -350,22 +339,22 @@ function AuthModal({ defaultEmail, initialMode, onClose }: AuthModalProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider block">Email Address</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isSignUp && !!defaultEmail} className="w-full bg-slate-950 border border-slate-900 p-3 text-sm text-slate-200 rounded-xl outline-none focus:border-cyan-500 transition-all disabled:opacity-50" placeholder="name@company.com" />
+            <label className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider block">Authorized Email</label>
+            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-900 p-3 text-sm text-slate-200 rounded-xl outline-none focus:border-cyan-500 transition-all placeholder:text-slate-700" placeholder="name@company.com" />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider block">Password</label>
             <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-900 p-3 text-sm text-slate-200 rounded-xl outline-none focus:border-cyan-500 transition-all" />
           </div>
           <button type="submit" disabled={loading} className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 py-3 rounded-xl font-black uppercase tracking-wider shadow-lg transition-all text-xs disabled:opacity-50">
-            {loading ? (isSignUp ? 'Securing Account...' : 'Authenticating...') : (isSignUp ? 'Lock In Workspace' : 'Sign In To Dashboard')}
+            {loading ? 'Authenticating Access...' : 'Verify & Boot Console'}
           </button>
         </form>
 
         <footer className="text-center pt-2 border-t border-slate-900/60">
-          <button type="button" onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }} className="text-xs text-slate-400 hover:text-cyan-400 transition-all font-mono">
-            {isSignUp ? "Already secured your workspace? Sign In" : "Need to claim premium access? Claim Workspace"}
-          </button>
+          <p className="text-[10px] text-slate-500 font-mono leading-relaxed">
+            First-time subscriber? Your login link was securely generated during checkout. Follow the redirect to set your initial password [cite: 3].
+          </p>
         </footer>
       </div>
     </div>
@@ -417,7 +406,7 @@ function SetupPasswordModal({ onClose }: SetupPasswordModalProps) {
             <h2 className="text-xl font-black text-white tracking-tight uppercase">Secure Your Workspace</h2>
           </div>
           <p className="text-slate-400 text-xs mt-0.5">
-            Since your payment was verified, please establish a password to access your dashboard securely in the future.
+            Since your payment was verified, please establish a password to access your dashboard securely in the future [cite: 3].
           </p>
         </header>
 
@@ -443,7 +432,7 @@ function SetupPasswordModal({ onClose }: SetupPasswordModalProps) {
 }
 
 // =====================================================================
-// COMPONENT: RecallLogic Compliance Badge (BRAND-ALIGNED DESIGN)
+// COMPONENT: RECALL_LOGIC COMPLIANCE BADGE (OPTION A: GATED BY PAYMENT)
 // =====================================================================
 interface ComplianceBadgeProps {
   isPaid: boolean;
@@ -461,7 +450,7 @@ export function RecallLogicComplianceBadge({ isPaid, onShareClick, onClaimClick 
       <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
       <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl" />
       
-      {/* Header Block with Prominent Vector Branding [cite: 36] */}
+      {/* Header Block with Prominent Vector Branding */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-900/60 relative z-10">
         <div className="flex items-center gap-4">
           <RecallLogicLogo className="w-14 h-14" />
@@ -478,7 +467,7 @@ export function RecallLogicComplianceBadge({ isPaid, onShareClick, onClaimClick 
         </div>
         
         {/* Verification Status Seal */}
-        <div className="px-4 py-2 bg-emerald-500/10 text-emerald-400 text-xs font-black tracking-widest rounded-xl border border-emerald-500/20 font-mono shadow-inner text-center">
+        <div className="px-4 py-2 bg-emerald-500/10 text-emerald-400 text-xs font-black tracking-widest rounded-xl border border-emerald-500/20 font-mono shadow-inner text-center font-bold">
           PASS • 0 ACTIVE DEFECTS
         </div>
       </div>
@@ -507,28 +496,28 @@ export function RecallLogicComplianceBadge({ isPaid, onShareClick, onClaimClick 
         {isPaid ? (
           <button 
             onClick={onShareClick}
-            className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.98] shadow-lg shadow-cyan-500/10 whitespace-nowrap"
+            className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.985] shadow-lg shadow-cyan-500/10 whitespace-nowrap"
           >
             Share Verification Link
           </button>
         ) : (
           <button 
             onClick={onClaimClick}
-            className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-sky-600 hover:opacity-95 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.98] shadow-lg whitespace-nowrap"
+            className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-sky-600 hover:opacity-95 text-slate-950 font-black py-3 px-6 rounded-xl text-xs uppercase tracking-wider transition-all duration-150 active:scale-[0.985] shadow-lg whitespace-nowrap"
           >
-            Claim Badge & Lower Premiums
+            Claim Badge & Lower Premiums [cite: 21]
           </button>
         )}
       </div>
 
-      {/* Lock Blur Layer for Unpaid Users */}
+      {/* Lock Blur Layer for Unpaid Users (Teaser/Curiosity Hook) [cite: 21] */}
       {!isPaid && (
         <div className="absolute inset-0 bg-[#030712]/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-20 p-6 text-center">
           <div className="max-w-md bg-slate-950/90 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-4 ring-1 ring-slate-800">
             <span className="text-2xl">🔒</span>
-            <h4 className="text-sm font-black text-white tracking-tight uppercase">Lock In Verification Credentials</h4>
+            <h4 className="text-sm font-black text-white tracking-tight uppercase">Lock In Verification Credentials [cite: 21]</h4>
             <p className="text-slate-400 text-[11px] leading-relaxed">
-              Your vehicles passed with 100% compliance. Unlock your live cryptographic security badge to stream passing states directly to brokers and underwriters to negotiate premium reductions [cite: 36].
+              Your vehicles passed with 100% compliance. Unlock your live cryptographic security badge to stream passing states directly to brokers and underwriters to negotiate premium reductions [cite: 21, 36].
             </p>
             <div className="pt-1 flex justify-center">
               <button 
@@ -564,7 +553,7 @@ export function ROICalculator() {
       <header className="space-y-1">
         <span className="text-[10px] font-bold text-cyan-400 font-mono tracking-widest uppercase">Underwriting Audit Tool</span>
         <h3 className="text-lg font-black text-white uppercase tracking-tight">Interactive Premium & ROI Impact</h3>
-        <p className="text-slate-400 text-xs">Simulate safety compliance value and calculate underwriter premium offsets.</p>
+        <p className="text-slate-400 text-xs">Simulate safety compliance value and calculate underwriter premium offsets [cite: 35].</p>
       </header>
 
       <div className="space-y-5">
@@ -613,14 +602,12 @@ export default function App() {
   const [error, setError] = useState('');
   
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [blockedVinCount, setBlockedVinCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showShareModal, setShowShareModal] = useState(false);
-  const [authModalConfig, setAuthModalConfig] = useState<{ isOpen: boolean; mode: 'signup' | 'signin' }>({
-    isOpen: false,
-    mode: 'signup'
+  const [authModalConfig, setAuthModalConfig] = useState<{ isOpen: boolean }>({
+    isOpen: false
   });
   
   const [brokerEmail, setBrokerEmail] = useState('');
@@ -680,12 +667,6 @@ export default function App() {
     }, 2000);
   };
 
-  const calculateCustomMRR = (totalCars: number) => {
-    const baseFee = 99;
-    const perCarFee = 2.50;
-    return (baseFee + (totalCars * perCarFee)).toFixed(2);
-  };
-
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareableVerificationUrl);
     setCopiedLink(true);
@@ -733,7 +714,6 @@ export default function App() {
     }
 
     if (cleanedLines.length > 10 && !isPaid) {
-      setBlockedVinCount(cleanedLines.length);
       setShowUpgradeModal(true);
       return;
     }
@@ -809,22 +789,24 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔑 REGISTRATION BRIDGE BANNER */}
+      {/* 🔑 REGISTRATION BRIDGE BANNER (OPTION A: FORCES STRIPE SUBMISSION FIRST) */}
       {isPaid && !isAuthenticated && (
         <div className="bg-gradient-to-r from-cyan-950/85 to-blue-950/85 border-b border-cyan-500/30 px-6 py-3 text-center text-xs flex justify-between items-center z-40 backdrop-blur-md">
           <span className="text-cyan-300 font-medium font-mono">
-            🛡️ <strong>WORKSPACE UNLOCKED:</strong> Active premium access confirmed. secure your assets and claims dashboard.
+            🛡️ <strong>WORKSPACE UNLOCKED:</strong> Active premium access confirmed. Claim your workspace now.
           </span>
           <button 
-            onClick={() => setAuthModalConfig({ isOpen: true, mode: 'signup' })}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-4 py-1.5 rounded-lg font-bold transition-all text-xs uppercase tracking-wider font-mono"
+            onClick={() => {
+              setShowUpgradeModal(true);
+            }}
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-4 py-1.5 rounded-lg font-bold transition-all text-xs uppercase tracking-wider font-mono animate-bounce"
           >
             Claim Workspace
           </button>
         </div>
       )}
 
-      {/* 🌐 GLOBAL AUTHENTICATED NAVIGATION BAR [cite: 36] */}
+      {/* 🌐 GLOBAL BRAND-ALIGNED NAVIGATION BAR */}
       <nav className="border-b border-slate-900/60 bg-[#050915]/60 backdrop-blur-xl py-4 px-8 sticky top-0 z-30">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 animate-fade-in">
@@ -849,7 +831,7 @@ export default function App() {
             </div>
           ) : (
             <div className="flex items-center gap-4">
-              <button onClick={() => setAuthModalConfig({ isOpen: true, mode: 'signin' })} className="px-4 py-1.5 border border-slate-800 bg-[#040815] hover:bg-slate-900 text-slate-200 hover:text-white rounded-lg font-bold transition-all text-xs font-mono uppercase tracking-wider">
+              <button onClick={() => setAuthModalConfig({ isOpen: true })} className="px-4 py-1.5 border border-slate-800 bg-[#040815] hover:bg-slate-900 text-slate-200 hover:text-white rounded-lg font-bold transition-all text-xs font-mono uppercase tracking-wider">
                 Sign In
               </button>
             </div>
@@ -891,11 +873,14 @@ export default function App() {
         {/* 🏢 THE ACTIVE AUTHENTICATED SAAS COMMAND CONSOLE */}
         {isAuthenticated ? (
           <section className="space-y-10 animate-fade-in">
+            {/* Compliance Badge Gated strictly by Option A (isPaid) */}
             <div>
               <RecallLogicComplianceBadge 
                 isPaid={isPaid}
                 onShareClick={() => setShowShareModal(true)}
-                onClaimClick={() => setAuthModalConfig({ isOpen: true, mode: 'signup' })}
+                onClaimClick={() => {
+                  setShowUpgradeModal(true);
+                }}
               />
             </div>
 
@@ -950,7 +935,7 @@ export default function App() {
             </div>
           </section>
         ) : (
-          // 🏡 BRANCH B: GUEST MODE (EXPLORATORY CSV DRAG & DROP SEARCH)
+          // 🏡 BRANCH B: GUEST MODE (EXPLORATORY CSV DRAG & DROP SEARCH) [cite: 17, 21]
           <div className="space-y-10">
             <section className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1011,10 +996,15 @@ export default function App() {
 
                   {!isPaid && (
                     <div className="bg-[#0b101d] border border-slate-800 p-5 rounded-2xl text-center shrink-0 w-full md:w-auto">
-                      <div className="text-xs font-bold text-slate-400 uppercase">RecallLogic Shield Pricing</div>
-                      <div className="text-2xl font-black text-cyan-400 font-mono mt-1">${calculateCustomMRR(blockedVinCount || recalls.length)}/mo</div>
-                      <div className="mt-3">
-                        <UpgradeButton vinCount={blockedVinCount || recalls.length} />
+                      <div className="text-xs font-bold text-slate-400 uppercase">Protect Your Fleet</div>
+                      <div className="text-xs text-slate-400 mt-1">Unlock un-blurred badges & proactive compliance monitoring [cite: 21].</div>
+                      <div className="mt-4">
+                        <button 
+                          onClick={() => setShowUpgradeModal(true)}
+                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-2.5 px-6 rounded-xl text-xs uppercase tracking-wider transition-all"
+                        >
+                          View Premium Plans
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1047,12 +1037,15 @@ export default function App() {
                 </div>
               </section>
             ) : (
+              // Teaser Badge displayed under search box when result logs are clean or empty [cite: 21]
               !loading && (
                 <section className="space-y-6">
                   <RecallLogicComplianceBadge 
                     isPaid={isPaid}
                     onShareClick={() => setShowShareModal(true)}
-                    onClaimClick={() => setAuthModalConfig({ isOpen: true, mode: 'signup' })}
+                    onClaimClick={() => {
+                      setShowUpgradeModal(true);
+                    }}
                   />
                 </section>
               )
@@ -1068,7 +1061,7 @@ export default function App() {
             <header className="flex justify-between items-start">
               <div>
                 <h2 className="text-xl font-black text-white tracking-tight">Insurance Compliance Dispatch</h2>
-                <p className="text-slate-400 text-xs mt-0.5">Allow commercial underwriting agents to verify your security clearance.</p>
+                <p className="text-slate-400 text-xs mt-0.5">Allow commercial underwriting agents to verify your security clearance [cite: 22].</p>
               </div>
               <button type="button" onClick={() => setShowShareModal(false)} className="text-slate-500 hover:text-slate-300 font-mono text-sm p-1">✕</button>
             </header>
@@ -1107,50 +1100,107 @@ export default function App() {
         </div>
       )}
 
+      {/* 🔐 AUTHORIZED PORTAL SIGN IN MODAL */}
       {authModalConfig.isOpen && (
-        <AuthModal defaultEmail={lead?.contact_email} initialMode={authModalConfig.mode} onClose={() => setAuthModalConfig({ isOpen: false, mode: 'signup' })} />
+        <AuthModal onClose={() => setAuthModalConfig({ isOpen: false })} />
       )}
 
+      {/* 🔐 PASSWORD PROMPT SETUP MODAL (AUTO-LOGIN SUCCESS FLOW) */}
       {showSetupPasswordModal && (
         <SetupPasswordModal onClose={() => setShowSetupPasswordModal(false)} />
       )}
 
+      {/* PRO SUBSCRIPTION MONETIZATION INTERCEPTOR MODAL (NEW FLAT 3-TIER GRIDS) */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-50 p-4">
-          <div className="bg-[#0b0f19] border border-slate-800 p-8 rounded-3xl max-w-lg w-full shadow-2xl text-center space-y-6 relative overflow-hidden">
-            <div className="absolute -top-12 -left-12 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl" />
-            <RecallLogicLogo className="w-16 h-16 mx-auto" />
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black text-white tracking-tight">Unlock RecallLogic Pro</h2>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                Your submitted manifest targets <strong className="text-white font-mono">{blockedVinCount} assets</strong>. Exploratory testing requires a premium subscription to process complete datasets.
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex justify-center items-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[#0b0f19] border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-4xl w-full shadow-2xl relative my-8">
+            <button 
+              type="button" 
+              onClick={() => setShowUpgradeModal(false)} 
+              className="absolute top-6 right-6 text-slate-500 hover:text-slate-300 font-mono text-sm p-1"
+            >
+              ✕
+            </button>
+            
+            <header className="text-center space-y-2 mb-8">
+              <RecallLogicLogo className="w-14 h-14 mx-auto" />
+              <h2 className="text-2xl font-black text-white tracking-tight uppercase">Select Your Compliance Tier</h2>
+              <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto">
+                No complex per-vehicle fees. Lock in a flat-rate plan to secure your un-blurred cryptographic badge and stream active passing states to brokers [cite: 21, 36].
               </p>
-            </div>
-            
-            <div className="bg-slate-950/60 border border-slate-900 rounded-2xl p-5 text-left space-y-4 shadow-inner">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-900">
-                <span className="text-xs font-bold font-mono uppercase text-slate-500 tracking-wider">Custom Pro Subscription</span>
-                <span className="text-2xl font-black text-cyan-400 font-mono"> ${calculateCustomMRR(blockedVinCount)}<span className="text-xs font-normal text-slate-400">/mo</span></span>
-              </div>
-              <div className="space-y-1.5 text-xs text-slate-400 font-mono">
-                <div className="flex justify-between">
-                  <span>• Base Platform License Fee</span>
-                  <span className="text-slate-200">$ 99.00/mo</span>
+            </header>
+
+            {/* Side-by-Side Product Tier Grid [cite: 36] */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Standard Plan */}
+              <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-500 font-mono uppercase tracking-widest block">Standard</span>
+                  <div className="text-2xl font-black text-slate-100 font-mono">
+                    $99<span className="text-xs font-normal text-slate-500">/mo</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Essential recall tracking and digital compliance logging for local operations [cite: 34].
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span>• Active Monitoring Allocation ({blockedVinCount} units × $2.50)</span>
-                  <span className="text-slate-200">$ {(blockedVinCount * 2.5).toFixed(2)}/mo</span>
+                <ul className="text-[11px] text-slate-400 space-y-1.5 font-mono border-t border-slate-900 pt-3">
+                  <li>✓ Scan Up to 50 Vehicles</li>
+                  <li>✓ Automated Monthly Audits</li>
+                  <li>✓ Signed PDF Certificates</li>
+                  <li>✗ Live Broker Sharing</li>
+                </ul>
+                <UpgradeButton planType="standard" />
+              </div>
+
+              {/* Professional Plan (Highlighted) */}
+              <div className="bg-gradient-to-b from-[#081b2c]/40 to-slate-950/40 border border-cyan-500/30 rounded-2xl p-5 flex flex-col justify-between space-y-4 relative shadow-[0_0_30px_rgba(34,211,238,0.05)]">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-cyan-500 text-slate-950 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                  Recommended
                 </div>
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-cyan-400 font-mono uppercase tracking-widest block">Professional</span>
+                  <div className="text-2xl font-black text-cyan-400 font-mono">
+                    $249<span className="text-xs font-normal text-cyan-400">/mo</span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    Full live-syncing insurance compliance badge with instant underwriter sharing channels [cite: 35].
+                  </p>
+                </div>
+                <ul className="text-[11px] text-slate-300 space-y-1.5 font-mono border-t border-slate-900 pt-3">
+                  <li>✓ Unlimited Fleet Size</li>
+                  <li>✓ Live-Syncing Cyber Badge</li>
+                  <li>✓ Active Climate Risk Alerts</li>
+                  <li>✓ Secure Underwriter Routing</li>
+                </ul>
+                <UpgradeButton planType="professional" />
               </div>
-              <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
-                ✓ Includes real-time climate risk-mapping & secure broker token generation.
+
+              {/* Enterprise Plan */}
+              <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-500 font-mono uppercase tracking-widest block">Enterprise</span>
+                  <div className="text-2xl font-black text-slate-100 font-mono">
+                    $499<span className="text-xs font-normal text-slate-500">/mo</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Enterprise-grade API integrations and deep historical compliance audit trails [cite: 36, 41].
+                  </p>
+                </div>
+                <ul className="text-[11px] text-slate-400 space-y-1.5 font-mono border-t border-slate-900 pt-3">
+                  <li>✓ Multi-Branch Admin Tools</li>
+                  <li>✓ API Access (TaaS Platform) [cite: 36]</li>
+                  <li>✓ Dedicated Safety Engineer</li>
+                  <li>✓ Custom SLA Commitments</li>
+                </ul>
+                <UpgradeButton planType="enterprise" />
               </div>
+
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button type="button" onClick={() => setShowUpgradeModal(false)} className="w-full sm:w-1/3 px-4 py-2.5 text-xs text-slate-400 hover:text-slate-200 font-bold border border-slate-900 bg-transparent rounded-xl transition-all">Trim List</button>
-              <UpgradeButton vinCount={blockedVinCount} />
-            </div>
+
+            <p className="text-[10px] text-slate-500 text-center font-mono mt-6 leading-relaxed">
+              * By selecting a plan, you declare your active business classification. Plans can be shifted or upgraded seamlessly inside your workspace settings.
+            </p>
           </div>
         </div>
       )}
