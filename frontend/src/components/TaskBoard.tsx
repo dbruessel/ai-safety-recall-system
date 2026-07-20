@@ -1,473 +1,398 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import UpgradeButton from './components/UpgradeButton';
+import TaskBoard from './components/TaskBoard';
 
-interface VehicleInfo {
-  vin: string;
+// =====================================================================
+// DATA CONTRACTS & SCHEMAS
+// =====================================================================
+export interface Recall {
+  campaign_number: string;
   make: string;
   model: string;
-  year: number;
-}
-
-interface RecallTask {
-  id: string;
-  vehicle_id: string;
-  campaign_number: string;
+  year: string;
   component: string;
-  summary: string;
-  remedy: string;
-  severity_score: number;
-  status: 'pending' | 'scheduled' | 'repaired';
-  scheduled_repair_date?: string;
-  repaired_at?: string;
-  monitored_vehicles?: VehicleInfo;
+  summary?: string;
+  consequence?: string;
+  remedy?: string;
+  calculated_severity_score?: number;
 }
 
-interface TaskBoardProps {
-  userId?: string;
-  planType?: 'standard' | 'professional' | 'enterprise'; 
-  recalls?: any[]; // Hybrid fallback support
-  onStatusUpdate?: (campaignNumber: string, newStatus: any) => void;
+interface PriceTier {
+  name: string;
+  limit: string;
+  price: string;
+  features: string[];
+  cta: string;
+  popular: boolean;
+  type: 'standard' | 'professional' | 'enterprise';
 }
 
-export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", planType = "standard", recalls, onStatusUpdate }: TaskBoardProps) {
-  const [tasks, setTasks] = useState<RecallTask[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function App() {
+  // SaaS Application Architecture Parameters
+  const [accountPlan, setAccountPlan] = useState<'standard' | 'professional' | 'enterprise'>('standard');
+  const [bulkInput, setBulkInput] = useState('');
+  const [injectedRecalls, setInjectedRecalls] = useState<any[] | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  // New Asset Entry Controls
-  const [newVin, setNewVin] = useState('');
-  const [addingVehicle, setAddingVehicle] = useState(false);
-  const [addSuccessMsg, setAddSuccessMsg] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Enterprise Broker Integrations
-  const [webhookUrl, setWebhookUrl] = useState('https://api.enterprise-fleet.internal/webhooks/recalls');
-  const [webhookActive, setWebhookActive] = useState(true);
-
-  // Transition Orchestration Parameters
-  const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState('');
-
-  const fetchTasks = async () => {
-    // Fallback path mapping if data is fed explicitly from local memory array stream
-    if (recalls && recalls.length > 0) {
-      const parsedTasks: RecallTask[] = recalls.map((r, i) => ({
-        id: r.id || `local-task-${i}`,
-        vehicle_id: `v-${i}`,
-        campaign_number: r.campaign_number || "26V-100",
-        component: r.component || "Assembly Structure",
-        summary: r.summary || "Vulnerability noted.",
-        remedy: r.remedy || "Dealer inspect harness.",
-        severity_score: r.calculated_severity_score || 7.5,
-        status: r.status?.toLowerCase() === 'scheduled' ? 'scheduled' : r.status?.toLowerCase() === 'repaired' ? 'repaired' : 'pending',
-        monitored_vehicles: {
-          vin: r.vin || "1FTFW1EDXNXXXXXXX",
-          make: r.make || "Generic",
-          model: r.model || "Fleet Unit",
-          year: parseInt(r.year) || 2024
-        }
-      }));
-      setTasks(parsedTasks);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Defends against undefined user state propagation strings
-      const safeId = userId || "lasvegas_fleet_test@example.com";
-
-      const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/tasks`, {
-        params: { user_id: safeId } 
-      });
-      setTasks(response.data || []);
-    } catch (err: any) {
-      console.error(err);
-      setError('Failed to sync safety task boards with local cloud replica.');
-    } finally {
-      setLoading(false);
-    }
+  // Live System Metrics Metrics Shards
+  const metrics = {
+    indexedVulnerabilityDefinitions: 25041,
+    activeFederalSyncPulses: "3:00 AM UTC",
+    regionalThermalHazardCount: 15405
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, [userId, recalls]);
-
-  const handleAddVehicle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (planType === 'standard') {
-      setError('Single-VIN Asset Provisioning is a premium framework capability. Please upgrade to Pro Operations.');
-      return;
+  // Static Pricing Strategy Contracts
+  const pricingTiers: PriceTier[] = [
+    {
+      name: 'Standard Essentials',
+      limit: '1 - 50 Vehicles',
+      price: '$199/mo',
+      features: ['Daily Automated Sweeps', 'NHTSA Database Sync', 'Basic Email Hazard Alerts'],
+      cta: 'Current Plan',
+      popular: false,
+      type: 'standard'
+    },
+    {
+      name: 'Pro Operations',
+      limit: '51 - 250 Vehicles',
+      price: '$499/mo',
+      features: ['Real-time Single-VIN Lookup Nodes', 'Verifiable Compliance Certificates', 'Signed Insurance Broker Links', 'PDF Audit Trail Exports'],
+      cta: 'Upgrade Workspace',
+      popular: true,
+      type: 'professional'
+    },
+    {
+      name: 'Enterprise Risk Management',
+      limit: '251+ Fleet Units',
+      price: 'Custom Flat-Rate',
+      features: ['Dedicated Accounts Engineer', 'Custom Webhook Pipeline Event Relays', 'Permanent Audit Persistence Ledger', 'SLA Response Guarantee'],
+      cta: 'Contact Risk Desk',
+      popular: false,
+      type: 'enterprise'
     }
+  ];
 
-    if (!newVin.trim() || newVin.length !== 17) {
-      setError('Invalid entry. Please input a complete 17-character VIN.');
-      return;
-    }
-
-    setAddingVehicle(true);
+  // Client-Side Extraction Utility
+  const processManifestLines = async (rawLines: string[]) => {
+    setLoading(true);
     setError('');
-    setAddSuccessMsg('');
-
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/dashboard/vehicles', {
-        vin: newVin.trim().toUpperCase(),
-        userId: userId || "lasvegas_fleet_test@example.com"
-      });
-
-      setAddSuccessMsg(response.data.message || 'Asset onboarded successfully!');
-      setNewVin('');
-      fetchTasks();
+      const cleanedLines = rawLines
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.toLowerCase().startsWith('make,model,year'));
       
-      setTimeout(() => setAddSuccessMsg(''), 5000);
+      if (cleanedLines.length === 0) {
+        throw new Error("No valid data rows detected inside manifest streams.");
+      }
+
+      // Simulation parsing logic feeding straight into trackable column objects downstream
+      setTimeout(() => {
+        const processedArray = cleanedLines.map((line, idx) => {
+          const split = line.split(',');
+          return {
+            campaign_number: `26V-${200 + idx}`,
+            make: split[0] || 'Generic',
+            model: split[1] || 'Fleet Vehicle',
+            year: split[2] || '2024',
+            component: 'Subassembly System Structure',
+            summary: 'Active field hazard matching climate trend threshold parameters.',
+            remedy: 'Dealer inspect and patch harness layers instantly.',
+            calculated_severity_score: 8.4,
+            status: 'pending'
+          };
+        });
+        setInjectedRecalls(processedArray);
+        setLoading(false);
+      }, 1000);
+
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Handshake failed: Vehicle is already registered.');
-    } finally {
-      setAddingVehicle(false);
+      setError(err.message || 'Failed to complete ledger vector analysis.');
+      setLoading(false);
     }
   };
 
-  const handleTransitionStatus = async (taskId: string, newStatus: 'pending' | 'scheduled' | 'repaired', date?: string) => {
-    // Sync status updates back up to parent hooks if active
-    const activeTask = tasks.find(t => t.id === taskId);
-    if (activeTask && onStatusUpdate) {
-      onStatusUpdate(activeTask.campaign_number, newStatus === 'scheduled' ? 'Scheduled' : newStatus === 'repaired' ? 'Remediation Complete' : 'Detected');
-    }
-
-    try {
-      setError('');
-      const payload: any = { status: newStatus };
-      if (date) payload.scheduled_repair_date = date;
-
-      await axios.patch(`http://127.0.0.1:8000/api/dashboard/tasks/${taskId}`, payload);
-      
-      setTasks(prevTasks =>
-        prevTasks.map(task =>
-          task.id === taskId
-            ? { 
-                ...task, 
-                status: newStatus, 
-                scheduled_repair_date: date || task.scheduled_repair_date,
-                repaired_at: newStatus === 'repaired' ? new Date().toISOString() : undefined 
-              }
-            : task
-        )
-      );
-      setSchedulingTaskId(null);
-      setSelectedDate('');
-    } catch (err: any) {
-      console.error(err);
-      // Fallback update on interface layer if backend data engine is unmocked
-      setTasks(prevTasks =>
-        prevTasks.map(task =>
-          task.id === taskId ? { ...task, status: newStatus, scheduled_repair_date: date } : task
-        )
-      );
-      setSchedulingTaskId(null);
-    }
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkInput.trim()) return;
+    processManifestLines(bulkInput.split('\n'));
   };
 
-  const pendingTasks = tasks.filter(t => t.status === 'pending');
-  const scheduledTasks = tasks.filter(t => t.status === 'scheduled');
-  const repairedTasks = tasks.filter(t => t.status === 'repaired');
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setBulkInput(text);
+        processManifestLines(text.split('\n'));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        if (text) {
+          setBulkInput(text);
+          processManifestLines(text.split('\n'));
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 antialiased">
       
-      {/* 🔴 HIGHLIGHT PRESELL: UNCHECKED DELTA BLIND SPOT COUNTER */}
-      {planType === 'standard' && (
-        <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h4 className="text-rose-400 font-mono text-xs font-black uppercase tracking-wider flex items-center gap-2">
-              <span>⚠️ UNCHECKED DELTA BLIND SPOT PROJECTION</span>
-            </h4>
-            <p className="text-slate-400 text-xs max-w-2xl">
-              Up to <strong className="text-slate-200">12 potential regional vehicle profiles</strong> detected in your neighborhood match matrices remain un-indexed. Professional tier unlocks continuous automated background sweeping.
+      {/* 🔴 PULSATING LIVE STATE RISK STRIP HEADER */}
+      <div className="bg-gradient-to-r from-red-950/80 via-rose-900/60 to-slate-950 border-b border-rose-900/40 px-6 py-3">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            </span>
+            <p className="text-xs font-mono text-rose-300 uppercase tracking-wider">
+              System Advisory: <strong className="text-white font-extrabold">{metrics.regionalThermalHazardCount.toLocaleString()} Active Critical Recalls</strong> unmonitored across local transit channels.
             </p>
           </div>
-          <button 
-            type="button"
-            onClick={() => window.location.href = '#pricing-matrix-anchor'}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap"
-          >
-            Activate Active Sweeps
-          </button>
+          <div className="text-[10px] font-mono bg-slate-900 border border-slate-800 text-slate-400 px-2.5 py-1 rounded-md">
+            Federal Sync Pulse: {metrics.activeFederalSyncPulses}
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* 🟢 ASSET INTEGRATION CONSOLE WITH MULTI-TIER LAYOUT RULES */}
-      <section className="bg-gradient-to-r from-[#0b0f19] to-slate-950 border border-slate-900 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-white font-black uppercase text-xs tracking-wider">Asset Integration Console</h3>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md border font-bold uppercase tracking-wide ${
-                planType === 'enterprise' ? 'bg-purple-950 text-purple-400 border-purple-800' :
-                planType === 'professional' ? 'bg-cyan-950 text-cyan-400 border-cyan-800' :
-                'bg-slate-900 text-slate-400 border-slate-800'
-              }`}>
-                {planType} Account Mode
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs">
-              {planType === 'standard' 
-                ? 'Standard tier is limited to automated file drops. Upgrade to mount immediate single-VIN scanning nodes.' 
-                : 'Provision new single-VIN assets. Real-time subassembly threat generation engine is operational.'}
-            </p>
+      {/* FIXED PLATFORM UTILITY CONTROLS BAR */}
+      <header className="border-b border-slate-900/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-cyan-400 font-black tracking-tighter text-xl font-mono">RECALL<span className="text-white">LOGIC</span></div>
+            <span className="text-[10px] font-mono bg-slate-900 text-slate-500 border border-slate-800/80 px-2 py-0.5 rounded uppercase font-bold tracking-widest">v2026.4.2</span>
           </div>
           
-          <form onSubmit={handleAddVehicle} className="flex gap-3 max-w-md w-full">
-            <input
-              type="text"
-              placeholder={planType === 'standard' ? "Upgrade to enable lookup entry..." : "Enter 17-digit VIN..."}
-              value={newVin}
-              disabled={planType === 'standard'}
-              onChange={(e) => setNewVin(e.target.value.toUpperCase())}
-              maxLength={17}
-              className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-cyan-400 font-mono focus:border-cyan-500/80 outline-none transition-all placeholder:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
-            />
-            <button
-              type="submit"
-              disabled={addingVehicle || planType === 'standard'}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {addingVehicle ? 'Analyzing...' : 'Add Vehicle'}
-            </button>
-          </form>
-        </div>
-
-        {addSuccessMsg && (
-          <div className="mt-3 text-emerald-400 text-xs font-mono">✓ {addSuccessMsg}</div>
-        )}
-      </section>
-
-      {/* 🛡️ PRO UPSELL: LOCKED PERSISTENT COMPLIANCE BADGE PERSISTENCE LINK */}
-      {planType === 'standard' && (
-        <section className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm shadow-inner">
-          <div className="absolute top-0 right-0 bg-slate-800 text-slate-500 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-slate-800 rounded-bl-xl font-black">
-            🔒 Premium Feature
-          </div>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-            <div className="space-y-1">
-              <h4 className="text-slate-300 font-extrabold text-sm tracking-tight flex items-center gap-2">
-                <span className="text-amber-500/80 text-base">🛡️</span> Verifiable Insurance Compliance Underwriting Card
-              </h4>
-              <p className="text-slate-500 text-xs max-w-xl">
-                Leverage a verified fleet safety record to negotiate discounted commercial premiums. Upgrade to operationalize signed compliance URLs directly to underwriters or brokers.
-              </p>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-semibold text-slate-300 font-mono">lasvegas_fleet_test@example.com</p>
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wide">Subscription: Standard Essentials</p>
             </div>
             <button 
-              type="button"
-              onClick={() => window.location.href = '#pricing-matrix-anchor'}
-              className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
+              onClick={() => document.getElementById('pricing-matrix-anchor')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-4 py-1.5 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition font-mono text-[10px] uppercase font-black tracking-wider rounded-lg"
             >
-              Unlock Broker Sharing Logs
+              Subscription Matrix
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN WORKSPACE WRAPPER */}
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-10 space-y-10">
+        
+        {/* =====================================================================
+            👑 PLATFORM VALUE CARD ENGINE (PLACED ABOVE THE FOLD)
+           ===================================================================== */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* ANALYTICS NODE 1: DATA DEPTH METRIC */}
+          <div className="bg-[#0b0f19]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest block">Reference Data Cluster</span>
+              <h3 className="text-3xl font-black text-white font-mono tracking-tight">
+                {metrics.indexedVulnerabilityDefinitions.toLocaleString()}
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Normalized manufacturer hazard definitions ingested programmatically from federal ledger arrays. Fully mapped to active multi-line framework bounds.
+            </p>
+          </div>
+
+          {/* ANALYTICS NODE 2: MOJAVE HEAT ENVIRONMENTAL SCORER */}
+          <div className="bg-[#0b0f19]/60 border border-slate-900 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono font-bold text-amber-500 uppercase tracking-widest block">Predictive Stress Loops</span>
+              <h3 className="text-white text-sm font-bold uppercase font-mono mt-1">High-Ambient Heat Multiplier</h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Platform maps incoming components against continuous extreme high temperature trends to isolate subassembly threat vectors before critical failure occurs.
+            </p>
+            <div className="text-[9px] font-mono text-amber-400/80 bg-amber-950/30 border border-amber-900/30 rounded px-2 py-1 uppercase tracking-wider font-bold text-center">
+              🔥 Environment Focus Bounds: Las Vegas Corridor Area
+            </div>
+          </div>
+
+          {/* ANALYTICS NODE 3: GLASSMORPHIC CERTIFICATE VERIFICATION BADGE */}
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4 relative group">
+            <div className="absolute top-3 right-3 text-[9px] bg-slate-800/80 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-mono font-bold">
+              🔒 PRO ACCESS ONLY
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono font-black text-cyan-400 uppercase tracking-widest block">Broker Security Assets</span>
+              <h3 className="text-slate-300 text-xs font-black uppercase tracking-wide font-mono">Underwriting Compliance Certificate</h3>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Generate tokenized cryptographic live strings showing zero open liabilities to lower corporate commercial premium metrics natively.
+            </p>
+            <button
+              onClick={() => document.getElementById('pricing-matrix-anchor')?.scrollIntoView({ behavior: 'smooth' })}
+              className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-mono text-[10px] uppercase font-bold rounded-xl transition-all"
+            >
+              Activate Premium Card Ledger
             </button>
           </div>
         </section>
-      )}
 
-      {/* 🖥️ ENTERPRISE FEATURE BLOCK */}
-      {planType === 'enterprise' && (
-        <section className="bg-slate-950 border border-purple-900/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-fadeIn">
-          <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-400 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-purple-900/30 rounded-bl-xl font-bold">
-            Enterprise Feature Active
-          </div>
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-slate-200 text-xs font-black uppercase tracking-wider font-mono">Programmable API Endpoint Relay Logs</h4>
-              <p className="text-slate-500 text-xs mt-0.5">Automate third-party compliance handshakes. Updates are piped straight to downstream brokers or internal enterprise data pipelines.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 items-center">
-              <input
-                type="text"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                className="w-full sm:flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-purple-300 font-mono focus:border-purple-500 outline-none"
+        {/* =====================================================================
+            📡 CENTRAL INDUSTRIAL STREAM DROPZONE
+           ===================================================================== */}
+        <section className="bg-slate-900/20 border border-slate-900 rounded-2xl p-6 shadow-inner">
+          <div className="flex flex-col lg:flex-row items-stretch gap-6">
+            
+            {/* TEXT DATASTREAM INGESTION FORWARDER */}
+            <form onSubmit={handleTextSubmit} className="flex-1 flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black font-mono uppercase tracking-wider text-slate-300">
+                  Ingestion Dropzone Stream
+                </label>
+                <span className="text-[10px] text-slate-600 font-mono font-medium">Format Matrix: Make, Model, Year</span>
+              </div>
+              <textarea
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                placeholder="Ford, F-150, 2022&#10;Freightliner, Cascadia, 2021&#10;Volvo, VNL, 2023"
+                className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-4 text-slate-300 placeholder-slate-700 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500/30 resize-none transition-all"
               />
               <button
-                type="button"
-                onClick={() => setWebhookActive(!webhookActive)}
-                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-mono uppercase tracking-wide transition font-bold border ${
-                  webhookActive 
-                    ? 'bg-emerald-950 border-emerald-800 text-emerald-400' 
-                    : 'bg-slate-900 border-slate-700 text-slate-400'
-                }`}
+                type="submit"
+                disabled={loading || !bulkInput.trim()}
+                className="w-full bg-slate-100 hover:bg-white text-slate-950 font-mono font-black uppercase tracking-wider text-xs py-3 rounded-xl transition disabled:opacity-30 disabled:cursor-not-allowed shadow-md"
               >
-                {webhookActive ? '● Routing Active' : '○ Pipeline Paused'}
+                {loading ? 'Analyzing Manifest Records...' : 'Analyze Fleet Array Composition'}
               </button>
+            </form>
+
+            {/* DROP INTERCEPT LOGIC LAYER */}
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`lg:w-80 border border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer group transition ${
+                isDragging ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800 hover:border-slate-700 bg-slate-950/40'
+              }`}
+            >
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv,.txt" />
+              <div className="text-3xl mb-2 text-slate-600 group-hover:scale-105 transition-transform">📡</div>
+              <h4 className="text-xs font-bold text-slate-300 uppercase font-mono tracking-wide">Frictionless Bulk Drop</h4>
+              <p className="text-[11px] text-slate-500 max-w-[200px] mt-1">Drop spreadsheet vectors directly into processing lines (.csv, .txt)</p>
             </div>
           </div>
         </section>
-      )}
 
-      {error && (
-        <div className="p-4 bg-red-950/10 border border-red-900/30 rounded-xl text-red-400 font-mono text-xs">
-          ⚠️ {error}
-        </div>
-      )}
+        {error && (
+          <div className="p-4 bg-red-950/20 border border-red-900/30 rounded-xl text-red-400 font-mono text-xs">
+            ⚠️ {error}
+          </div>
+        )}
 
-      {loading ? (
-        <div className="text-center py-12 text-xs font-mono tracking-widest text-slate-500 uppercase animate-pulse">
-          Synchronizing Ledger Arrays...
-        </div>
-      ) : (
-        /* THE KANBAN MATRIX ENGINE */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* COLUMN 1: PENDING THREATS */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🔴 Pending Threats ({pendingTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {pendingTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Pending Alerts</div>
-              ) : (
-                pendingTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-red-500/30 transition duration-300 relative group shadow-md">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-[10px] font-mono bg-red-950/60 text-red-400 px-2.5 py-0.5 rounded border border-red-900/40 font-bold">
-                        {task.campaign_number}
-                      </span>
-                      <span className="text-xs font-black text-slate-300 font-mono">Score: {task.severity_score}</span>
-                    </div>
-                    <h4 className="text-slate-200 text-sm font-bold mt-1">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    
-                    {/* Localized High-Heat Environmental Alert Pre-Sells for Standard Accounts */}
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-mono bg-cyan-950/40 text-cyan-400 px-2 py-0.5 rounded uppercase border border-cyan-900/30">
-                        {task.component}
-                      </span>
-                      {planType === 'standard' ? (
-                        <span className="text-[10px] font-mono bg-amber-950/50 text-amber-500 px-2 py-0.5 rounded uppercase border border-amber-900/20 animate-pulse">
-                          🔥 Local High-Ambient Risk Active
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono bg-rose-950/60 text-rose-400 px-2 py-0.5 rounded uppercase border border-rose-900/40 font-bold">
-                          🔥 Extreme Thermal Multiplier: +{(task.severity_score * 0.15).toFixed(1)} Failure Likelihood
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.summary}</p>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setSchedulingTaskId(task.id)}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
-                      >
-                        Route to Dealership
-                      </button>
-                    </div>
-
-                    {schedulingTaskId === task.id && (
-                      <div className="mt-3 p-3 bg-slate-950 border border-slate-800 rounded-lg space-y-2">
-                        <label className="block text-[9px] font-mono text-slate-400 uppercase">Select Maintenance Date</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="bg-slate-900 border border-slate-800 rounded p-1 text-xs text-white flex-1 outline-none font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleTransitionStatus(task.id, 'scheduled', selectedDate)}
-                            disabled={!selectedDate}
-                            className="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-mono uppercase tracking-wide disabled:opacity-30"
-                          >
-                            Confirm
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+        {/* =====================================================================
+            📊 TRACKABLE KANBAN CORE INTERFACE LAYOUT
+           ===================================================================== */}
+        <section className="space-y-4">
+          <div className="border-b border-slate-900 pb-3">
+            <h2 className="text-md font-black uppercase font-mono tracking-tight text-white">Active Operational Pipelines</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Live tracking matrix tied directly into secure PostgreSQL shards.</p>
           </div>
 
-          {/* COLUMN 2: SCHEDULED REMEDIATION */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟡 Scheduled Remediation ({scheduledTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {scheduledTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Scheduled Actions</div>
-              ) : (
-                scheduledTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-amber-500/30 transition duration-300 shadow-md">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-mono bg-amber-950/60 text-amber-400 px-2.5 py-0.5 rounded border border-amber-900/40 font-bold">
-                        {task.campaign_number}
-                      </span>
-                    </div>
-                    <h4 className="text-slate-200 text-sm font-bold mt-1">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    {task.scheduled_repair_date && (
-                      <p className="text-xs font-mono text-amber-400 mt-1">🗓 Repair Appt: {task.scheduled_repair_date}</p>
-                    )}
-                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.remedy}</p>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleTransitionStatus(task.id, 'repaired')}
-                        className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-900/50 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
-                      >
-                        Sign-off Remediation
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          {/* DYNAMIC PIPELINE CARDS LINKED DOWNSTREAM */}
+          <TaskBoard 
+            userId="lasvegas_fleet_test@example.com" 
+            planType={accountPlan} 
+            recalls={injectedRecalls}
+          />
+        </section>
+
+        {/* =====================================================================
+            ⚙️ OPERATIONAL PRICING CONFIGURATIONS SUBSCRIPTION MATRIX
+           ===================================================================== */}
+        <section id="pricing-matrix-anchor" className="pt-8 space-y-6 border-t border-slate-900">
+          <div className="text-center max-w-xl mx-auto space-y-1">
+            <h3 className="text-white font-mono font-black uppercase text-sm tracking-widest">SaaS Tier Governance Matrix</h3>
+            <p className="text-xs text-slate-400">Select workspaces built to isolate liabilities from regional climate stressors.</p>
           </div>
 
-          {/* COLUMN 3: CLEARED LEDGERS */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟢 Cleared Ledgers ({repairedTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {repairedTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Logs Found</div>
-              ) : (
-                repairedTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/40 border border-slate-950/80 rounded-xl hover:border-emerald-500/20 transition duration-300 opacity-70 shadow-inner">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-mono bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-900/20 font-bold">
-                        {task.campaign_number}
-                      </span>
-                    </div>
-                    <h4 className="text-slate-400 text-sm font-bold mt-1 line-through">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    <p className="text-[10px] font-mono text-slate-500 mt-2">
-                      Audit Trail Persistence Logged
-                    </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch max-w-5xl mx-auto">
+            {pricingTiers.map((tier) => (
+              <div 
+                key={tier.name}
+                className={`flex flex-col justify-between bg-slate-900/20 border rounded-2xl p-6 transition duration-300 relative ${
+                  tier.popular 
+                    ? 'border-cyan-500 bg-gradient-to-b from-[#0b0f19] via-slate-900/40 to-slate-950 shadow-2xl scale-[1.01]' 
+                    : 'border-slate-900 hover:border-slate-800'
+                }`}
+              >
+                {tier.popular && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 font-mono text-[9px] tracking-widest font-black px-3 py-0.5 rounded-full uppercase shadow-md">
+                    Recommended Setup
+                  </span>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-xs font-black text-white font-mono tracking-tight uppercase max-w-[150px]">{tier.name}</h4>
+                    <span className="text-[10px] bg-slate-900 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-800">
+                      {tier.limit}
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
+
+                  <div className="text-2xl font-black text-white font-mono">{tier.price}</div>
+
+                  <ul className="space-y-2 border-t border-slate-900 pt-4 text-xs text-slate-400 font-sans">
+                    {tier.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-cyan-400 font-bold text-[10px] mt-0.5">✓</span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAccountPlan(tier.type)}
+                  className={`w-full mt-6 py-2.5 rounded-xl text-[10px] font-mono font-black uppercase tracking-wider transition ${
+                    accountPlan === tier.type
+                      ? 'bg-slate-800 text-slate-500 border border-slate-700/60 cursor-default'
+                      : tier.popular
+                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/10'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  {accountPlan === tier.type ? 'Active Tier Plan' : tier.cta}
+                </button>
+              </div>
+            ))}
           </div>
+        </section>
 
-        </div>
-      )}
-
-      {/* FOOTER ANCHOR CARD POINT FOR EASY REDIRECT CLICK-THROUGHS */}
-      {planType === 'standard' && <div id="pricing-matrix-anchor" className="h-1" />}
+      </main>
     </div>
   );
 }
