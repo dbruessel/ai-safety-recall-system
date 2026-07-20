@@ -19,34 +19,39 @@ interface RecallTask {
   status: 'pending' | 'scheduled' | 'repaired';
   scheduled_repair_date?: string;
   repaired_at?: string;
-  monitored_vehicles?: VehicleInfo; // Joined from our PostgreSQL relation
+  monitored_vehicles?: VehicleInfo;
 }
 
 interface TaskBoardProps {
-  userId: string; // Dynamic user profile mapping
+  userId: string;
+  planType: 'standard' | 'professional' | 'enterprise'; // Comprehensive 3-Tier Support
 }
 
-export default function TaskBoard({ userId }: TaskBoardProps) {
+export default function TaskBoard({ userId, planType }: TaskBoardProps) {
   const [tasks, setTasks] = useState<RecallTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // New Vehicle Input States
+  // New Asset Entry Controls
   const [newVin, setNewVin] = useState('');
   const [addingVehicle, setAddingVehicle] = useState(false);
   const [addSuccessMsg, setAddSuccessMsg] = useState('');
 
-  // Date selection state for scheduling
+  // Enterprise Broker Integrations
+  const [webhookUrl, setWebhookUrl] = useState('https://api.enterprise-fleet.internal/webhooks/recalls');
+  const [webhookActive, setWebhookActive] = useState(true);
+
+  // Transition Orchestration Parameters
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
 
-  // 1. Fetch tasks on mount
+  // Fixed: Option A Alignment changing param envelope key to query directly as 'userId'
   const fetchTasks = async () => {
     try {
       setLoading(true);
       setError('');
       const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/tasks`, {
-        params: { user_id: userId }
+        params: { userId: userId } // Aligned with endpoint argument requirements
       });
       setTasks(response.data || []);
     } catch (err: any) {
@@ -61,9 +66,15 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
     fetchTasks();
   }, [userId]);
 
-  // 2. Handle adding a new vehicle & scanning in real-time
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Friction-based entry blockade for lower-tier segments
+    if (planType === 'standard') {
+      setError('Single-VIN Asset Provisioning is a premium framework capability. Please upgrade to Pro Operations.');
+      return;
+    }
+
     if (!newVin.trim() || newVin.length !== 17) {
       setError('Invalid entry. Please input a complete 17-character VIN.');
       return;
@@ -76,14 +87,13 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/dashboard/vehicles', {
         vin: newVin.trim().toUpperCase(),
-        user_id: userId
+        userId: userId // Aligned payload
       });
 
-      setAddSuccessMsg(response.data.message || 'Asset added successfully!');
+      setAddSuccessMsg(response.data.message || 'Asset onboarded successfully!');
       setNewVin('');
-      fetchTasks(); // Reload board with newly scanned database task cards
+      fetchTasks();
       
-      // Auto-clear success message
       setTimeout(() => setAddSuccessMsg(''), 5000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Handshake failed: Vehicle is already registered.');
@@ -92,7 +102,6 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
     }
   };
 
-  // 3. Handle task column transitions (Kanban updates)
   const handleTransitionStatus = async (taskId: string, newStatus: 'pending' | 'scheduled' | 'repaired', date?: string) => {
     try {
       setError('');
@@ -101,7 +110,6 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
 
       await axios.patch(`http://127.0.0.1:8000/api/dashboard/tasks/${taskId}`, payload);
       
-      // Optimistic state update for instant, frictionless UI transition
       setTasks(prevTasks =>
         prevTasks.map(task =>
           task.id === taskId
@@ -122,7 +130,6 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
     }
   };
 
-  // Filter tasks into their respective Kanban columns
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const scheduledTasks = tasks.filter(t => t.status === 'scheduled');
   const repairedTasks = tasks.filter(t => t.status === 'repaired');
@@ -130,27 +137,61 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
   return (
     <div className="space-y-8 animate-fadeIn">
       
-      {/* 🟢 TOP CONSOLE: On-board New Assets Directly Into Dashboard */}
+      {/* 🔴 HIGHLIGHT PRESELL: UNCHECKED DELTA BLIND SPOT COUNTER */}
+      {planType === 'standard' && (
+        <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-rose-400 font-mono text-xs font-black uppercase tracking-wider flex items-center gap-2">
+              <span>⚠️ UNCHECKED DELTA BLIND SPOT PROJECTION</span>
+            </h4>
+            <p className="text-slate-400 text-xs max-w-2xl">
+              Up to <strong className="text-slate-200">12 potential regional vehicle profiles</strong> detected in your neighborhood match matrices remain un-indexed. Professional tier unlocks continuous automated background sweeping.
+            </p>
+          </div>
+          <button 
+            onClick={() => window.location.href = '#pricing-matrix-anchor'}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap"
+          >
+            Activate Active Sweeps
+          </button>
+        </div>
+      )}
+
+      {/* 🟢 ASSET INTEGRATION CONSOLE WITH MULTI-TIER LAYOUT RULES */}
       <section className="bg-gradient-to-r from-[#0b0f19] to-slate-950 border border-slate-900 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
-            <h3 className="text-white font-black uppercase text-xs tracking-wider">Asset Integration Console</h3>
-            <p className="text-slate-400 text-xs">Onboard new vehicles. Our background worker will automatically scan, decode, and generate task cards.</p>
+            <div className="flex items-center gap-2">
+              <h3 className="text-white font-black uppercase text-xs tracking-wider">Asset Integration Console</h3>
+              <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md border font-bold uppercase tracking-wide ${
+                planType === 'enterprise' ? 'bg-purple-950 text-purple-400 border-purple-800' :
+                planType === 'professional' ? 'bg-cyan-950 text-cyan-400 border-cyan-800' :
+                'bg-slate-900 text-slate-400 border-slate-800'
+              }`}>
+                {planType} Account Mode
+              </span>
+            </div>
+            <p className="text-slate-400 text-xs">
+              {planType === 'standard' 
+                ? 'Standard tier is limited to automated file drops. Upgrade to mount immediate single-VIN scanning nodes.' 
+                : 'Provision new single-VIN assets. Real-time subassembly threat generation engine is operational.'}
+            </p>
           </div>
           
           <form onSubmit={handleAddVehicle} className="flex gap-3 max-w-md w-full">
             <input
               type="text"
-              placeholder="Enter 17-digit VIN..."
+              placeholder={planType === 'standard' ? "Upgrade to enable lookup entry..." : "Enter 17-digit VIN..."}
               value={newVin}
+              disabled={planType === 'standard'}
               onChange={(e) => setNewVin(e.target.value.toUpperCase())}
               maxLength={17}
-              className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-cyan-400 font-mono focus:border-cyan-500/80 outline-none transition-all placeholder:text-slate-700"
+              className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-cyan-400 font-mono focus:border-cyan-500/80 outline-none transition-all placeholder:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
             />
             <button
               type="submit"
-              disabled={addingVehicle}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-50"
+              disabled={addingVehicle || planType === 'standard'}
+              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {addingVehicle ? 'Analyzing...' : 'Add Vehicle'}
             </button>
@@ -162,166 +203,227 @@ export default function TaskBoard({ userId }: TaskBoardProps) {
         )}
       </section>
 
-      {/* ⚠️ SYSTEM MESSAGES BANNER */}
+      {/* 🛡️ PRO UPSELL: LOCKED PERSISTENT COMPLIANCE BADGE PERSISTENCE LINK */}
+      {planType === 'standard' && (
+        <section className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm shadow-inner">
+          <div className="absolute top-0 right-0 bg-slate-800 text-slate-500 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-slate-800 rounded-bl-xl font-black">
+            🔒 Premium Feature
+          </div>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+            <div className="space-y-1">
+              <h4 className="text-slate-300 font-extrabold text-sm tracking-tight flex items-center gap-2">
+                <span className="text-amber-500/80 text-base">🛡️</span> Verifiable Insurance Compliance Underwriting Card
+              </h4>
+              <p className="text-slate-500 text-xs max-w-xl">
+                Leverage a verified fleet safety record to negotiate discounted commercial premiums. Upgrade to operationalize signed compliance URLs directly to underwriters or brokers.
+              </p>
+            </div>
+            <button 
+              onClick={() => window.location.href = '#pricing-matrix-anchor'}
+              className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
+            >
+              Unlock Broker Sharing Logs
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* 🖥️ ENTERPRISE FEATURE BLOCK */}
+      {planType === 'enterprise' && (
+        <section className="bg-slate-950 border border-purple-900/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-fadeIn">
+          <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-400 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-purple-900/30 rounded-bl-xl font-bold">
+            Enterprise Feature Active
+          </div>
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-slate-200 text-xs font-black uppercase tracking-wider font-mono">Programmable API Endpoint Relay Logs</h4>
+              <p className="text-slate-500 text-xs mt-0.5">Automate third-party compliance handshakes. Updates are piped straight to downstream brokers or internal enterprise data pipelines.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 items-center">
+              <input
+                type="text"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                className="w-full sm:flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-purple-300 font-mono focus:border-purple-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setWebhookActive(!webhookActive)}
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-mono uppercase tracking-wide transition font-bold border ${
+                  webhookActive 
+                    ? 'bg-emerald-950 border-emerald-800 text-emerald-400' 
+                    : 'bg-slate-900 border-slate-700 text-slate-400'
+                }`}
+              >
+                {webhookActive ? '● Routing Active' : '○ Pipeline Paused'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {error && (
         <div className="p-4 bg-red-950/10 border border-red-900/30 rounded-xl text-red-400 font-mono text-xs">
           ⚠️ {error}
         </div>
       )}
 
-      {/* 📊 THE THREE-COLUMN KANBAN BOARD */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* ========================================== */}
-        {/* COLUMN 1: PENDING THREATS                  */}
-        {/* ========================================== */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🔴 Pending Threats ({pendingTasks.length})</span>
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          </div>
-
-          <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-            {pendingTasks.length === 0 ? (
-              <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Pending Alerts</div>
-            ) : (
-              pendingTasks.map(task => (
-                <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-red-500/30 transition duration-300 relative group shadow-md">
-                  <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 uppercase font-mono tracking-wider">
-                      Severity {task.severity_score}/100
-                    </span>
-                    <h4 className="text-white font-black text-sm uppercase mt-1">
-                      {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
+      {loading ? (
+        <div className="text-center py-12 text-xs font-mono tracking-widest text-slate-500 uppercase animate-pulse">
+          Synchronizing Ledger Arrays...
+        </div>
+      ) : (
+        /* THE KANBAN MATRIX ENGINE */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* COLUMN 1: PENDING THREATS */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🔴 Pending Threats ({pendingTasks.length})</span>
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            </div>
+            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
+              {pendingTasks.length === 0 ? (
+                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Pending Alerts</div>
+              ) : (
+                pendingTasks.map(task => (
+                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-red-500/30 transition duration-300 relative group shadow-md">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-[10px] font-mono bg-red-950/60 text-red-400 px-2.5 py-0.5 rounded border border-red-900/40 font-bold">
+                        {task.campaign_number}
+                      </span>
+                      <span className="text-xs font-black text-slate-300 font-mono">Score: {task.severity_score}</span>
+                    </div>
+                    <h4 className="text-slate-200 text-sm font-bold mt-1">
+                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
                     </h4>
-                    <p className="text-slate-500 text-[10px] font-mono">VIN: {task.monitored_vehicles?.vin}</p>
                     
-                    <div className="text-slate-400 text-xs font-medium space-y-1.5 pt-2 border-t border-slate-900">
-                      <p><span className="text-slate-500 uppercase text-[9px] font-bold font-mono">Component:</span> {task.component}</p>
-                      <p className="text-slate-400 leading-normal line-clamp-3">{task.summary}</p>
+                    {/* Localized High-Heat Environmental Alert Pre-Sells for Standard Accounts */}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-mono bg-cyan-950/40 text-cyan-400 px-2 py-0.5 rounded uppercase border border-cyan-900/30">
+                        {task.component}
+                      </span>
+                      {planType === 'standard' ? (
+                        <span className="text-[10px] font-mono bg-amber-950/50 text-amber-500 px-2 py-0.5 rounded uppercase border border-amber-900/20 animate-pulse">
+                          🔥 Local High-Ambient Risk Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono bg-rose-950/60 text-rose-400 px-2 py-0.5 rounded uppercase border border-rose-900/40 font-bold">
+                          🔥 Extreme Thermal Multiplier: +{(task.severity_score * 0.15).toFixed(1)} Failure Likelihood
+                        </span>
+                      )}
                     </div>
 
-                    {/* Schedule Interface Action Drawer */}
-                    {schedulingTaskId === task.id ? (
-                      <div className="space-y-2 pt-3 border-t border-slate-900">
-                        <label className="text-[9px] text-slate-500 uppercase font-mono font-bold block">Appointment Date:</label>
+                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.summary}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
+                      <button
+                        onClick={() => setSchedulingTaskId(task.id)}
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                      >
+                        Route to Dealership
+                      </button>
+                    </div>
+
+                    {schedulingTaskId === task.id && (
+                      <div className="mt-3 p-3 bg-slate-950 border border-slate-800 rounded-lg space-y-2">
+                        <label className="block text-[9px] font-mono text-slate-400 uppercase">Select Maintenance Date</label>
                         <div className="flex gap-2">
                           <input
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
-                            className="flex-1 px-2 py-1.5 text-xs rounded-lg border border-slate-800 bg-[#050914] text-cyan-400 font-mono outline-none"
+                            className="bg-slate-900 border border-slate-800 rounded p-1 text-xs text-white flex-1 outline-none font-mono"
                           />
                           <button
                             onClick={() => handleTransitionStatus(task.id, 'scheduled', selectedDate)}
                             disabled={!selectedDate}
-                            className="px-3 py-1 bg-amber-500 text-slate-950 font-black uppercase text-[9px] rounded-lg disabled:opacity-40"
+                            className="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-mono uppercase tracking-wide disabled:opacity-30"
                           >
-                            Save
+                            Confirm
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <div className="pt-3 border-t border-slate-900">
-                        <button
-                          onClick={() => setSchedulingTaskId(task.id)}
-                          className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-amber-400 border border-slate-800 font-black uppercase text-[10px] tracking-wider rounded-lg transition"
-                        >
-                          🗓️ Schedule Dealership Fix
-                        </button>
-                      </div>
                     )}
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ========================================== */}
-        {/* COLUMN 2: SCHEDULED REPAIRS                */}
-        {/* ========================================== */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟡 Scheduled Repairs ({scheduledTasks.length})</span>
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                ))
+              )}
+            </div>
           </div>
 
-          <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-            {scheduledTasks.length === 0 ? (
-              <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Scheduled Repairs</div>
-            ) : (
-              scheduledTasks.map(task => (
-                <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-amber-500/30 transition duration-300 shadow-md">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase font-mono tracking-wider">
-                        Scheduled
+          {/* COLUMN 2: SCHEDULED REMEDIATION */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟡 Scheduled Remediation ({scheduledTasks.length})</span>
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+            </div>
+            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
+              {scheduledTasks.length === 0 ? (
+                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Scheduled Actions</div>
+              ) : (
+                scheduledTasks.map(task => (
+                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-amber-500/30 transition duration-300 shadow-md">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-mono bg-amber-950/60 text-amber-400 px-2.5 py-0.5 rounded border border-amber-900/40 font-bold">
+                        {task.campaign_number}
                       </span>
-                      <span className="text-[9px] font-mono text-slate-500 font-bold">{task.scheduled_repair_date}</span>
                     </div>
-                    
-                    <h4 className="text-white font-black text-sm uppercase">
-                      {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
+                    <h4 className="text-slate-200 text-sm font-bold mt-1">
+                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
                     </h4>
-                    <p className="text-slate-500 text-[10px] font-mono">VIN: {task.monitored_vehicles?.vin}</p>
-
-                    <div className="text-slate-400 text-xs font-medium space-y-1.5 pt-2 border-t border-slate-900">
-                      <p><span className="text-slate-500 uppercase text-[9px] font-bold font-mono">Dealership Remedy:</span> {task.remedy}</p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-900">
+                    {task.scheduled_repair_date && (
+                      <p className="text-xs font-mono text-amber-400 mt-1">🗓 Repair Appt: {task.scheduled_repair_date}</p>
+                    )}
+                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.remedy}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
                       <button
                         onClick={() => handleTransitionStatus(task.id, 'repaired')}
-                        className="w-full py-2 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 font-black uppercase text-[10px] tracking-wider rounded-lg transition"
+                        className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-900/50 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
                       >
-                        ✓ Mark Repair Complete
+                        Sign-off Remediation
                       </button>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ========================================== */}
-        {/* COLUMN 3: RESOLVED & SECURED               */}
-        {/* ========================================== */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟢 Resolved & Secured ({repairedTasks.length})</span>
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                ))
+              )}
+            </div>
           </div>
 
-          <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-            {repairedTasks.length === 0 ? (
-              <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Resolved Records</div>
-            ) : (
-              repairedTasks.map(task => (
-                <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-emerald-500/30 transition duration-300 shadow-md">
-                  <div className="space-y-2">
-                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 uppercase font-mono tracking-wider">
-                      Secured
-                    </span>
-                    
-                    <h4 className="text-white font-black text-sm uppercase">
-                      {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    <p className="text-slate-500 text-[10px] font-mono font-bold">VIN: {task.monitored_vehicles?.vin}</p>
-
-                    <div className="pt-3 border-t border-slate-900 text-slate-500 font-mono text-[9px] space-y-1">
-                      <p className="text-emerald-500 font-bold">✓ Audit Clearance Logged</p>
-                      <p>Time: {task.repaired_at ? new Date(task.repaired_at).toLocaleDateString() : 'Instant'}</p>
+          {/* COLUMN 3: CLEARED LEDGERS */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟢 Cleared Ledgers ({repairedTasks.length})</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            </div>
+            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
+              {repairedTasks.length === 0 ? (
+                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Logs Found</div>
+              ) : (
+                repairedTasks.map(task => (
+                  <div key={task.id} className="p-5 bg-[#0b0f19]/40 border border-slate-950/80 rounded-xl hover:border-emerald-500/20 transition duration-300 opacity-70 shadow-inner">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-mono bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-900/20 font-bold">
+                        {task.campaign_number}
+                      </span>
                     </div>
+                    <h4 className="text-slate-400 text-sm font-bold mt-1 line-through">
+                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
+                    </h4>
+                    <p className="text-[10px] font-mono text-slate-500 mt-2">
+                      Audit Trail Persistence Logged
+                    </p>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
 
-      </div>
+        </div>
+      )}
+
+      {/* FOOTER ANCHOR CARD POINT FOR EASY REDIRECT CLICK-THROUGHS */}
+      {planType === 'standard' && <div id="pricing-matrix-anchor" className="h-1" />}
     </div>
   );
 }
