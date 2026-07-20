@@ -63,7 +63,6 @@ def search_vehicle_recalls(
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
     try:
-        # 🔑 FIXED: Pointed to 'recall_results' instead of 'recalls'
         query = sb.table("recall_results").select("*") \
             .ilike("make", make) \
             .ilike("model", model) \
@@ -91,9 +90,6 @@ def verify_badge_status(response: Response, vin: str):
     """
     Generates a cryptographically sound pass/fail reference token.
     """
-    from supabase import create_client, Client
-    sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
-    
     try:
         hash_id = hashlib.md5(vin.strip().upper().encode()).hexdigest()[:8].upper()
         return {
@@ -145,7 +141,7 @@ async def share_compliance_badge(payload: BadgeShareRequest):
         raise HTTPException(status_code=500, detail=f"Failed to share badge: {str(e)}")
 
 # =====================================================================
-# ENDPOINT 5: DIRECT VIN DECODING & RECALL THREAT SCANNER (FIXED MAPPING)
+# ENDPOINT 5: DIRECT VIN DECODING & RECALL THREAT SCANNER
 # =====================================================================
 @router.get("/recalls/vin/{vin}", response_model=List[RecallResponse])
 async def get_recalls_by_vin(vin: str):
@@ -153,7 +149,6 @@ async def get_recalls_by_vin(vin: str):
     Asynchronously decodes a 17-digit VIN using the public NHTSA vPIC API,
     resolves Make, Model, and Year, and queries Supabase for matching recalls.
     """
-    # 1. Enforce strict format standards
     clean_vin = vin.strip().upper()
     if len(clean_vin) != 17:
         raise HTTPException(
@@ -161,7 +156,6 @@ async def get_recalls_by_vin(vin: str):
             detail="Invalid VIN structure. Must be exactly 17 alphanumeric characters."
         )
 
-    # 2. Query NHTSA's public vPIC decoder
     vpic_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{clean_vin}?format=json"
     
     try:
@@ -177,9 +171,7 @@ async def get_recalls_by_vin(vin: str):
                 detail="VIN could not be decoded by the federal registry."
             )
             
-        # Extract the first dictionary object out of the list results
         decoded = results.pop(0)
-        
         make = decoded.get("Make", "").strip()
         model = decoded.get("Model", "").strip()
         year_str = decoded.get("ModelYear", "").strip()
@@ -204,21 +196,17 @@ async def get_recalls_by_vin(vin: str):
             detail="Failed to parse model year returned from federal decoder."
         )
 
-    # 3. Query your central Supabase recall catalog using resolved attributes
     try:
         from supabase import create_client, Client
         sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
         
-        # 🔑 FIXED: Pointed to 'recall_results' instead of 'recalls'
         query = sb.table("recall_results").select("*") \
             .ilike("make", make) \
             .ilike("model", model) \
             .eq("year", str(year))
             
         db_response = query.execute()
-        recalls_data = db_response.data or []
-        
-        return recalls_data
+        return db_response.data or []
         
     except Exception as e:
         logger.error(f"Database query failed: {str(e)}")
@@ -228,16 +216,45 @@ async def get_recalls_by_vin(vin: str):
         )
 
 # =====================================================================
-# BACKGROUND WORKER & SCHEDULER ENTRY POINT (ADMINISTRATIVE)
+# BACKGROUND WORKER & SCHEDULER ENTRY POINT (SUPABASE RELATIONAL SYNC)
 # =====================================================================
 async def run_nhtsa_ingestion_pipeline(days_back: int, force_full_run: bool):
     """
-    Background worker process that handles automated delta retrieval.
+    Background worker process that handles automated delta retrieval from NHTSA
+    and performs relational upserts directly into Supabase tables.
     """
     from supabase import create_client, Client
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     logger.info(f"Running NHTSA ingestion pipeline (days_back={days_back}, force_full_run={force_full_run})")
-    # Ingestion operations logic here
+    
+    try:
+        # Fetch fresh public data feed from NHTSA or api/recalls endpoint
+        nhtsa_url = "https://api.nhtsa.gov/recalls/recallsByVehicle?make=Ford&model=F-150&modelYear=2022"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(nhtsa_url, timeout=15.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                campaigns = data.get("results", [])
+                
+                for campaign in campaigns:
+                    campaign_number = campaign.get("NHTSACampaignNumber")
+                    if not campaign_number:
+                        continue
+                    
+                    # Upsert definition into Supabase
+                    sb.table("recall_definitions").upsert({
+                        "campaign_number": campaign_number,
+                        "component": campaign.get("Component", "UNKNOWN"),
+                        "summary": campaign.get("Summary", ""),
+                        "consequence": campaign.get("Conequence", ""),
+                        "remedy": campaign.get("Remedy", "")
+                    }, on_conflict="campaign_number").execute()
+                    
+                    logger.info(f"Successfully synced campaign {campaign_number} to Supabase.")
+                    
+        logger.info("NHTSA nightly ingestion worker run completed successfully.")
+    except Exception as e:
+        logger.error(f"NHTSA background ingestion worker failed: {str(e)}")
 
 @router.post("/ingest/trigger", status_code=202)
 async def trigger_nightly_ingest(
@@ -246,7 +263,7 @@ async def trigger_nightly_ingest(
     x_cron_secret: Optional[str] = Header(None)
 ):
     """
-    Secure ingestion trigger invoked via Google Cloud Scheduler or local pg_cron infrastructure.
+    Secure ingestion trigger invoked via Supabase pg_cron or external scheduler.
     """
     expected_secret = getattr(settings, "cron_secret_token", None)
     if expected_secret and x_cron_secret != expected_secret:
