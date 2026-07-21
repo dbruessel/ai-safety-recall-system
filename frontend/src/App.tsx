@@ -110,7 +110,7 @@ export default function App() {
             />
             <div>
               <h1 className="text-base font-black text-slate-100 tracking-tight uppercase">RecallLogic</h1>
-              <p className="text-[10px] text-slate-400 font-mono tracking-wider">Verified Safety. Intelligent Compliance.</p>
+              <p className="text-[10px] text-slate-400 font-mono tracking-wider">Verified Safety Intelligence.</p>
             </div>
           </div>
           

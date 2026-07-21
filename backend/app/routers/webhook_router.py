@@ -7,11 +7,11 @@ from app.config import settings
 logger = logging.getLogger("webhook-router")
 router = APIRouter(prefix="/payments", tags=["webhooks"])
 
-# Map your Stripe Price IDs to the corresponding RecallLogic tiers
+# Map your Stripe Price IDs to your active RecallLogic tiers
 PRICE_TIER_MAPPING = {
-    "price_1TrlFTDXs4xycz0o1e9gfg9d": "standard",      # $199/mo Standard
-    "price_1TsR6jDXs4xycz0ohAfewQgk": "professional",   # $499/mo Professional
-    "price_1TrlFxDXs4xycz0ofyuV70Rf": "enterprise"      # Custom Enterprise
+    "price_1TrlFTDXs4xycz0o1e9gfg9d": "standard",       # $99/mo Standard
+    "price_1TsR6jDXs4xycz0ohAfewQgk": "professional",   # $249/mo Professional
+    "price_1TrlFxDXs4xycz0ofyuV70Rf": "enterprise"      # $499/mo Enterprise
 }
 
 @router.post("/webhook")
@@ -47,22 +47,28 @@ async def stripe_webhook_listener(request: Request, stripe_signature: str = Head
                 expand=['line_items']
             )
             
-            customer_email = session.get("customer_details", {}).get("email")
-            line_items_data = getattr(session_with_items.line_items, "data", [])
+            customer_email = session.get("customer_details", {}).get("email") or session.get("customer_email")
+            line_items_obj = getattr(session_with_items, "line_items", None)
+            line_items_data = getattr(line_items_obj, "data", []) if line_items_obj else []
             
             if customer_email and len(line_items_data) > 0:
-                # FIXED: Access the first element of the line items list safely
-                purchased_price_id = line_items_data[0].price.id
+                item = line_items_data[0]
+                
+                # Safely extract price ID whether item is a dict or object
+                if isinstance(item, dict):
+                    purchased_price_id = item.get("price", {}).get("id")
+                else:
+                    purchased_price_id = getattr(getattr(item, "price", None), "id", None)
                 
                 # Map the Price ID to your tier string, defaulting to 'standard' if unmatched
                 assigned_tier = PRICE_TIER_MAPPING.get(purchased_price_id, "standard")
                 
-                # Initialize Supabase client
+                # Initialize Supabase client using service role key for administrative DB write
                 sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
                 
                 # Update the profile record in Supabase to reflect active subscription tier
-                sb.table("profiles").update({"tier": assigned_tier}).eq("email", customer_email).execute()
-                logger.info(f"Successfully upgraded user {customer_email} to {assigned_tier} tier.")
+                sb.table("profiles").update({"tier": assigned_tier, "is_pro": True}).eq("email", customer_email).execute()
+                logger.info(f"Successfully upgraded user {customer_email} to {assigned_tier} tier under Verified Safety Intelligence.")
             else:
                 logger.warning(f"Checkout session {session.get('id')} completed without customer email or line items.")
                 
