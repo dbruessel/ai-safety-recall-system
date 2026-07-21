@@ -49,21 +49,21 @@ export default function ModalsContainer({
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl">
             <div className="space-y-2 text-center">
-              <span className="text-3xl">🚀</span>
-              <h3 className="text-lg font-black text-white font-mono uppercase">Asset Limit Exceeded</h3>
+              <span className="text-3xl">🛡️</span>
+              <h3 className="text-lg font-black text-white font-mono uppercase">Verified Safety Intelligence Limit Exceeded</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Your manifest upload contained <strong className="text-cyan-400">{blockedVinCount} VIN units</strong>, exceeding the limit for Standard Essentials. Upgrade to Pro Operations for unlimited single-node lookups and automated background syncs.
+                Your manifest upload contained <strong className="text-cyan-400">{blockedVinCount} asset units</strong>, exceeding the free tier threshold. Upgrade your <span className="text-cyan-300 font-semibold">RecallLogic</span> subscription to unlock continuous background compliance tracking.
               </p>
             </div>
             
             <div className="bg-slate-950 border border-slate-900 rounded-xl p-4 space-y-2 text-xs font-mono">
               <div className="flex justify-between text-slate-400">
-                <span>Selected Tier:</span>
-                <span className="text-white font-bold">Pro Operations ($499/mo)</span>
+                <span>Recommended Tier:</span>
+                <span className="text-white font-bold">Professional Pro ($249/mo)</span>
               </div>
               <div className="flex justify-between text-slate-400">
-                <span>Maximum Fleet Range:</span>
-                <span className="text-cyan-400 font-bold">Up to 250 Active Assets</span>
+                <span>Compliance Scope:</span>
+                <span className="text-cyan-400 font-bold">Up to 100 Monitored Assets</span>
               </div>
             </div>
 
@@ -90,13 +90,13 @@ export default function ModalsContainer({
             <div className="space-y-1">
               <div className="flex justify-between items-start">
                 <h3 className="text-sm font-black text-white font-mono uppercase flex items-center gap-2">
-                  <span>🛡️</span> Verified Underwriting Certificate
+                  <span>🛡️</span> Verified Safety Intelligence Certificate
                 </h3>
                 <span className="text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded uppercase font-bold">
                   Active
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Share this verified compliance URL with commercial insurance brokers to lower monthly premiums.</p>
+              <p className="text-xs text-slate-400">Share this cryptographic audit URL with commercial underwriters to validate your safety posture.</p>
             </div>
 
             <div className="bg-slate-950 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-2">
@@ -135,7 +135,7 @@ export default function ModalsContainer({
                 </button>
               </div>
               {shareSuccess && (
-                <p className="text-emerald-400 text-[10px] font-mono">✓ Audit ledger successfully transmitted to insurance provider.</p>
+                <p className="text-emerald-400 text-[10px] font-mono">✓ Verified Safety Intelligence ledger transmitted to insurance provider.</p>
               )}
             </form>
 
