@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-import stripe
+import logging
 import os
+import stripe
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -10,11 +11,12 @@ from dotenv import load_dotenv
 # =====================================================================
 load_dotenv()
 
+logger = logging.getLogger("payment-router")
+
 STRIPE_API_KEY = os.getenv("STRIPE_SECRET_KEY", "sk_test_51P...")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ygbiurcvparmwfaqrtg.supabase.co")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Grab the key using either standard naming convention
+# Grab the Supabase service key securely
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Defensive Configuration Check
@@ -30,8 +32,62 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
+# Map your flat-fee tier slugs to actual Stripe Price IDs
+PRICE_TIER_MAPPING = {
+    "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",      # $99/mo Standard
+    "professional": "price_1TsR6jDXs4xycz0ohAfewQgk",   # $249/mo Professional
+    "enterprise": "price_1TrlFxDXs4xycz0ofyuV70Rf"      # $499/mo Enterprise
+}
+
+class CheckoutRequest(BaseModel):
+    plan_type: str # Must be "standard", "professional", or "enterprise"
+    user_id: str   # User email or account ID
+
 class VerifySessionRequest(BaseModel):
     session_id: str
+
+# =====================================================================
+# ENDPOINT: CREATE SECURE STRIPE-HOSTED CHECKOUT SESSION
+# =====================================================================
+@router.post("/create-checkout-session")
+async def create_checkout_session(request: CheckoutRequest):
+    """
+    Spins up a secure Stripe Checkout Session in Hosted Redirection mode
+    for RecallLogic: Verified Safety Intelligence tiers.
+    """
+    try:
+        price_id = PRICE_TIER_MAPPING.get(request.plan_type)
+        if not price_id:
+            raise HTTPException(status_code=400, detail=f"Invalid plan type selected: {request.plan_type}")
+
+        # Determine frontend origin for success/cancel redirects
+        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price': price_id,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            customer_email=request.user_id if "@" in request.user_id else None,
+            success_url=f"{frontend_base}/?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{frontend_base}/?canceled=true",
+            metadata={
+                "plan_type": request.plan_type,
+                "user_id": request.user_id
+            }
+        )
+
+        return {"url": checkout_session.url}
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe Session Creation Failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Internal Checkout Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
+
 
 # =====================================================================
 # ENDPOINT: SECURE AUTO-LOGIN REDIRECTION EXCHANGER
@@ -59,7 +115,14 @@ async def verify_session(req: VerifySessionRequest):
         if not email:
             raise HTTPException(status_code=400, detail="Checkout session contains no valid customer email.")
             
-        # 4. Synchronous Fallback Sync: Ensure leads table is updated immediately
+        # 4. Synchronous Sync: Update profile/leads table to active tier status
+        assigned_tier = session.metadata.get("plan_type", "standard")
+        
+        supabase_admin.table("profiles").update({
+            "tier": assigned_tier,
+            "is_pro": True
+        }).eq("email", email).execute()
+
         supabase_admin.table("leads").update({
             "lead_status": "Stripe Completed"
         }).eq("contact_email", email).execute()
@@ -84,8 +147,8 @@ async def verify_session(req: VerifySessionRequest):
         }
         
     except stripe.error.StripeError as e:
-        print(f"Stripe Retrieval Error: {str(e)}")
+        logger.error(f"Stripe Retrieval Error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Stripe session verification failed: {str(e)}")
     except Exception as e:
-        print(f"Internal Handshake Error: {str(e)}")
+        logger.error(f"Internal Handshake Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate secure auto-login credentials: {str(e)}")
