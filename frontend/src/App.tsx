@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import UpgradeButton from './components/UpgradeButton';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -25,7 +26,7 @@ export default function App() {
   // Paywall & Upgrade Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [blockedVinCount, setBlockedVinCount] = useState(0);
-  const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
+  const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
 
   const globalMetrics = {
     indexedVulnerabilityDefinitions: 25041,
@@ -78,11 +79,6 @@ export default function App() {
     }
   };
 
-  const handleStripeCheckout = (tier: 'standard' | 'professional' | 'enterprise') => {
-    // Placeholder for backend checkout session initialization
-    alert(window.location.origin + ` - Redirecting to secure Stripe Checkout for ${tier.toUpperCase()} tier.`);
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 antialiased">
       
@@ -125,7 +121,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN LAYOUT: CLEAN & CONCISE */}
+      {/* MAIN LAYOUT */}
       <main className="max-w-6xl mx-auto px-6 py-12 space-y-12">
         
         {/* HERO INTRO & GHOST AUDIT DROPZONE */}
@@ -180,7 +176,7 @@ export default function App() {
           )}
         </div>
 
-        {/* RESULTS FEED (IF UNDER 10 VINs) */}
+        {/* RESULTS FEED */}
         {injectedRecalls && (
           <div className="max-w-3xl mx-auto space-y-4 animate-fadeIn">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
@@ -202,7 +198,7 @@ export default function App() {
           </div>
         )}
 
-        {/* PRODUCT TIERS & PRICING MATRIX (THE CLEAR OFFERING) */}
+        {/* PRODUCT TIERS & PRICING MATRIX */}
         <section id="pricing-anchor" className="space-y-8 pt-6">
           <div className="text-center max-w-xl mx-auto space-y-3">
             <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based SaaS Tiers</h3>
@@ -229,12 +225,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ Standard Compliance Badges</li>
                 </ul>
               </div>
-              <button 
-                onClick={() => handleStripeCheckout('standard')}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-mono text-xs uppercase font-bold tracking-wider rounded-xl transition border border-slate-700"
-              >
-                Select Standard ($99/mo)
-              </button>
+              <UpgradeButton planType="standard" className="w-full py-3" />
             </div>
 
             {/* PROFESSIONAL TIER (FEATURED) */}
@@ -258,12 +249,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ One-Click Insurance Underwriter Share</li>
                 </ul>
               </div>
-              <button 
-                onClick={() => handleStripeCheckout('professional')}
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-black tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/20"
-              >
-                Select Pro ($249/mo)
-              </button>
+              <UpgradeButton planType="professional" className="w-full py-3" />
             </div>
 
             {/* ENTERPRISE TIER */}
@@ -284,12 +270,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ Quarterly Risk Reduction Audits (QBR)</li>
                 </ul>
               </div>
-              <button 
-                onClick={() => handleStripeCheckout('enterprise')}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-mono text-xs uppercase font-bold tracking-wider rounded-xl transition border border-slate-700"
-              >
-                Select Enterprise ($499/mo)
-              </button>
+              <UpgradeButton planType="enterprise" className="w-full py-3" />
             </div>
 
           </div>
@@ -297,7 +278,7 @@ export default function App() {
 
       </main>
 
-      {/* UPGRADE INTERCEPTOR MODAL (TRIGGERS WHEN > 10 VINs UPLOADED) */}
+      {/* UPGRADE INTERCEPTOR MODAL */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
@@ -332,13 +313,9 @@ export default function App() {
             </div>
 
             <div className="space-y-3">
+              <UpgradeButton planType={selectedTier} className="w-full py-3" />
               <button
-                onClick={() => handleStripeCheckout(selectedTier)}
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-black tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/20"
-              >
-                Proceed to Secure Checkout
-              </button>
-              <button
+                type="button"
                 onClick={() => setShowUpgradeModal(false)}
                 className="w-full py-2 text-slate-400 hover:text-white font-mono text-xs uppercase"
               >
