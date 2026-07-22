@@ -29,6 +29,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // LOGIN / SIGN-IN MODAL STATES
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
   // Paywall & Upgrade Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [blockedVinCount, setBlockedVinCount] = useState(0);
@@ -158,6 +164,30 @@ export default function App() {
     }
   };
 
+  // SIGN IN HANDLER FOR REGISTERED ACCOUNTS
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+
+    try {
+      const targetEmail = userEmail || 'vegasfleetmgr@commercialpro.com';
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: loginPassword,
+      });
+
+      if (error) throw error;
+      
+      setSession(data.session);
+      setShowLoginModal(false);
+    } catch (err: any) {
+      setLoginError(err.message || 'Invalid login credentials. Please try again.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   // ROUTE 1: STRIPE RETURN SCREEN
   if (isReturnPage) {
     return <CheckoutReturn />;
@@ -228,25 +258,28 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* HYDRATED USER SESSION INDICATOR */}
+          <div className="flex items-center gap-3">
+            {/* HYDRATED USER SESSION BADGE - CLICK TO SIGN IN */}
             {(companyName || userEmail) && (
-              <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 px-3 py-1.5 rounded-full">
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 px-3 py-1.5 rounded-full cursor-pointer transition"
+              >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <span className="text-xs font-mono text-emerald-400 font-medium">
-                  {companyName ? companyName : userEmail}
+                  {companyName ? companyName : userEmail} (Sign In)
                 </span>
-              </div>
+              </button>
             )}
 
             <button 
-              onClick={() => document.getElementById('pricing-anchor')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => setShowLoginModal(true)}
               className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10 cursor-pointer"
             >
-              View Pricing Tiers
+              Sign In to Workspace
             </button>
           </div>
         </div>
@@ -415,7 +448,59 @@ export default function App() {
 
       </main>
 
-      {/* UPGRADE INTERCEPTOR MODAL */}
+      {/* SIGN IN MODAL FOR EXISTING ACTIVE USERS */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
+          <div className="bg-slate-900 border border-cyan-500/30 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
+            <button 
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/20">
+                Active Account Detected
+              </span>
+              <h3 className="text-xl font-bold text-white tracking-tight">Sign In to TaskBoard</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Enter password for <strong className="text-white">{userEmail || 'vegasfleetmgr@commercialpro.com'}</strong> to access your workspace.
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold">Account Password:</label>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono text-white focus:outline-none focus:border-cyan-500 transition"
+                />
+              </div>
+
+              {loginError && (
+                <div className="p-2.5 bg-rose-950/40 border border-rose-900/50 rounded-lg text-rose-400 text-[11px] font-mono">
+                  ⚠️ {loginError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition cursor-pointer"
+              >
+                {loginLoading ? 'Authenticating...' : 'Enter TaskBoard Workspace'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* UPGRADE INTERCEPTOR MODAL FOR PROSPECTS */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
