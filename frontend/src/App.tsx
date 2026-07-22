@@ -37,7 +37,7 @@ export default function App() {
   };
 
   // ====================================================================
-  // STEP 1 & 2: OUTBOUND HOOK PARSING & DUAL HYDRATION (UUID / EMAIL)
+  // STEP 1 & 2: OUTBOUND HOOK PARSING & GRACEFUL HYDRATION
   // ====================================================================
   useEffect(() => {
     const hydrateProspectSession = async () => {
@@ -54,28 +54,26 @@ export default function App() {
       if (refParam) {
         const isEmail = refParam.includes('@');
 
-        try {
-          const query = supabase
-            .from('profiles')
-            .select('company_name, email, plan_type');
+        if (isEmail) {
+          setUserEmail(refParam);
+          setCompanyName(refParam.split('@')[0]);
+        } else {
+          setCompanyName('Active Fleet Workspace');
+        }
 
-          // Query by email or UUID depending on input string format
+        // Fetch profile safely without throwing unhandled 401 exceptions
+        try {
+          const query = supabase.from('profiles').select('company_name, email, plan_type');
           const { data, error } = isEmail 
-            ? await query.eq('email', refParam).single()
-            : await query.eq('id', refParam).single();
+            ? await query.eq('email', refParam).maybeSingle()
+            : await query.eq('id', refParam).maybeSingle();
 
           if (data && !error) {
-            setUserEmail(data.email || (isEmail ? refParam : ''));
-            setCompanyName(data.company_name || (data.email ? data.email.split('@')[0] : 'Active Fleet Workspace'));
-          } else {
-            // Unregistered or cold lead fallback
-            setUserEmail(isEmail ? refParam : '');
-            setCompanyName(isEmail ? refParam.split('@')[0] : 'Active Fleet Workspace');
+            if (data.email) setUserEmail(data.email);
+            if (data.company_name) setCompanyName(data.company_name);
           }
         } catch (err) {
-          console.warn("Prospect profile hydration fallback executed.", err);
-          setUserEmail(isEmail ? refParam : '');
-          setCompanyName(isEmail ? refParam.split('@')[0] : 'Active Fleet Workspace');
+          console.warn("Supabase profile hydration fallback executed:", err);
         }
       }
     };
