@@ -94,3 +94,33 @@ async def create_checkout_session(request: CheckoutRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred."
         )
+
+# ====================================================================
+# STEP 5: SESSION STATUS VERIFICATION ENDPOINT
+# ====================================================================
+@router.get("/session-status")
+async def get_session_status(session_id: str):
+    """
+    Retrieves status and customer details for a completed Stripe Checkout Session.
+    """
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        
+        customer_email = (
+            session.get("customer_details", {}).get("email") or 
+            session.get("customer_email") or 
+            session.get("metadata", {}).get("email")
+        )
+
+        return {
+            "status": session.status,          # e.g., 'complete'
+            "payment_status": session.payment_status, # e.g., 'paid'
+            "customer_email": customer_email,
+            "plan_type": session.get("metadata", {}).get("plan_type", "professional")
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Error fetching Stripe session status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired Stripe session ID."
+        )
