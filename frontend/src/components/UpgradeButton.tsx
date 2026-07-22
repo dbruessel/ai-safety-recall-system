@@ -6,7 +6,6 @@ interface UpgradeButtonProps {
   className?: string;
 }
 
-// Ensure the request hits FastAPI on port 8000, not Vite on port 5173
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 export const UpgradeButton: React.FC<UpgradeButtonProps> = ({ 
@@ -21,7 +20,8 @@ export const UpgradeButton: React.FC<UpgradeButtonProps> = ({
     const activeEmail = email || localStorage.getItem('recalllogic_ref') || 'vegasfleetmgr@commercialpro.com';
 
     try {
-      const response = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
+      // Matches FastAPI app.include_router(payment_router.router, prefix="/api") + router prefix="/payments"
+      const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -30,6 +30,10 @@ export const UpgradeButton: React.FC<UpgradeButtonProps> = ({
           plan_type: planType 
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
 
       const data = await response.json();
       const redirectUrl = data.checkout_url || data.url;
