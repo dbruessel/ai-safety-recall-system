@@ -259,22 +259,6 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* HYDRATED USER SESSION BADGE - CLICK TO SIGN IN */}
-            {(companyName || userEmail) && (
-              <button
-                onClick={() => setShowLoginModal(true)}
-                className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 px-3 py-1.5 rounded-full cursor-pointer transition"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-xs font-mono text-emerald-400 font-medium">
-                  {companyName ? companyName : userEmail} (Sign In)
-                </span>
-              </button>
-            )}
-
             <button 
               onClick={() => setShowLoginModal(true)}
               className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10 cursor-pointer"
