@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
+import TaskBoard from './components/TaskBoard';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -19,16 +20,7 @@ interface Recall {
 }
 
 export default function App() {
-  // ====================================================================
-  // ROUTE INTERCEPTOR: POST-CHECKOUT STRIPE RETURN DETECTOR
-  // ====================================================================
-  const isReturnPage = window.location.pathname.includes('/return') || 
-                       window.location.search.includes('session_id');
-
-  if (isReturnPage) {
-    return <CheckoutReturn />;
-  }
-
+  const [session, setSession] = useState<Session | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [bulkInput, setBulkInput] = useState('');
@@ -46,6 +38,25 @@ export default function App() {
     activeFederalSyncPulses: "24/7 Continuously Monitored",
     regionalThermalHazardCount: 15405
   };
+
+  // ====================================================================
+  // ROUTE INTERCEPTOR: POST-CHECKOUT STRIPE RETURN DETECTOR
+  // ====================================================================
+  const isReturnPage = window.location.pathname.includes('/return') || 
+                       window.location.search.includes('session_id');
+
+  // Listen for active Supabase Auth sessions (triggers automatically after password creation)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ====================================================================
   // STEP 1 & 2: OUTBOUND HOOK PARSING & GRACEFUL HYDRATION
@@ -141,6 +152,45 @@ export default function App() {
     }
   };
 
+  // ROUTE 1: STRIPE RETURN SCREEN
+  if (isReturnPage) {
+    return <CheckoutReturn />;
+  }
+
+  // ROUTE 2: AUTHENTICATED WORKSPACE (Loads TaskBoard.tsx!)
+  if (session) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 antialiased">
+        <header className="border-b border-slate-900 pb-4 mb-6 flex justify-between items-center max-w-7xl mx-auto">
+          <div className="flex items-center space-x-3">
+            <img src="/recall-logo.png" alt="RecallLogic" className="h-8 w-auto object-contain" />
+            <div>
+              <h1 className="text-base font-black text-white tracking-tight uppercase">RecallLogic Workspace</h1>
+              <p className="text-[10px] text-slate-400 font-mono tracking-wider">Active Operational Risk Control.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-3 py-1 rounded-full flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              {session.user.email}
+            </span>
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-mono rounded-lg border border-slate-800 transition cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto">
+          <TaskBoard session={session} planType="professional" />
+        </main>
+      </div>
+    );
+  }
+
+  // ROUTE 3: GUEST MARKETING / FREEMIUM LANDING PAGE
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 antialiased">
       
@@ -188,7 +238,7 @@ export default function App() {
 
             <button 
               onClick={() => document.getElementById('pricing-anchor')?.scrollIntoView({ behavior: 'smooth' })}
-              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10"
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10 cursor-pointer"
             >
               View Pricing Tiers
             </button>
@@ -238,7 +288,7 @@ export default function App() {
             <button
               onClick={() => handleProcessManifest(bulkInput)}
               disabled={loading || !bulkInput.trim()}
-              className="px-6 py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-mono text-xs uppercase font-extrabold tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/20"
+              className="px-6 py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-mono text-xs uppercase font-extrabold tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/20 cursor-pointer"
             >
               {loading ? 'Running Safety Sweep...' : 'Execute Free Ghost Audit'}
             </button>
@@ -365,7 +415,7 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
             <button 
               onClick={() => setShowUpgradeModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm cursor-pointer"
             >
               ✕
             </button>
@@ -398,7 +448,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowUpgradeModal(false)}
-                className="w-full py-2 text-slate-400 hover:text-white font-mono text-xs uppercase"
+                className="w-full py-2 text-slate-400 hover:text-white font-mono text-xs uppercase cursor-pointer"
               >
                 Return to 10-VIN Preview Audit
               </button>
