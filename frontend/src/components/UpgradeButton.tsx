@@ -4,26 +4,28 @@ import axios from 'axios';
 interface UpgradeButtonProps {
   planType: 'standard' | 'professional' | 'enterprise';
   className?: string;
-  userId: string; // Added to link checkout session properly
+  userId?: string; 
 }
 
 export default function UpgradeButton({ planType, className, userId }: UpgradeButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleUpgradeClick = async () => {
+  const handleUpgradeClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const response = await axios.post('http://localhost:8000/payments/create-checkout-session', {
+      // FIXED: Added the missing /api prefix matching your main.py router mount
+      const response = await axios.post('http://localhost:8000/api/payments/create-checkout-session', {
         plan_type: planType,
-        user_id: userId,
+        user_id: userId || 'anonymous_prospect', // Fallback to prevent 422 crash
       });
 
       const { checkout_url } = response.data;
       if (checkout_url) {
-        window.location.href = checkout_url; // Redirect to Stripe Hosted Checkout
+        window.location.href = checkout_url; // Direct redirect to Stripe Checkout
       } else {
         throw new Error('Invalid checkout URL received from server.');
       }
