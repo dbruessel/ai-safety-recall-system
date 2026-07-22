@@ -5,6 +5,8 @@ interface ModalsContainerProps {
   showUpgradeModal: boolean;
   onCloseUpgradeModal: () => void;
   blockedVinCount: number;
+  selectedPlanType?: 'standard' | 'professional' | 'enterprise'; // Added to support dynamic tier selection
+  userId?: string;                                               // Added to pass tracking context
 
   showShareModal: boolean;
   onCloseShareModal: () => void;
@@ -15,6 +17,8 @@ export default function ModalsContainer({
   showUpgradeModal,
   onCloseUpgradeModal,
   blockedVinCount,
+  selectedPlanType = 'professional', // Default fallback
+  userId = 'anonymous_prospect',
   showShareModal,
   onCloseShareModal,
   shareableVerificationUrl,
@@ -58,12 +62,12 @@ export default function ModalsContainer({
             
             <div className="bg-slate-950 border border-slate-900 rounded-xl p-4 space-y-2 text-xs font-mono">
               <div className="flex justify-between text-slate-400">
-                <span>Recommended Tier:</span>
-                <span className="text-white font-bold">Professional Pro ($249/mo)</span>
+                <span>Selected Target Tier:</span>
+                <span className="text-white font-bold uppercase">{selectedPlanType}</span>
               </div>
               <div className="flex justify-between text-slate-400">
                 <span>Compliance Scope:</span>
-                <span className="text-cyan-400 font-bold">Up to 100 Monitored Assets</span>
+                <span className="text-cyan-400 font-bold">Unlimited Fleet Monitoring</span>
               </div>
             </div>
 
@@ -76,7 +80,8 @@ export default function ModalsContainer({
                 Dismiss
               </button>
               <div className="flex-1">
-                <UpgradeButton planType="professional" className="w-full py-3" />
+                {/* FIXED: Dynamically passes the active planType and userId */}
+                <UpgradeButton planType={selectedPlanType} userId={userId} className="w-full py-3" />
               </div>
             </div>
           </div>
