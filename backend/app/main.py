@@ -2,7 +2,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import init_vertex, get_settings
 
-# Explicitly import all system and newly created feature routers
+# Explicitly import all system and feature routers
 from app.routers import (
     metrics,
     batches,
@@ -10,12 +10,12 @@ from app.routers import (
     upload,
     recalls,
     webhook_router,
-    dashboard_router,  # Live interactive fleet/task management
+    dashboard_router,
     sandbox,
-    payment_router     # Unified Stripe subscriptions & webhooks
+    payment_router     # Unified Stripe subscriptions & checkout router
 )
 
-# Initialize Vertex AI as required by the backend configuration
+# Initialize Vertex AI before application construction if configured
 init_vertex()
 
 def create_app() -> FastAPI:
@@ -29,39 +29,33 @@ def create_app() -> FastAPI:
         version="2026.4.2"
     )
 
-    # Configure CORS middleware to support local development server origins
+    # Configure CORS middleware to support local development origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # For production, limit this to settings.FRONTEND_ORIGIN
+        allow_origins=[
+            settings.frontend_origin if hasattr(settings, "frontend_origin") else "*",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # =====================================================================
-    # CENTRAL ROUTER REGISTRY (UNIFIED UNDER /api PREFIX)
-    # =====================================================================
-    
-    # 1. Core Platform & Telemetry Routers
+    # ==========================================
+    # REGISTER ALL ROUTERS UNDER THE /api PREFIX
+    # ==========================================
     app.include_router(metrics.router, prefix="/api")
     app.include_router(batches.router, prefix="/api")
     app.include_router(vins.router, prefix="/api")
     app.include_router(upload.router, prefix="/api")
     app.include_router(recalls.router, prefix="/api")
-    
-    # 2. Interactive Fleet & Safety Task Board Router (Fixed: Synchronized to Frontend Calls)
-    app.include_router(dashboard_router.router, prefix="/api")
-    
-    # 3. SaaS Monetization & Automated Checkout Router (Fixed: Synchronized to Stripe Forms)
-    app.include_router(payment_router.router, prefix="/api")
-    
-    # 4. Sandbox Testing Controls
-    app.include_router(sandbox.router, prefix="/api")
-    
-    # 5. Standalone Webhook Listener Router (Fixed: Piped cleanly into the API lifecycle)
     app.include_router(webhook_router.router, prefix="/api")
+    app.include_router(dashboard_router.router, prefix="/api")
+    app.include_router(sandbox.router, prefix="/api")
+    app.include_router(payment_router.router, prefix="/api")  # Routes /api/payments/...
 
     return app
 
-# Instantiate the central ASGI application for Uvicorn hot-reloads
+# Expose app instance for Uvicorn
 app = create_app()
