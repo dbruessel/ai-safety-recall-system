@@ -1,62 +1,80 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 
 interface UpgradeButtonProps {
   planType: 'standard' | 'professional' | 'enterprise';
+  email?: string;
   className?: string;
-  userId?: string; 
 }
 
-export default function UpgradeButton({ planType, className, userId }: UpgradeButtonProps) {
+export const UpgradeButton: React.FC<UpgradeButtonProps> = ({ 
+  planType, 
+  email = '', 
+  className = '' 
+}) => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleUpgradeClick = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleCheckout = async () => {
     setLoading(true);
-    setError(null);
-
     try {
-      // FIXED: Added the missing /api prefix matching your main.py router mount
-      const response = await axios.post('http://localhost:8000/api/payments/create-checkout-session', {
-        plan_type: planType,
-        user_id: userId || 'anonymous_prospect', // Fallback to prevent 422 crash
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: email || localStorage.getItem('recalllogic_ref') || '', 
+          plan_type: planType 
+        }),
       });
 
-      const { checkout_url } = response.data;
-      if (checkout_url) {
-        window.location.href = checkout_url; // Direct redirect to Stripe Checkout
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        throw new Error('Invalid checkout URL received from server.');
+        console.error('Checkout creation failed:', data);
       }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      setError(err.response?.data?.detail || 'Failed to initiate checkout. Please try again.');
+    } catch (err) {
+      console.error('Failed to initialize Stripe checkout session:', err);
+    } finally {
       setLoading(false);
     }
   };
 
-  const planDisplayNames = {
-    standard: 'Standard',
-    professional: 'Pro',
-    enterprise: 'Enterprise',
+  // Tier-specific button styling for high contrast & prominence
+  const getButtonStyle = () => {
+    switch (planType) {
+      case 'professional':
+        // Primary / Featured Tier (Glowing Cyan Button)
+        return "bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black shadow-lg shadow-cyan-500/25 border border-cyan-300";
+      case 'enterprise':
+        // High-Value Tier (Emerald Green Button)
+        return "bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-lg shadow-emerald-500/20 border border-emerald-400";
+      case 'standard':
+      default:
+        // Secondary Tier (Glass/Slate Styled Button with Bright Cyan Text)
+        return "bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold border border-cyan-500/40 hover:border-cyan-400 shadow-md";
+    }
   };
 
-  const buttonLabel = loading ? 'Redirecting to Stripe...' : `Activate RecallLogic ${planDisplayNames[planType]}`;
+  const getButtonLabel = () => {
+    if (loading) return "Connecting to Stripe...";
+    switch (planType) {
+      case 'standard':
+        return "Activate RecallLogic Standard →";
+      case 'professional':
+        return "Activate RecallLogic Pro →";
+      case 'enterprise':
+        return "Activate RecallLogic Enterprise →";
+    }
+  };
 
   return (
-    <div className="w-full">
-      <button
-        onClick={handleUpgradeClick}
-        disabled={loading}
-        className={
-          className ||
-          'w-full py-3.5 px-6 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-xs tracking-wider transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed'
-        }
-      >
-        {buttonLabel}
-      </button>
-      {error && <p className="mt-2 text-xs text-red-500 text-center">{error}</p>}
-    </div>
+    <button
+      onClick={handleCheckout}
+      disabled={loading}
+      className={`w-full py-3.5 px-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all duration-200 transform active:scale-[0.98] disabled:opacity-50 cursor-pointer ${getButtonStyle()} ${className}`}
+    >
+      {getButtonLabel()}
+    </button>
   );
-}
+};
+
+export default UpgradeButton;
