@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Session } from '@supabase/supabase-js';
 
 interface VehicleInfo {
   vin: string;
@@ -23,13 +24,26 @@ interface RecallTask {
 }
 
 interface TaskBoardProps {
+  session?: Session | null;
   userId?: string;
   planType?: 'standard' | 'professional' | 'enterprise';
   recalls?: any[];
   onStatusUpdate?: (campaignNumber: string, newStatus: any) => void;
 }
 
-export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", planType = "standard", recalls, onStatusUpdate }: TaskBoardProps) {
+export default function TaskBoard({ 
+  session,
+  userId, 
+  planType = "professional", 
+  recalls, 
+  onStatusUpdate 
+}: TaskBoardProps) {
+  // Dynamically resolve active user email from Supabase session, props, or localStorage
+  const activeUserId = session?.user?.email || 
+                       userId || 
+                       localStorage.getItem('recalllogic_ref') || 
+                       "vegasfleetmgr@commercialpro.com";
+
   const [tasks, setTasks] = useState<RecallTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -70,9 +84,8 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
     try {
       setLoading(true);
       setError('');
-      const safeId = userId || "lasvegas_fleet_test@example.com";
       const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/tasks`, {
-        params: { user_id: safeId } 
+        params: { user_id: activeUserId } 
       });
       setTasks(response.data || []);
     } catch (err: any) {
@@ -85,7 +98,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
 
   useEffect(() => {
     fetchTasks();
-  }, [userId, recalls]);
+  }, [activeUserId, recalls]);
 
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +120,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/dashboard/vehicles', {
         vin: newVin.trim().toUpperCase(),
-        user_id: userId || "lasvegas_fleet_test@example.com"
+        user_id: activeUserId
       });
 
       setAddSuccessMsg(response.data.message || 'Asset onboarded successfully!');
@@ -180,7 +193,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
           <button 
             type="button"
             onClick={() => window.location.href = '#pricing-matrix-anchor'}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap cursor-pointer"
           >
             Activate Active Sweeps
           </button>
@@ -220,7 +233,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
             <button
               type="submit"
               disabled={addingVehicle || planType === 'standard'}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {addingVehicle ? 'Analyzing...' : 'Add Vehicle'}
             </button>
@@ -249,7 +262,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
             <button 
               type="button"
               onClick={() => window.location.href = '#pricing-matrix-anchor'}
-              className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all shadow-md"
+              className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
             >
               Unlock Broker Sharing Logs
             </button>
@@ -277,7 +290,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
               <button
                 type="button"
                 onClick={() => setWebhookActive(!webhookActive)}
-                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-mono uppercase tracking-wide transition font-bold border ${
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-mono uppercase tracking-wide transition font-bold border cursor-pointer ${
                   webhookActive 
                     ? 'bg-emerald-950 border-emerald-800 text-emerald-400' 
                     : 'bg-slate-900 border-slate-700 text-slate-400'
@@ -346,7 +359,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
                       <button
                         type="button"
                         onClick={() => setSchedulingTaskId(task.id)}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
                       >
                         Route to Dealership
                       </button>
@@ -366,7 +379,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
                             type="button"
                             onClick={() => handleTransitionStatus(task.id, 'scheduled', selectedDate)}
                             disabled={!selectedDate}
-                            className="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-mono uppercase tracking-wide disabled:opacity-30"
+                            className="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-mono uppercase tracking-wide disabled:opacity-30 cursor-pointer"
                           >
                             Confirm
                           </button>
@@ -408,7 +421,7 @@ export default function TaskBoard({ userId = "lasvegas_fleet_test@example.com", 
                       <button
                         type="button"
                         onClick={() => handleTransitionStatus(task.id, 'repaired')}
-                        className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-900/50 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                        className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-900/50 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
                       >
                         Sign-off Remediation
                       </button>
