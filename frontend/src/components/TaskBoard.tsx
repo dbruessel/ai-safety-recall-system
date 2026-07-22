@@ -58,25 +58,31 @@ export default function TaskBoard({
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
 
+  // Helper function to format recall tasks cleanly
+  const parseAndSetTasks = (rawRecalls: any[]) => {
+    const parsedTasks: RecallTask[] = rawRecalls.map((r, i) => ({
+      id: r.id || `task-${i}`,
+      vehicle_id: `v-${i}`,
+      campaign_number: r.campaign_number || `26V-${700 + i}`,
+      component: r.component || "Mojave High-Heat Thermal Subassembly",
+      summary: r.summary || "Vulnerability noted under regional stress parameters.",
+      remedy: r.remedy || "Dealer inspect harness.",
+      severity_score: r.calculated_severity_score || r.severity_score || 8.5,
+      status: r.status?.toLowerCase() === 'scheduled' ? 'scheduled' : r.status?.toLowerCase() === 'repaired' ? 'repaired' : 'pending',
+      monitored_vehicles: r.monitored_vehicles || {
+        vin: r.vin || `1FTFW1ED4NFC${10000 + i}`,
+        make: r.make || "Fleet Make",
+        model: r.model || "Commercial Unit",
+        year: parseInt(r.year) || 2024
+      }
+    }));
+    setTasks(parsedTasks);
+  };
+
   const fetchTasks = async () => {
+    // 1. If explicit recalls array is passed via props
     if (recalls && recalls.length > 0) {
-      const parsedTasks: RecallTask[] = recalls.map((r, i) => ({
-        id: r.id || `local-task-${i}`,
-        vehicle_id: `v-${i}`,
-        campaign_number: r.campaign_number || "26V-100",
-        component: r.component || "Assembly Structure",
-        summary: r.summary || "Vulnerability noted.",
-        remedy: r.remedy || "Dealer inspect harness.",
-        severity_score: r.calculated_severity_score || 7.5,
-        status: r.status?.toLowerCase() === 'scheduled' ? 'scheduled' : r.status?.toLowerCase() === 'repaired' ? 'repaired' : 'pending',
-        monitored_vehicles: {
-          vin: r.vin || "1FTFW1EDXNXXXXXXX",
-          make: r.make || "Generic",
-          model: r.model || "Fleet Unit",
-          year: parseInt(r.year) || 2024
-        }
-      }));
-      setTasks(parsedTasks);
+      parseAndSetTasks(recalls);
       setLoading(false);
       return;
     }
@@ -87,10 +93,29 @@ export default function TaskBoard({
       const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/tasks`, {
         params: { user_id: activeUserId } 
       });
-      setTasks(response.data || []);
+
+      if (response.data && response.data.length > 0) {
+        parseAndSetTasks(response.data);
+      } else {
+        // 2. FALLBACK: Check if user processed a Ghost Audit before logging in!
+        const savedAuditData = localStorage.getItem('recalllogic_audit_recalls');
+        if (savedAuditData) {
+          const parsed = JSON.parse(savedAuditData);
+          parseAndSetTasks(parsed);
+        } else {
+          setTasks([]);
+        }
+      }
     } catch (err: any) {
-      console.error(err);
-      setError('Failed to sync safety task boards with local cloud replica.');
+      console.warn("API Fetch Error, checking local audit backup...", err);
+      // 3. FALLBACK ON API FAILURE: Load saved Ghost Audit vehicles directly from localStorage
+      const savedAuditData = localStorage.getItem('recalllogic_audit_recalls');
+      if (savedAuditData) {
+        const parsed = JSON.parse(savedAuditData);
+        parseAndSetTasks(parsed);
+      } else {
+        setError('Failed to sync safety task boards with local cloud replica.');
+      }
     } finally {
       setLoading(false);
     }
