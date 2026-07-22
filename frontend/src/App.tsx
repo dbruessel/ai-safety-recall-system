@@ -30,7 +30,7 @@ export default function App() {
 
   const globalMetrics = {
     indexedVulnerabilityDefinitions: 25041,
-    activeFederalSyncPulses: "3:00 AM UTC",
+    activeFederalSyncPulses: "24/7 Continuously Monitored",
     regionalThermalHazardCount: 15405
   };
 
