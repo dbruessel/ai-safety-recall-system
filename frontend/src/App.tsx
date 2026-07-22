@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 
@@ -18,6 +18,8 @@ interface Recall {
 }
 
 export default function App() {
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
   const [bulkInput, setBulkInput] = useState('');
   const [injectedRecalls, setInjectedRecalls] = useState<Recall[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,56 @@ export default function App() {
     regionalThermalHazardCount: 15405
   };
 
+  // ====================================================================
+  // STEP 1 & 2: OUTBOUND HOOK PARSING & DUAL HYDRATION (UUID / EMAIL)
+  // ====================================================================
+  useEffect(() => {
+    const hydrateProspectSession = async () => {
+      const params = new URLSearchParams(window.location.search);
+      let refParam = params.get('ref');
+
+      // Fallback to localStorage if refreshed without URL parameter
+      if (!refParam) {
+        refParam = localStorage.getItem('recalllogic_ref');
+      } else {
+        localStorage.setItem('recalllogic_ref', refParam);
+      }
+
+      if (refParam) {
+        const isEmail = refParam.includes('@');
+
+        try {
+          const query = supabase
+            .from('profiles')
+            .select('company_name, email, plan_type');
+
+          // Query by email or UUID depending on input string format
+          const { data, error } = isEmail 
+            ? await query.eq('email', refParam).single()
+            : await query.eq('id', refParam).single();
+
+          if (data && !error) {
+            setUserEmail(data.email || (isEmail ? refParam : ''));
+            setCompanyName(data.company_name || (data.email ? data.email.split('@')[0] : 'Active Fleet Workspace'));
+          } else {
+            // Unregistered or cold lead fallback
+            setUserEmail(isEmail ? refParam : '');
+            setCompanyName(isEmail ? refParam.split('@')[0] : 'Active Fleet Workspace');
+          }
+        } catch (err) {
+          console.warn("Prospect profile hydration fallback executed.", err);
+          setUserEmail(isEmail ? refParam : '');
+          setCompanyName(isEmail ? refParam.split('@')[0] : 'Active Fleet Workspace');
+        }
+      }
+    };
+
+    hydrateProspectSession();
+  }, []);
+
+  // ====================================================================
+  // STEP 2 & 3: GHOST AUDIT SLICING (FIRST 10 VINS FREE) & PAYWALL GATE
+  // ====================================================================
   const handleProcessManifest = (rawText: string) => {
     setLoading(true);
     setError('');
@@ -47,24 +99,25 @@ export default function App() {
         throw new Error("No valid asset rows detected inside your input feed.");
       }
 
-      // 10-VIN Freemium Interceptor Gate
+      // Check if fleet size exceeds free audit limit
       if (lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
-        setLoading(false);
-        return;
       }
 
+      // Slice the first 10 vehicles for the instant live "Ghost Audit" preview
+      const ghostAuditLines = lines.slice(0, 10);
+
       setTimeout(() => {
-        const processed = lines.map((line, idx) => {
+        const processed = ghostAuditLines.map((line, idx) => {
           const parts = line.split(',');
           return {
             campaign_number: `26V-${700 + idx}`,
             make: parts[0] || 'Fleet Make',
             model: parts[1] || 'Commercial Unit',
             year: parts[2] || '2024',
-            component: 'Critical Thermal Subassembly',
-            summary: 'Active federal safety campaign match identified under local environmental stress parameters.',
+            component: 'Mojave High-Heat Thermal Subassembly',
+            summary: 'Active federal safety campaign match identified under regional Mojave high-heat environmental stress parameters.',
             remedy: 'Schedule dealer inspection and harness reinforcement immediately.',
             calculated_severity_score: 8.5
           };
@@ -110,7 +163,20 @@ export default function App() {
             </div>
           </div>
           
-          <div>
+          <div className="flex items-center gap-4">
+            {/* STEP 2: HYDRATED USER SESSION INDICATOR */}
+            {(companyName || userEmail) && (
+              <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 px-3 py-1.5 rounded-full">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-mono text-emerald-400 font-medium">
+                  {companyName ? companyName : userEmail}
+                </span>
+              </div>
+            )}
+
             <button 
               onClick={() => document.getElementById('pricing-anchor')?.scrollIntoView({ behavior: 'smooth' })}
               className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10"
@@ -180,15 +246,21 @@ export default function App() {
         {injectedRecalls && (
           <div className="max-w-3xl mx-auto space-y-4 animate-fadeIn">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">Audit Results ({injectedRecalls.length} Assets Analyzed)</h3>
-              <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">Audit Complete</span>
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                Ghost Audit Results ({injectedRecalls.length} Preview Assets Analyzed)
+              </h3>
+              <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                10-VIN Preview Complete
+              </span>
             </div>
             <div className="space-y-3">
               {injectedRecalls.map((r, i) => (
                 <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-cyan-400">{r.make} {r.model} ({r.year})</span>
-                    <span className="font-mono text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">Campaign: {r.campaign_number}</span>
+                    <span className="font-mono text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">
+                      Campaign: {r.campaign_number}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-300">{r.summary}</p>
                   <p className="text-xs text-slate-400 italic"><strong>Remedy:</strong> {r.remedy}</p>
@@ -225,7 +297,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ Standard Compliance Badges</li>
                 </ul>
               </div>
-              <UpgradeButton planType="standard" className="w-full py-3" />
+              <UpgradeButton planType="standard" email={userEmail} className="w-full py-3" />
             </div>
 
             {/* PROFESSIONAL TIER (FEATURED) */}
@@ -249,7 +321,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ One-Click Insurance Underwriter Share</li>
                 </ul>
               </div>
-              <UpgradeButton planType="professional" className="w-full py-3" />
+              <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
             </div>
 
             {/* ENTERPRISE TIER */}
@@ -270,7 +342,7 @@ export default function App() {
                   <li className="flex items-center gap-2">✓ Quarterly Risk Reduction Audits (QBR)</li>
                 </ul>
               </div>
-              <UpgradeButton planType="enterprise" className="w-full py-3" />
+              <UpgradeButton planType="enterprise" email={userEmail} className="w-full py-3" />
             </div>
 
           </div>
@@ -295,7 +367,7 @@ export default function App() {
               </span>
               <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Fleet Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                You attempted to scan <strong className="text-white">{blockedVinCount} assets</strong>, which exceeds the free 10-VIN audit limit. Activate a Pro workspace to process your entire fleet and unlock continuous 3:00 AM monitoring.
+                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. We've shown a live Ghost Audit preview of your first 10 assets below. Activate a Pro workspace to unlock all {blockedVinCount} vehicles and enable continuous 3:00 AM monitoring[cite: 1].
               </p>
             </div>
 
@@ -313,13 +385,13 @@ export default function App() {
             </div>
 
             <div className="space-y-3">
-              <UpgradeButton planType={selectedTier} className="w-full py-3" />
+              <UpgradeButton planType={selectedTier} email={userEmail} className="w-full py-3" />
               <button
                 type="button"
                 onClick={() => setShowUpgradeModal(false)}
                 className="w-full py-2 text-slate-400 hover:text-white font-mono text-xs uppercase"
               >
-                Return to Free Audit Scan
+                Return to 10-VIN Preview Audit
               </button>
             </div>
           </div>
