@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createClient, Session } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
 import TaskBoard from './components/TaskBoard';
