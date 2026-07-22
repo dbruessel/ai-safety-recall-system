@@ -46,7 +46,7 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Listen for active Supabase Auth sessions (triggers automatically after password creation)
+  // Listen for active Supabase Auth sessions
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -84,7 +84,7 @@ export default function App() {
           setCompanyName('Active Fleet Workspace');
         }
 
-        // Fetch profile safely without throwing unhandled 401 exceptions
+        // Fetch profile safely using maybeSingle to prevent console exceptions
         try {
           const query = supabase.from('profiles').select('company_name, email, plan_type');
           const { data, error } = isEmail 
@@ -105,7 +105,7 @@ export default function App() {
   }, []);
 
   // ====================================================================
-  // STEP 2 & 3: GHOST AUDIT SLICING (FIRST 10 VINS FREE) & PAYWALL GATE
+  // STEP 2 & 3: GHOST AUDIT SLICING & PERSISTENCE TO LOCAL STORAGE
   // ====================================================================
   const handleProcessManifest = (rawText: string) => {
     setLoading(true);
@@ -126,13 +126,12 @@ export default function App() {
         setShowUpgradeModal(true);
       }
 
-      // Slice the first 10 vehicles for the instant live "Ghost Audit" preview
-      const ghostAuditLines = lines.slice(0, 10);
-
       setTimeout(() => {
-        const processed = ghostAuditLines.map((line, idx) => {
+        // Process ALL uploaded lines so they persist for the workspace TaskBoard
+        const fullAuditRecalls = lines.map((line, idx) => {
           const parts = line.split(',');
           return {
+            id: `audit-task-${idx}`,
             campaign_number: `26V-${700 + idx}`,
             make: parts[0] || 'Fleet Make',
             model: parts[1] || 'Commercial Unit',
@@ -140,10 +139,16 @@ export default function App() {
             component: 'Mojave High-Heat Thermal Subassembly',
             summary: 'Active federal safety campaign match identified under regional Mojave high-heat environmental stress parameters.',
             remedy: 'Schedule dealer inspection and harness reinforcement immediately.',
-            calculated_severity_score: 8.5
+            calculated_severity_score: 8.5,
+            status: 'pending'
           };
         });
-        setInjectedRecalls(processed);
+
+        // Save the full manifest dataset to localStorage for TaskBoard hydration
+        localStorage.setItem('recalllogic_audit_recalls', JSON.stringify(fullAuditRecalls));
+
+        // Slice first 10 assets for the free preview feed
+        setInjectedRecalls(fullAuditRecalls.slice(0, 10));
         setLoading(false);
       }, 800);
 
@@ -224,7 +229,7 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* STEP 2: HYDRATED USER SESSION INDICATOR */}
+            {/* HYDRATED USER SESSION INDICATOR */}
             {(companyName || userEmail) && (
               <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/30 px-3 py-1.5 rounded-full">
                 <span className="relative flex h-2 w-2">
