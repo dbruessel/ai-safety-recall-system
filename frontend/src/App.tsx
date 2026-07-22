@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
+import CheckoutReturn from './components/CheckoutReturn';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -18,6 +19,16 @@ interface Recall {
 }
 
 export default function App() {
+  // ====================================================================
+  // ROUTE INTERCEPTOR: POST-CHECKOUT STRIPE RETURN DETECTOR
+  // ====================================================================
+  const isReturnPage = window.location.pathname.includes('/return') || 
+                       window.location.search.includes('session_id');
+
+  if (isReturnPage) {
+    return <CheckoutReturn />;
+  }
+
   const [userEmail, setUserEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [bulkInput, setBulkInput] = useState('');
@@ -365,7 +376,7 @@ export default function App() {
               </span>
               <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Fleet Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. We've shown a live Ghost Audit preview of your first 10 assets below. Activate a Pro workspace to unlock all {blockedVinCount} vehicles and enable continuous 3:00 AM monitoring[cite: 1].
+                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. We've shown a live Ghost Audit preview of your first 10 assets below. Activate a Pro workspace to unlock all {blockedVinCount} vehicles and enable continuous 3:00 AM monitoring.
               </p>
             </div>
 

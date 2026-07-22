@@ -18,7 +18,7 @@ export default function CheckoutReturn() {
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [password, setPassword] = useState<string>('');
   const [passwordLoading, setPasswordLoading] = useState<boolean>(false);
-  const [passwordSuccess, setPasswordLoadingSuccess] = useState<boolean>(false);
+  const [passwordSuccess, setPasswordSuccess] = useState<boolean>(false);
   const [passwordError, setPasswordError] = useState<string>('');
 
   useEffect(() => {
@@ -31,8 +31,20 @@ export default function CheckoutReturn() {
       return;
     }
 
+    // DEV MOCK OVERRIDE: Fast UI testing bypass
+    if (sessionId.startsWith('cs_test_mock')) {
+      setTimeout(() => {
+        setStatus('complete');
+        setCustomerEmail(localStorage.getItem('recalllogic_ref') || 'vegasfleetmgr@commercialpro.com');
+        setShowPasswordModal(true);
+        setLoading(false);
+      }, 500);
+      return;
+    }
+
     // Query backend to verify payment and retrieve customer email
-    axios.get(`${API_BASE_URL}/payments/session-status`, {
+    // FIXED: Correct endpoint route with /api prefix
+    axios.get(`${API_BASE_URL}/api/payments/session-status`, {
       params: { session_id: sessionId }
     })
     .then(res => {
@@ -41,7 +53,6 @@ export default function CheckoutReturn() {
       setCustomerEmail(email);
 
       if (res.data.status === 'complete') {
-        // Automatically open the Password Setup Modal upon payment verification
         setShowPasswordModal(true);
       }
     })
@@ -66,7 +77,6 @@ export default function CheckoutReturn() {
     setPasswordError('');
 
     try {
-      // Register credentials with Supabase Auth
       const { error: signUpError } = await supabase.auth.signUp({
         email: customerEmail,
         password: password,
@@ -76,10 +86,10 @@ export default function CheckoutReturn() {
         throw signUpError;
       }
 
-      setPasswordLoadingSuccess(true);
+      setPasswordSuccess(true);
       setTimeout(() => {
         setShowPasswordModal(false);
-      }, 1500);
+      }, 1800);
 
     } catch (err: any) {
       console.error("Password setup error:", err);
@@ -125,7 +135,7 @@ export default function CheckoutReturn() {
           </div>
           <button
             onClick={handleReturnToDashboard}
-            className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold uppercase text-xs tracking-wider rounded-xl transition"
+            className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold uppercase text-xs tracking-wider rounded-xl transition cursor-pointer"
           >
             Return to Dashboard
           </button>
@@ -134,7 +144,7 @@ export default function CheckoutReturn() {
     );
   }
 
-  // 3. SUCCESS STATE
+  // 3. SUCCESS STATE WITH PASSWORD MODAL
   if (status === 'complete') {
     return (
       <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col items-center justify-center p-6 font-sans relative">
@@ -166,21 +176,19 @@ export default function CheckoutReturn() {
 
           <button
             onClick={handleReturnToDashboard}
-            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/10"
+            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/10 cursor-pointer"
           >
             Launch Active Workspace
           </button>
         </div>
 
-        {/* ==================================================================== */}
-        {/* STEP 5: PASSWORD CREATION MODAL                                     */}
-        {/* ==================================================================== */}
+        {/* STEP 5: PASSWORD CREATION MODAL */}
         {showPasswordModal && (
           <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
             <div className="bg-slate-900 border border-emerald-500/30 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
               <button 
                 onClick={() => setShowPasswordModal(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm"
+                className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm cursor-pointer"
               >
                 ✕
               </button>
@@ -191,14 +199,14 @@ export default function CheckoutReturn() {
                 </span>
                 <h3 className="text-xl font-bold text-white tracking-tight">Secure Your Workspace</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Set a permanent password for <strong className="text-white">{customerEmail}</strong> so you and your team can sign in anytime without tracking links.
+                  Set a permanent password for <strong className="text-white">{customerEmail}</strong> so you can access your workspace anytime without tracking links.
                 </p>
               </div>
 
               {passwordSuccess ? (
                 <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center space-y-2">
                   <span className="text-emerald-400 text-sm font-bold block">✓ Password Configured Successfully!</span>
-                  <p className="text-[11px] text-slate-400 font-mono">Redirecting to your unlocked TaskBoard...</p>
+                  <p className="text-[11px] text-slate-400 font-mono">Unlocking full TaskBoard workspace...</p>
                 </div>
               ) : (
                 <form onSubmit={handleCreatePassword} className="space-y-4">
@@ -226,7 +234,7 @@ export default function CheckoutReturn() {
                   <button
                     type="submit"
                     disabled={passwordLoading}
-                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/20"
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
                   >
                     {passwordLoading ? 'Securing Credentials...' : 'Save Password & Enter Workspace'}
                   </button>
@@ -252,7 +260,7 @@ export default function CheckoutReturn() {
         </div>
         <button
           onClick={handleReturnToDashboard}
-          className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold uppercase text-xs tracking-wider rounded-xl transition"
+          className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold uppercase text-xs tracking-wider rounded-xl transition cursor-pointer"
         >
           Return to Dashboard
         </button>
