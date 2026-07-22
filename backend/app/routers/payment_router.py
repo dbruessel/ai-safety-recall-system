@@ -22,7 +22,6 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 # Define mapping for product tiers to actual Stripe Price IDs 
-# (Make sure to replace these placeholder IDs with your actual Stripe Dashboard Price IDs)
 PRICE_TIER_MAPPING = {
     "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",      # $99/mo Standard
     "professional": "price_1TsR6jDXs4xycz0ohAfewQgk",   # $249/mo Professional
@@ -39,13 +38,15 @@ async def create_checkout_session(request: CheckoutRequest):
     Spins up a secure Stripe Checkout Session in Hosted Redirection mode.
     """
     plan = request.plan_type.lower()
-    if plan not in STRIPE_PRICE_IDS:
+    
+    # FIXED: Use PRICE_TIER_MAPPING instead of STRIPE_PRICE_IDS
+    if plan not in PRICE_TIER_MAPPING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid plan type '{request.plan_type}'. Must be standard, professional, or enterprise."
         )
 
-    price_id = STRIPE_PRICE_IDS[plan]
+    price_id = PRICE_TIER_MAPPING[plan]
 
     try:
         checkout_session = stripe.checkout.Session.create(
