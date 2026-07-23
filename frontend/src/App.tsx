@@ -24,6 +24,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
+  const [planType, setPlanType] = useState<'standard' | 'professional' | 'enterprise'>('professional');
+  
   const [bulkInput, setBulkInput] = useState('');
   const [injectedRecalls, setInjectedRecalls] = useState<Recall[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,14 +54,38 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Listen for active Supabase Auth sessions
+  // Helper to pull subscriber tier & profile data from Supabase
+  const fetchUserProfile = async (email: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('company_name, email, plan_type')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (data && !error) {
+        if (data.company_name) setCompanyName(data.company_name);
+        if (data.plan_type) setPlanType(data.plan_type as 'standard' | 'professional' | 'enterprise');
+      }
+    } catch (err) {
+      console.warn("Error loading user profile tier:", err);
+    }
+  };
+
+  // Listen for active Supabase Auth sessions & hydrate planType
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user?.email) {
+        fetchUserProfile(session.user.email);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user?.email) {
+        fetchUserProfile(session.user.email);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -86,23 +112,9 @@ export default function App() {
         if (isEmail) {
           setUserEmail(refParam);
           setCompanyName(refParam.split('@')[0]);
+          fetchUserProfile(refParam);
         } else {
           setCompanyName('Active Fleet Workspace');
-        }
-
-        // Fetch profile safely using maybeSingle to prevent console exceptions
-        try {
-          const query = supabase.from('profiles').select('company_name, email, plan_type');
-          const { data, error } = isEmail 
-            ? await query.eq('email', refParam).maybeSingle()
-            : await query.eq('id', refParam).maybeSingle();
-
-          if (data && !error) {
-            if (data.email) setUserEmail(data.email);
-            if (data.company_name) setCompanyName(data.company_name);
-          }
-        } catch (err) {
-          console.warn("Supabase profile hydration fallback executed:", err);
         }
       }
     };
@@ -181,6 +193,7 @@ export default function App() {
       
       setSession(data.session);
       setShowLoginModal(false);
+      fetchUserProfile(targetEmail);
     } catch (err: any) {
       setLoginError(err.message || 'Invalid login credentials. Please try again.');
     } finally {
@@ -193,7 +206,7 @@ export default function App() {
     return <CheckoutReturn />;
   }
 
-  // ROUTE 2: AUTHENTICATED WORKSPACE (Loads TaskBoard.tsx!)
+  // ROUTE 2: AUTHENTICATED WORKSPACE (Passes dynamic planType to TaskBoard!)
   if (session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 antialiased">
@@ -220,7 +233,7 @@ export default function App() {
         </header>
 
         <main className="max-w-7xl mx-auto">
-          <TaskBoard session={session} planType="professional" />
+          <TaskBoard session={session} planType={planType} />
         </main>
       </div>
     );
