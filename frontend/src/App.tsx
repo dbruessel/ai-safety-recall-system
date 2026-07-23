@@ -48,7 +48,7 @@ export default function App() {
 
   const globalMetrics = {
     indexedVulnerabilityDefinitions: 25041,
-    activeFederalSyncPulses: "24/7 Continuously Monitored",
+    activeFederalSyncPulses: "Continuous Active Monitoring",
     regionalThermalHazardCount: 15405
   };
 
@@ -116,7 +116,7 @@ export default function App() {
           setCompanyName(refParam.split('@')[0]);
           fetchUserProfile(refParam);
         } else {
-          setCompanyName('Active Fleet Workspace');
+          setCompanyName('Active Workspace');
         }
       }
     };
@@ -141,7 +141,7 @@ export default function App() {
         throw new Error("No valid asset rows detected inside your input feed.");
       }
 
-      // Intercept if fleet size exceeds free tier audit allowance (10 VINs)
+      // Intercept if asset size exceeds free tier audit allowance (10 VINs)
       if (lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
@@ -154,7 +154,7 @@ export default function App() {
           return {
             id: `audit-task-${idx}`,
             campaign_number: `26V-${700 + idx}`,
-            make: parts[0] || 'Fleet Make',
+            make: parts[0] || 'Asset Make',
             model: parts[1] || 'Commercial Unit',
             year: parts[2] || '2024',
             component: 'Mojave High-Heat Thermal Subassembly',
@@ -258,8 +258,8 @@ export default function App() {
             <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
             <span>Live Security Advisory: <strong>{globalMetrics.regionalThermalHazardCount.toLocaleString()} Thermal-Risk Recalls</strong> active across regional transport corridors.</span>
           </div>
-          <div className="hidden sm:block text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
-            3 AM UTC Auto-Sync Active
+          <div className="hidden sm:block text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded text-[11px]">
+            Continuous Active Monitoring
           </div>
         </div>
       </div>
@@ -296,13 +296,13 @@ export default function App() {
         {/* HERO INTRO & GHOST AUDIT DROPZONE */}
         <div className="text-center max-w-2xl mx-auto space-y-4">
           <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono text-xs font-semibold">
-            Complimentary 10-VIN Fleet Ghost Audit
+            Complimentary 10-VIN Ghost Audit
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-            Uncover Hidden Fleet Safety Liabilities Instantly
+            Uncover Hidden <span className="text-cyan-400 underline underline-offset-8 decoration-cyan-500/40">Safety Liability Issues</span> Instantly
           </h2>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Drop your fleet asset records below. We cross-reference your units against <strong className="text-slate-200">{globalMetrics.indexedVulnerabilityDefinitions.toLocaleString()} federal safety definitions</strong> completely free up to 10 vehicles.
+            Drop your vehicle asset records below. We cross-reference your units against <strong className="text-slate-200">{globalMetrics.indexedVulnerabilityDefinitions.toLocaleString()} federal safety definitions</strong> completely free up to 10 vehicles.
           </p>
         </div>
 
@@ -310,7 +310,7 @@ export default function App() {
         <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between">
             <label className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
-              Paste Fleet Manifest (Make, Model, Year) or VIN list:
+              Paste Vehicle Manifest (Make, Model, Year) or VIN list:
             </label>
             <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
               Free Tier Limit: 10 Assets Max
@@ -350,7 +350,7 @@ export default function App() {
           <div ref={resultsRef} className="max-w-3xl mx-auto space-y-6 animate-fadeIn pt-4">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
               <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                <span>🔍 Ghost Audit Findings</span>
+                <span>🔍 Safety Liability Issues Detected</span>
                 <span className="text-xs font-normal text-slate-400">({injectedRecalls.length} Preview Assets Analyzed)</span>
               </h3>
               <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
@@ -363,8 +363,8 @@ export default function App() {
                 <div key={i} className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-cyan-400">{r.make} {r.model} ({r.year})</span>
-                    <span className="font-mono text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">
-                      Campaign: {r.campaign_number}
+                    <span className="font-mono text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-0.5 rounded font-bold">
+                      NHTSA Recall #: {r.campaign_number}
                     </span>
                   </div>
                   <p className="text-xs text-slate-300">{r.summary}</p>
@@ -375,9 +375,9 @@ export default function App() {
 
             {/* CALL TO ACTION BANNER FOR GHOST AUDIT COMPLETED */}
             <div className="bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border border-cyan-500/40 rounded-2xl p-6 text-center space-y-3 shadow-2xl">
-              <h4 className="text-base font-bold text-white tracking-tight">Ready to Track & Resolve These Safety Threats?</h4>
+              <h4 className="text-base font-bold text-white tracking-tight">Ready to Track & Resolve These Safety Liability Issues?</h4>
               <p className="text-xs text-slate-400 max-w-xl mx-auto">
-                Activate a workspace subscription below to convert these findings into an active <strong className="text-slate-200">Kanban TaskBoard</strong> with 3 AM auto-sync, dealer scheduling, and broker compliance cards.
+                Activate a workspace subscription below to convert these findings into an active <strong className="text-slate-200">Kanban TaskBoard</strong> with continuous active monitoring, dealer scheduling, and broker compliance cards.
               </p>
               <a 
                 href="#pricing-matrix-anchor"
@@ -393,7 +393,7 @@ export default function App() {
         <section id="pricing-matrix-anchor" className="space-y-8 pt-6">
           <div className="text-center max-w-xl mx-auto space-y-3">
             <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based SaaS Tiers</h3>
-            <p className="text-xs text-slate-400">Unlock full automated fleet tracking, continuous 3AM updates, and broker-ready compliance audit trails.</p>
+            <p className="text-xs text-slate-400">Unlock full automated monitoring, continuous federal sync, and broker-ready compliance audit trails.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -409,10 +409,10 @@ export default function App() {
                   <span className="text-3xl font-black text-white">$99</span>
                   <span className="text-xs text-slate-400 font-mono">/ month</span>
                 </div>
-                <p className="text-xs text-slate-400">Essential monitoring and automated hazard alerts for boutique service fleets.</p>
+                <p className="text-xs text-slate-400">Essential monitoring and automated hazard alerts for regional service fleets.</p>
                 <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
                   <li className="flex items-center gap-2">✓ Up to 50 Vehicles Monitored</li>
-                  <li className="flex items-center gap-2">✓ Daily 3:00 AM Federal Sync</li>
+                  <li className="flex items-center gap-2">✓ Continuous Active Monitoring</li>
                   <li className="flex items-center gap-2">✓ Full Kanban TaskBoard Access</li>
                 </ul>
               </div>
@@ -457,7 +457,7 @@ export default function App() {
                 </div>
                 <p className="text-xs text-slate-400">Dedicated data streams, custom batch pipelines, and priority support for high-stakes renewals.</p>
                 <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
-                  <li className="flex items-center gap-2">✓ Unlimited Fleet Vehicles</li>
+                  <li className="flex items-center gap-2">✓ Unlimited Monitored Vehicles</li>
                   <li className="flex items-center gap-2">✓ Custom API Integrations & Webhooks</li>
                   <li className="flex items-center gap-2">✓ Quarterly Risk Reduction Audits (QBR)</li>
                 </ul>
@@ -547,7 +547,7 @@ export default function App() {
               <span className="text-xs font-mono text-rose-400 uppercase tracking-wider font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20">
                 Freemium Limit Intercepted
               </span>
-              <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Fleet Compliance</h3>
+              <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Safety Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
                 You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription below to unlock all {blockedVinCount} vehicles in a live TaskBoard.
               </p>
