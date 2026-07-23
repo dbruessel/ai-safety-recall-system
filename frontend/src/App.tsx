@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
@@ -32,7 +32,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // LOGIN / SIGN-IN MODAL STATES
+  // Ref for auto-scrolling to pricing upon audit completion
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // LOGIN / SIGN-IN MODAL STATES (For Paid Members Only)
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -55,7 +58,7 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Helper to pull subscriber tier & free audit status from Supabase
+  // Helper to pull subscriber tier & profile data from Supabase
   const fetchUserProfile = async (email: string) => {
     try {
       const { data, error } = await supabase
@@ -74,7 +77,7 @@ export default function App() {
     }
   };
 
-  // Listen for active Supabase Auth sessions & hydrate planType
+  // Listen for active Supabase Auth sessions
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -93,9 +96,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ====================================================================
-  // STEP 1 & 2: OUTBOUND HOOK PARSING & GRACEFUL HYDRATION
-  // ====================================================================
+  // Hydrate user info from URL parameters or local storage
   useEffect(() => {
     const hydrateProspectSession = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -124,20 +125,11 @@ export default function App() {
   }, []);
 
   // ====================================================================
-  // STEP 2 & 3: GHOST AUDIT SLICING, LIMIT TRACKING & LOCAL STORAGE
+  // PROSPECT GHOST AUDIT PROCESSOR (INLINE HOMEPAGE RESULTS)
   // ====================================================================
   const handleProcessManifest = async (rawText: string) => {
     setLoading(true);
     setError('');
-
-    // Check if free user has already consumed their complimentary audit
-    if (planType === 'free' && freeAuditCompleted) {
-      setLoading(false);
-      setBlockedVinCount(10);
-      setShowUpgradeModal(true);
-      setError('Your complimentary 10-VIN audit allocation has been consumed. Upgrade to run additional sweeps.');
-      return;
-    }
 
     try {
       const lines = rawText
@@ -149,15 +141,15 @@ export default function App() {
         throw new Error("No valid asset rows detected inside your input feed.");
       }
 
-      // Intercept if fleet size exceeds free tier audit allowance
-      if (planType === 'free' && lines.length > 10) {
+      // Intercept if fleet size exceeds free tier audit allowance (10 VINs)
+      if (lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
       }
 
       setTimeout(async () => {
-        // Process uploaded lines so they persist for the workspace TaskBoard
-        const fullAuditRecalls = lines.map((line, idx) => {
+        // Process preview audit items
+        const fullAuditRecalls = lines.slice(0, 10).map((line, idx) => {
           const parts = line.split(',');
           return {
             id: `audit-task-${idx}`,
@@ -173,25 +165,17 @@ export default function App() {
           };
         });
 
-        // Save full dataset to localStorage for TaskBoard hydration
+        // Save preview dataset to localStorage
         localStorage.setItem('recalllogic_audit_recalls', JSON.stringify(fullAuditRecalls));
 
-        // Mark free audit as consumed in Supabase if user is logged in
-        if (session?.user?.email && planType === 'free') {
-          await supabase
-            .from('profiles')
-            .update({ 
-              free_audit_completed: true,
-              vin_check_count: lines.length
-            })
-            .eq('email', session.user.email);
-
-          setFreeAuditCompleted(true);
-        }
-
-        // Slice first 10 assets for the free preview feed
-        setInjectedRecalls(fullAuditRecalls.slice(0, 10));
+        setInjectedRecalls(fullAuditRecalls);
         setLoading(false);
+
+        // Smoothly scroll down to the results and pricing matrix
+        setTimeout(() => {
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+
       }, 800);
 
     } catch (err: any) {
@@ -200,7 +184,7 @@ export default function App() {
     }
   };
 
-  // SIGN IN HANDLER FOR REGISTERED ACCOUNTS
+  // SIGN IN HANDLER FOR EXISTING PAID SUBSCRIBERS
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -230,7 +214,7 @@ export default function App() {
     return <CheckoutReturn />;
   }
 
-  // ROUTE 2: AUTHENTICATED WORKSPACE (Passes dynamic planType to TaskBoard!)
+  // ROUTE 2: AUTHENTICATED WORKSPACE (For Active Paid Members)
   if (session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 antialiased">
@@ -263,7 +247,7 @@ export default function App() {
     );
   }
 
-  // ROUTE 3: GUEST MARKETING / FREEMIUM LANDING PAGE
+  // ROUTE 3: GUEST MARKETING & FREEMIUM LANDING PAGE
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 antialiased">
       
@@ -298,9 +282,9 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setShowLoginModal(true)}
-              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition font-mono text-[11px] uppercase font-black tracking-wider rounded-lg shadow-lg shadow-cyan-500/10 cursor-pointer"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition font-mono text-[11px] uppercase font-bold tracking-wider rounded-lg cursor-pointer"
             >
-              Sign In to Workspace
+              Subscriber Sign In
             </button>
           </div>
         </div>
@@ -361,20 +345,22 @@ export default function App() {
           )}
         </div>
 
-        {/* RESULTS FEED */}
+        {/* INLINE GHOST AUDIT RESULTS FEED */}
         {injectedRecalls && (
-          <div className="max-w-3xl mx-auto space-y-4 animate-fadeIn">
+          <div ref={resultsRef} className="max-w-3xl mx-auto space-y-6 animate-fadeIn pt-4">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
-                Ghost Audit Results ({injectedRecalls.length} Preview Assets Analyzed)
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                <span>🔍 Ghost Audit Findings</span>
+                <span className="text-xs font-normal text-slate-400">({injectedRecalls.length} Preview Assets Analyzed)</span>
               </h3>
               <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
                 10-VIN Preview Complete
               </span>
             </div>
+
             <div className="space-y-3">
               {injectedRecalls.map((r, i) => (
-                <div key={i} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                <div key={i} className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-cyan-400">{r.make} {r.model} ({r.year})</span>
                     <span className="font-mono text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">
@@ -386,11 +372,25 @@ export default function App() {
                 </div>
               ))}
             </div>
+
+            {/* CALL TO ACTION BANNER FOR GHOST AUDIT COMPLETED */}
+            <div className="bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border border-cyan-500/40 rounded-2xl p-6 text-center space-y-3 shadow-2xl">
+              <h4 className="text-base font-bold text-white tracking-tight">Ready to Track & Resolve These Safety Threats?</h4>
+              <p className="text-xs text-slate-400 max-w-xl mx-auto">
+                Activate a workspace subscription below to convert these findings into an active <strong className="text-slate-200">Kanban TaskBoard</strong> with 3 AM auto-sync, dealer scheduling, and broker compliance cards.
+              </p>
+              <a 
+                href="#pricing-matrix-anchor"
+                className="inline-block px-6 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-extrabold tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/20"
+              >
+                Select Your Subscription Tier
+              </a>
+            </div>
           </div>
         )}
 
         {/* PRODUCT TIERS & PRICING MATRIX */}
-        <section id="pricing-anchor" className="space-y-8 pt-6">
+        <section id="pricing-matrix-anchor" className="space-y-8 pt-6">
           <div className="text-center max-w-xl mx-auto space-y-3">
             <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based SaaS Tiers</h3>
             <p className="text-xs text-slate-400">Unlock full automated fleet tracking, continuous 3AM updates, and broker-ready compliance audit trails.</p>
@@ -413,7 +413,7 @@ export default function App() {
                 <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
                   <li className="flex items-center gap-2">✓ Up to 50 Vehicles Monitored</li>
                   <li className="flex items-center gap-2">✓ Daily 3:00 AM Federal Sync</li>
-                  <li className="flex items-center gap-2">✓ Standard Compliance Badges</li>
+                  <li className="flex items-center gap-2">✓ Full Kanban TaskBoard Access</li>
                 </ul>
               </div>
               <UpgradeButton planType="standard" email={userEmail} className="w-full py-3" />
@@ -436,8 +436,9 @@ export default function App() {
                 <p className="text-xs text-slate-400">Full compliance history, active thermal multipliers, and insurance broker audit reports.</p>
                 <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
                   <li className="flex items-center gap-2">✓ Up to 250 Vehicles Monitored</li>
+                  <li className="flex items-center gap-2">✓ Instant Single-VIN Scan Console</li>
                   <li className="flex items-center gap-2">✓ Real-Time Thermal Hazard Alerts</li>
-                  <li className="flex items-center gap-2">✓ One-Click Insurance Underwriter Share</li>
+                  <li className="flex items-center gap-2">✓ Signed Underwriter Compliance Card</li>
                 </ul>
               </div>
               <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
@@ -469,7 +470,7 @@ export default function App() {
 
       </main>
 
-      {/* SIGN IN MODAL FOR REGISTERED USERS */}
+      {/* SIGN IN MODAL FOR EXISTING ACTIVE SUBSCRIBERS */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-cyan-500/30 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
@@ -482,16 +483,26 @@ export default function App() {
 
             <div className="space-y-2">
               <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/20">
-                Active Account Detected
+                Paid Workspace Portal
               </span>
-              <h3 className="text-xl font-bold text-white tracking-tight">Sign In to TaskBoard</h3>
+              <h3 className="text-xl font-bold text-white tracking-tight">Subscriber Sign In</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Enter password for <strong className="text-white">{userEmail || 'vegasfleetmgr@commercialpro.com'}</strong> to access your workspace.
+                Enter your credentials to access your active TaskBoard workspace.
               </p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1 text-left">
+                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold">Email Address:</label>
+                <input
+                  type="email"
+                  required
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  placeholder="vegasfleetmgr@commercialpro.com"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono text-white focus:outline-none focus:border-cyan-500 transition mb-3"
+                />
+
                 <label className="text-[10px] font-mono uppercase text-slate-400 font-bold">Account Password:</label>
                 <input
                   type="password"
@@ -534,11 +545,11 @@ export default function App() {
             
             <div className="space-y-2">
               <span className="text-xs font-mono text-rose-400 uppercase tracking-wider font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20">
-                Freemium Gate Intercepted
+                Freemium Limit Intercepted
               </span>
               <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Fleet Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. We've shown a live Ghost Audit preview of your first 10 assets below. Activate a Pro workspace to unlock all {blockedVinCount} vehicles and enable continuous 3:00 AM monitoring.
+                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription below to unlock all {blockedVinCount} vehicles in a live TaskBoard.
               </p>
             </div>
 
@@ -548,7 +559,7 @@ export default function App() {
                 <span className="text-cyan-400 uppercase font-bold">{selectedTier}</span>
               </div>
               <div className="flex justify-between text-slate-400">
-                <span>Monthly Base Subscription:</span>
+                <span>Monthly Subscription:</span>
                 <span className="text-white font-bold">
                   {selectedTier === 'standard' ? '$99.00' : selectedTier === 'professional' ? '$249.00' : '$499.00'}/mo
                 </span>
@@ -562,7 +573,7 @@ export default function App() {
                 onClick={() => setShowUpgradeModal(false)}
                 className="w-full py-2 text-slate-400 hover:text-white font-mono text-xs uppercase cursor-pointer"
               >
-                Return to 10-VIN Preview Audit
+                Return to 10-VIN Preview
               </button>
             </div>
           </div>
