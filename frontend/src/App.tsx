@@ -24,7 +24,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
-  const [planType, setPlanType] = useState<'standard' | 'professional' | 'enterprise'>('professional');
+  const [planType, setPlanType] = useState<'free' | 'standard' | 'professional' | 'enterprise'>('free');
+  const [freeAuditCompleted, setFreeAuditCompleted] = useState<boolean>(false);
   
   const [bulkInput, setBulkInput] = useState('');
   const [injectedRecalls, setInjectedRecalls] = useState<Recall[] | null>(null);
@@ -54,18 +55,19 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Helper to pull subscriber tier & profile data from Supabase
+  // Helper to pull subscriber tier & free audit status from Supabase
   const fetchUserProfile = async (email: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('company_name, email, plan_type')
+        .select('company_name, email, plan_type, free_audit_completed')
         .eq('email', email)
         .maybeSingle();
 
       if (data && !error) {
         if (data.company_name) setCompanyName(data.company_name);
-        if (data.plan_type) setPlanType(data.plan_type as 'standard' | 'professional' | 'enterprise');
+        if (data.plan_type) setPlanType(data.plan_type as any);
+        if (data.free_audit_completed) setFreeAuditCompleted(data.free_audit_completed);
       }
     } catch (err) {
       console.warn("Error loading user profile tier:", err);
@@ -99,7 +101,6 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       let refParam = params.get('ref');
 
-      // Fallback to localStorage if refreshed without URL parameter
       if (!refParam) {
         refParam = localStorage.getItem('recalllogic_ref');
       } else {
@@ -123,11 +124,21 @@ export default function App() {
   }, []);
 
   // ====================================================================
-  // STEP 2 & 3: GHOST AUDIT SLICING & PERSISTENCE TO LOCAL STORAGE
+  // STEP 2 & 3: GHOST AUDIT SLICING, LIMIT TRACKING & LOCAL STORAGE
   // ====================================================================
-  const handleProcessManifest = (rawText: string) => {
+  const handleProcessManifest = async (rawText: string) => {
     setLoading(true);
     setError('');
+
+    // Check if free user has already consumed their complimentary audit
+    if (planType === 'free' && freeAuditCompleted) {
+      setLoading(false);
+      setBlockedVinCount(10);
+      setShowUpgradeModal(true);
+      setError('Your complimentary 10-VIN audit allocation has been consumed. Upgrade to run additional sweeps.');
+      return;
+    }
+
     try {
       const lines = rawText
         .split('\n')
@@ -138,14 +149,14 @@ export default function App() {
         throw new Error("No valid asset rows detected inside your input feed.");
       }
 
-      // Check if fleet size exceeds free audit limit
-      if (lines.length > 10) {
+      // Intercept if fleet size exceeds free tier audit allowance
+      if (planType === 'free' && lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
       }
 
-      setTimeout(() => {
-        // Process ALL uploaded lines so they persist for the workspace TaskBoard
+      setTimeout(async () => {
+        // Process uploaded lines so they persist for the workspace TaskBoard
         const fullAuditRecalls = lines.map((line, idx) => {
           const parts = line.split(',');
           return {
@@ -162,8 +173,21 @@ export default function App() {
           };
         });
 
-        // Save the full manifest dataset to localStorage for TaskBoard hydration
+        // Save full dataset to localStorage for TaskBoard hydration
         localStorage.setItem('recalllogic_audit_recalls', JSON.stringify(fullAuditRecalls));
+
+        // Mark free audit as consumed in Supabase if user is logged in
+        if (session?.user?.email && planType === 'free') {
+          await supabase
+            .from('profiles')
+            .update({ 
+              free_audit_completed: true,
+              vin_check_count: lines.length
+            })
+            .eq('email', session.user.email);
+
+          setFreeAuditCompleted(true);
+        }
 
         // Slice first 10 assets for the free preview feed
         setInjectedRecalls(fullAuditRecalls.slice(0, 10));
@@ -445,7 +469,7 @@ export default function App() {
 
       </main>
 
-      {/* SIGN IN MODAL FOR EXISTING ACTIVE USERS */}
+      {/* SIGN IN MODAL FOR REGISTERED USERS */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-cyan-500/30 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
