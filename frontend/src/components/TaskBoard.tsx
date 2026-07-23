@@ -26,7 +26,7 @@ interface RecallTask {
 interface TaskBoardProps {
   session?: Session | null;
   userId?: string;
-  planType?: 'standard' | 'professional' | 'enterprise';
+  planType?: 'free' | 'standard' | 'professional' | 'enterprise';
   recalls?: any[];
   onStatusUpdate?: (campaignNumber: string, newStatus: any) => void;
 }
@@ -34,7 +34,7 @@ interface TaskBoardProps {
 export default function TaskBoard({ 
   session,
   userId, 
-  planType = "professional", 
+  planType = "free", 
   recalls, 
   onStatusUpdate 
 }: TaskBoardProps) {
@@ -57,6 +57,9 @@ export default function TaskBoard({
 
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
+
+  // Normalize baseline tiers for gated feature checks
+  const isBaseTier = planType === 'free' || planType === 'standard';
 
   // Helper function to format recall tasks cleanly
   const parseAndSetTasks = (rawRecalls: any[]) => {
@@ -128,7 +131,7 @@ export default function TaskBoard({
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (planType === 'standard') {
+    if (isBaseTier) {
       setError('Single-VIN Asset Provisioning is a premium framework capability. Please upgrade to Pro Operations.');
       return;
     }
@@ -205,7 +208,8 @@ export default function TaskBoard({
   return (
     <div className="space-y-8 animate-fadeIn">
       
-      {planType === 'standard' && (
+      {/* FREEMIUM / STANDARD UNCHECKED DELTA WARNING */}
+      {isBaseTier && (
         <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <h4 className="text-rose-400 font-mono text-xs font-black uppercase tracking-wider flex items-center gap-2">
@@ -225,6 +229,7 @@ export default function TaskBoard({
         </div>
       )}
 
+      {/* ASSET INTEGRATION CONSOLE */}
       <section className="bg-gradient-to-r from-[#0b0f19] to-slate-950 border border-slate-900 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
@@ -239,8 +244,8 @@ export default function TaskBoard({
               </span>
             </div>
             <p className="text-slate-400 text-xs">
-              {planType === 'standard' 
-                ? 'Standard tier is limited to automated file drops. Upgrade to mount immediate single-VIN scanning nodes.' 
+              {isBaseTier 
+                ? 'Standard and Free tiers are limited to batch manifest drops. Upgrade to Pro to mount single-VIN scanning nodes.' 
                 : 'Provision new single-VIN assets. Real-time subassembly threat generation engine is operational.'}
             </p>
           </div>
@@ -248,16 +253,16 @@ export default function TaskBoard({
           <form onSubmit={handleAddVehicle} className="flex gap-3 max-w-md w-full">
             <input
               type="text"
-              placeholder={planType === 'standard' ? "Upgrade to enable lookup entry..." : "Enter 17-digit VIN..."}
+              placeholder={isBaseTier ? "Upgrade to enable single-VIN lookup..." : "Enter 17-digit VIN..."}
               value={newVin}
-              disabled={planType === 'standard'}
+              disabled={isBaseTier}
               onChange={(e) => setNewVin(e.target.value.toUpperCase())}
               maxLength={17}
               className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-cyan-400 font-mono focus:border-cyan-500/80 outline-none transition-all placeholder:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
             />
             <button
               type="submit"
-              disabled={addingVehicle || planType === 'standard'}
+              disabled={addingVehicle || isBaseTier}
               className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {addingVehicle ? 'Analyzing...' : 'Add Vehicle'}
@@ -270,7 +275,8 @@ export default function TaskBoard({
         )}
       </section>
 
-      {planType === 'standard' && (
+      {/* PROMOTIONAL BROKER EXPORT BANNER FOR BASE TIERS */}
+      {isBaseTier && (
         <section className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm shadow-inner">
           <div className="absolute top-0 right-0 bg-slate-800 text-slate-500 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-slate-800 rounded-bl-xl font-black">
             🔒 Premium Feature
@@ -295,6 +301,7 @@ export default function TaskBoard({
         </section>
       )}
 
+      {/* ENTERPRISE WEBHOOK RELAY CONSOLE */}
       {planType === 'enterprise' && (
         <section className="bg-slate-950 border border-purple-900/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-fadeIn">
           <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-400 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-purple-900/30 rounded-bl-xl font-bold">
@@ -334,6 +341,7 @@ export default function TaskBoard({
         </div>
       )}
 
+      {/* KANBAN BOARD LANES */}
       {loading ? (
         <div className="text-center py-12 text-xs font-mono tracking-widest text-slate-500 uppercase animate-pulse">
           Synchronizing Ledger Arrays...
@@ -341,7 +349,7 @@ export default function TaskBoard({
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* PENDING THREATS */}
+          {/* PENDING THREATS LANE */}
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🔴 Pending Threats ({pendingTasks.length})</span>
@@ -367,7 +375,7 @@ export default function TaskBoard({
                       <span className="text-[10px] font-mono bg-cyan-950/40 text-cyan-400 px-2 py-0.5 rounded uppercase border border-cyan-900/30">
                         {task.component}
                       </span>
-                      {planType === 'standard' ? (
+                      {isBaseTier ? (
                         <span className="text-[10px] font-mono bg-amber-950/50 text-amber-500 px-2 py-0.5 rounded uppercase border border-amber-900/20 animate-pulse">
                           🔥 Local High-Ambient Risk Active
                         </span>
@@ -417,7 +425,7 @@ export default function TaskBoard({
             </div>
           </div>
 
-          {/* SCHEDULED REMEDIATION */}
+          {/* SCHEDULED REMEDIATION LANE */}
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟡 Scheduled Remediation ({scheduledTasks.length})</span>
@@ -457,7 +465,7 @@ export default function TaskBoard({
             </div>
           </div>
 
-          {/* CLEARED LEDGERS */}
+          {/* CLEARED LEDGERS LANE */}
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟢 Cleared Ledgers ({repairedTasks.length})</span>
@@ -489,7 +497,7 @@ export default function TaskBoard({
         </div>
       )}
 
-      {planType === 'standard' && <div id="pricing-matrix-anchor" className="h-1" />}
+      {isBaseTier && <div id="pricing-matrix-anchor" className="h-1" />}
     </div>
   );
 }
