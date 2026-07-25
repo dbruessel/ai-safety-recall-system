@@ -392,7 +392,7 @@ export default function App() {
         {/* PRODUCT TIERS & PRICING MATRIX */}
         <section id="pricing-matrix-anchor" className="space-y-8 pt-6">
           <div className="text-center max-w-xl mx-auto space-y-3">
-            <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based SaaS Tiers</h3>
+            <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based Tiers</h3>
             <p className="text-xs text-slate-400">Unlock full automated monitoring, continuous federal sync, and broker-ready compliance audit trails.</p>
           </div>
 
