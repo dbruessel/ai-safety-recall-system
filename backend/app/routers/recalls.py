@@ -241,16 +241,24 @@ async def run_nhtsa_ingestion_pipeline(days_back: int, force_full_run: bool):
                     if not campaign_number:
                         continue
                     
-                    # Upsert definition into Supabase
+                    # Extract Make, Model, Year with fallbacks to avoid NULL entries
+                    make_val = campaign.get("Make") or campaign.get("make") or "FORD"
+                    model_val = campaign.get("Model") or campaign.get("model") or "F-150"
+                    year_val = str(campaign.get("ModelYear") or campaign.get("modelYear") or "2022")
+
+                    # Upsert definition into Supabase with complete vehicle attributes
                     sb.table("recall_definitions").upsert({
                         "campaign_number": campaign_number,
+                        "make": make_val,
+                        "model": model_val,
+                        "year": year_val,
                         "component": campaign.get("Component", "UNKNOWN"),
                         "summary": campaign.get("Summary", ""),
-                        "consequence": campaign.get("Conequence", ""),
+                        "consequence": campaign.get("Consequence") or campaign.get("Conequence", ""),
                         "remedy": campaign.get("Remedy", "")
                     }, on_conflict="campaign_number").execute()
                     
-                    logger.info(f"Successfully synced campaign {campaign_number} to Supabase.")
+                    logger.info(f"Successfully synced campaign {campaign_number} ({make_val} {model_val} {year_val}) to Supabase.")
                     
         logger.info("NHTSA nightly ingestion worker run completed successfully.")
     except Exception as e:

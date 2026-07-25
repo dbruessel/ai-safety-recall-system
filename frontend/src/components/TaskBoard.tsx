@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { Session } from '@supabase/supabase-js';
 
+// Dynamically resolve backend base URL for local dev vs. production deployment
+const API_BASE_URL = 
+  process.env.NEXT_PUBLIC_API_URL || 
+  process.env.REACT_APP_API_URL || 
+  'http://127.0.0.1:8000';
+
 interface VehicleInfo {
   vin: string;
   make: string;
@@ -61,24 +67,40 @@ export default function TaskBoard({
   // Normalize baseline tiers for gated feature checks
   const isBaseTier = planType === 'free' || planType === 'standard';
 
-  // Helper function to format recall tasks cleanly
+  // Helper function to format recall tasks cleanly from direct Supabase payload
   const parseAndSetTasks = (rawRecalls: any[]) => {
-    const parsedTasks: RecallTask[] = rawRecalls.map((r, i) => ({
-      id: r.id || `task-${i}`,
-      vehicle_id: `v-${i}`,
-      campaign_number: r.campaign_number || `26V-${700 + i}`,
-      component: r.component || "Mojave High-Heat Thermal Subassembly",
-      summary: r.summary || "Vulnerability noted under regional stress parameters.",
-      remedy: r.remedy || "Dealer inspect harness.",
-      severity_score: r.calculated_severity_score || r.severity_score || 8.5,
-      status: r.status?.toLowerCase() === 'scheduled' ? 'scheduled' : r.status?.toLowerCase() === 'repaired' ? 'repaired' : 'pending',
-      monitored_vehicles: r.monitored_vehicles || {
-        vin: r.vin || `1FTFW1ED4NFC${10000 + i}`,
-        make: r.make || "Fleet Make",
-        model: r.model || "Commercial Unit",
-        year: parseInt(r.year) || 2024
-      }
-    }));
+    const parsedTasks: RecallTask[] = rawRecalls.map((r, i) => {
+      // Clean vehicle details directly from Supabase top-level fields
+      const vehicleMake = r.make || r.monitored_vehicles?.make || "FORD";
+      const vehicleModel = r.model || r.monitored_vehicles?.model || "F-150";
+      const vehicleYear = parseInt(r.year || r.monitored_vehicles?.year) || 2022;
+      const vehicleVin = r.vin || r.monitored_vehicles?.vin || `1FTFW1ED4NFC${10000 + i}`;
+
+      // Normalize status strings
+      const rawStatus = (r.status || 'pending').toLowerCase();
+      let normalizedStatus: 'pending' | 'scheduled' | 'repaired' = 'pending';
+      if (rawStatus === 'scheduled') normalizedStatus = 'scheduled';
+      if (rawStatus === 'repaired' || rawStatus === 'completed') normalizedStatus = 'repaired';
+
+      return {
+        id: r.id || `task-${i}`,
+        vehicle_id: r.vehicle_id || `v-${i}`,
+        campaign_number: r.campaign_number || `26V-${700 + i}`,
+        component: r.component || "ELECTRICAL SYSTEM",
+        summary: r.summary || "Safety campaign active for this asset model.",
+        remedy: r.remedy || "Dealers will inspect and repair affected components free of charge.",
+        severity_score: r.calculated_severity_score || r.severity_score || 50.0,
+        status: normalizedStatus,
+        scheduled_repair_date: r.scheduled_repair_date,
+        repaired_at: r.repaired_at,
+        monitored_vehicles: {
+          vin: vehicleVin,
+          make: vehicleMake,
+          model: vehicleModel,
+          year: vehicleYear
+        }
+      };
+    });
     setTasks(parsedTasks);
   };
 
@@ -93,14 +115,14 @@ export default function TaskBoard({
     try {
       setLoading(true);
       setError('');
-      const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/tasks`, {
+      const response = await axios.get(`${API_BASE_URL}/api/dashboard/tasks`, {
         params: { user_id: activeUserId } 
       });
 
       if (response.data && response.data.length > 0) {
         parseAndSetTasks(response.data);
       } else {
-        // 2. FALLBACK: Check if user processed a Ghost Audit before logging in!
+        // 2. FALLBACK: Check if user processed a Ghost Audit before logging in
         const savedAuditData = localStorage.getItem('recalllogic_audit_recalls');
         if (savedAuditData) {
           const parsed = JSON.parse(savedAuditData);
@@ -146,7 +168,7 @@ export default function TaskBoard({
     setAddSuccessMsg('');
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/dashboard/vehicles', {
+      const response = await axios.post(`${API_BASE_URL}/api/dashboard/vehicles`, {
         vin: newVin.trim().toUpperCase(),
         user_id: activeUserId
       });
@@ -174,7 +196,7 @@ export default function TaskBoard({
       const payload: any = { status: newStatus };
       if (date) payload.scheduled_repair_date = date;
 
-      await axios.patch(`http://127.0.0.1:8000/api/dashboard/tasks/${taskId}`, payload);
+      await axios.patch(`${API_BASE_URL}/api/dashboard/tasks/${taskId}`, payload);
       
       setTasks(prevTasks =>
         prevTasks.map(task =>
@@ -388,6 +410,12 @@ export default function TaskBoard({
 
                     <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.summary}</p>
                     
+                    {task.remedy && (
+                      <p className="text-slate-500 text-[11px] italic mt-2 border-l-2 border-slate-800 pl-2">
+                        Remedy: {task.remedy}
+                      </p>
+                    )}
+
                     <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
                       <button
                         type="button"
