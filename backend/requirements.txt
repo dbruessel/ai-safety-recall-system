@@ -2,7 +2,10 @@
 uvicorn
 pydantic
 pydantic-settings
+python-multipart
 supabase
 httpx
 requests
 python-dotenv
+stripe
+gunicorn
