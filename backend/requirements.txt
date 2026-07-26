@@ -3,3 +3,4 @@ uvicorn[standard]
 google-cloud-firestore
 python-dotenv
 pydantic
+pydantic-settings
