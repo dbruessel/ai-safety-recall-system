@@ -1,6 +1,8 @@
 ﻿fastapi
-uvicorn[standard]
-google-cloud-firestore
-python-dotenv
+uvicorn
 pydantic
 pydantic-settings
+supabase
+httpx
+requests
+python-dotenv
