@@ -10,7 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 # Import your database session dependency (adjust path if your DB module is located elsewhere)
-from app.database import get_db
+from app.db import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
