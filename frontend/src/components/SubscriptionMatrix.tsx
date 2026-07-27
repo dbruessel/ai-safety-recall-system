@@ -21,8 +21,13 @@ export default function SubscriptionMatrix({ currentPlan, onSelectPlan }: Subscr
     {
       name: 'Standard Essentials',
       limit: '1 - 50 Vehicles',
-      price: '$199/mo',
-      features: ['Daily Automated Sweeps', 'NHTSA Database Sync', 'Basic Email Hazard Alerts'],
+      price: '$99/mo',
+      features: [
+        'Daily Automated Sweeps',
+        'NHTSA Database Sync',
+        'Basic Email Hazard Alerts',
+        'CSV Audit Trail Exports'
+      ],
       cta: 'Current Plan',
       popular: false,
       type: 'standard'
@@ -30,18 +35,28 @@ export default function SubscriptionMatrix({ currentPlan, onSelectPlan }: Subscr
     {
       name: 'Pro Operations',
       limit: '51 - 250 Vehicles',
-      price: '$499/mo',
-      features: ['Real-time Single-VIN Lookup Nodes', 'Verifiable Compliance Certificates', 'Signed Insurance Broker Links', 'PDF Audit Trail Exports'],
+      price: '$249/mo',
+      features: [
+        'Real-time Single-VIN Scan Console',
+        'Signed Underwriter Compliance Cards',
+        'Real-Time Thermal Hazard Alerts',
+        'Co-Branded Insurance Audit Reports'
+      ],
       cta: 'Upgrade Workspace',
       popular: true,
       type: 'professional'
     },
     {
-      name: 'Enterprise Risk Management',
+      name: 'Enterprise Risk',
       limit: '251+ Fleet Units',
-      price: 'Custom Flat-Rate',
-      features: ['Dedicated Accounts Engineer', 'Custom Webhook Pipeline Event Relays', 'Permanent Audit Persistence Ledger', 'SLA Response Guarantee'],
-      cta: 'Contact Risk Desk',
+      price: '$499/mo',
+      features: [
+        'Unlimited Monitored Vehicles',
+        'Multi-Fleet Portfolio Controls',
+        'Telematics & TMS Integrations (Samsara, Geotab)',
+        'Dedicated Broker QBR & Renewal Packets'
+      ],
+      cta: 'Activate Enterprise',
       popular: false,
       type: 'enterprise'
     }
@@ -54,7 +69,7 @@ export default function SubscriptionMatrix({ currentPlan, onSelectPlan }: Subscr
           SaaS Tier Governance Matrix
         </h3>
         <p className="text-xs text-slate-400">
-          Select workspaces built to isolate liabilities from regional climate stressors.
+          Select workspaces built to isolate liabilities and satisfy commercial auto underwriter compliance.
         </p>
       </div>
 
@@ -70,7 +85,7 @@ export default function SubscriptionMatrix({ currentPlan, onSelectPlan }: Subscr
           >
             {tier.popular && (
               <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 font-mono text-[9px] tracking-widest font-black px-3 py-0.5 rounded-full uppercase shadow-md">
-                Recommended Setup
+                Most Popular
               </span>
             )}
 

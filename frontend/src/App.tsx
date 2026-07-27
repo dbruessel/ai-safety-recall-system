@@ -444,26 +444,26 @@ export default function App() {
               <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
             </div>
 
-            {/* ENTERPRISE TIER */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">Enterprise</span>
-                  <h4 className="text-xl font-bold text-white mt-1">Total Risk Management</h4>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-white">$499</span>
-                  <span className="text-xs text-slate-400 font-mono">/ month</span>
-                </div>
-                <p className="text-xs text-slate-400">Dedicated data streams, custom batch pipelines, and priority support for high-stakes renewals.</p>
-                <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
-                  <li className="flex items-center gap-2">✓ Unlimited Monitored Vehicles</li>
-                  <li className="flex items-center gap-2">✓ Custom API Integrations & Webhooks</li>
-                  <li className="flex items-center gap-2">✓ Quarterly Risk Reduction Audits (QBR)</li>
-                </ul>
-              </div>
-              <UpgradeButton planType="enterprise" email={userEmail} className="w-full py-3" />
-            </div>
+{/* ENTERPRISE TIER */}
+<div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
+  <div className="space-y-4">
+    <div>
+      <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">Enterprise</span>
+      <h4 className="text-xl font-bold text-white mt-1">Total Risk Management</h4>
+    </div>
+    <div className="flex items-baseline gap-1">
+      <span className="text-3xl font-black text-white">$499</span>
+      <span className="text-xs text-slate-400 font-mono">/ month</span>
+    </div>
+    <p className="text-xs text-slate-400">Dedicated data streams, custom batch pipelines, and priority support for high-stakes renewals.</p>
+    <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
+      <li className="flex items-center gap-2">✓ Unlimited Monitored Vehicles</li>
+      <li className="flex items-center gap-2">✓ Custom API Integrations & Webhooks</li>
+      <li className="flex items-center gap-2">✓ Quarterly Risk Reduction Audits (QBR)</li>
+    </ul>
+  </div>
+  <UpgradeButton planType="enterprise" email={userEmail} className="w-full py-3" />
+</div>
 
           </div>
         </section>
