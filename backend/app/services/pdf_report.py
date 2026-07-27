@@ -156,15 +156,19 @@ async def generate_fleet_compliance_pdf(
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1.5, color=ACCENT, spaceAfter=12))
 
-    # 2. BADGE
+    # 2. BADGE (Now featuring the highlighted Live Sweep Timestamp)
     badge_data = [[
-        Paragraph("<b>STATUS: RECALLLOGIC CERTIFIED RISK POSTURE</b><br/><font size=8 color='#047857'>24/7 Automated NHTSA Safety Sweep Active • Underwriter Verified</font>", badge_style)
+        Paragraph(
+            "<b>STATUS: RECALLLOGIC CERTIFIED RISK POSTURE</b><br/>"
+            f"<font size=8 color='#047857'><b>24/7 Automated Sweep Active</b> • Last Verified Engine Sweep: <b><u>{last_sweep}</u></b></font>",
+            badge_style
+        )
     ]]
     badge_table = Table(badge_data, colWidths=[530])
     badge_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
-        ('BORDER', (0, 0), (-1, -1), 1, colors.HexColor("#A7F3D0")),
-        ('PADDING', (0, 0), (-1, -1), 8),
+        ('BORDER', (0, 0), (-1, -1), 1.5, colors.HexColor("#10B981")),
+        ('PADDING', (0, 0), (-1, -1), 10),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
     ]))
     story.append(badge_table)
