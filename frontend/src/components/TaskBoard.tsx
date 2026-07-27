@@ -202,6 +202,11 @@ export const TaskBoard: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleDownloadPDF = () => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
+  };
+
   // ==========================================
   // RENDER UI
   // ==========================================
@@ -213,12 +218,20 @@ export const TaskBoard: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Fleet Recall Operations</h1>
           <p className="text-sm text-gray-500">Monitor, filter, and schedule safety recall remedies across active fleet assets.</p>
         </div>
-        <button
-          onClick={handleExportCSV}
-          className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
-        >
-          <span>📥</span> Export CSV Report
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleDownloadPDF}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
+          >
+            <span>📄</span> Download Risk Certificate (PDF)
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
+          >
+            <span>📥</span> Export CSV Report
+          </button>
+        </div>
       </div>
 
       {/* 1. TOP KPI STATS BAR */}
@@ -504,3 +517,5 @@ export const TaskBoard: React.FC = () => {
     </div>
   );
 };
+
+export default TaskBoard;
