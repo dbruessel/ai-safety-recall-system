@@ -444,7 +444,7 @@ export default function App() {
               <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
             </div>
 
-            {/* ENTERPRISE TIER */}
+{/* ENTERPRISE TIER */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div>
@@ -456,11 +456,23 @@ export default function App() {
                   <span className="text-xs text-slate-400 font-mono">/ month</span>
                 </div>
                 <p className="text-xs text-slate-400">Dedicated data streams, custom batch pipelines, and priority support for high-stakes renewals.</p>
-                <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
-                  <li className="flex items-center gap-2">✓ <strong>Unlimited Vehicles</strong> & Multi-Fleet Portfolios</li>
-                  <li className="flex items-center gap-2">✓ <strong>Telematics & TMS Integrations</strong> (Samsara, Geotab, Fleetio)</li>
-                  <li className="flex items-center gap-2">✓ <strong>Dedicated Broker QBR</strong> & Co-Branded Renewal Packets</li>
-                  <li className="flex items-center gap-2">✓ Custom Batch Ingestion & Webhooks</li>
+                <ul className="space-y-3 text-xs text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span><strong className="text-white font-semibold">Unlimited Vehicles</strong> & Multi-Fleet Portfolios</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span><strong className="text-white font-semibold">Telematics & TMS Integrations</strong> (Samsara, Geotab, Fleetio)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span><strong className="text-white font-semibold">Dedicated Broker QBR</strong> & Co-Branded Renewal Packets</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span>Custom Batch Ingestion & Webhooks</span>
+                  </li>
                 </ul>
               </div>
               <UpgradeButton planType="enterprise" email={userEmail} className="w-full py-3" />
