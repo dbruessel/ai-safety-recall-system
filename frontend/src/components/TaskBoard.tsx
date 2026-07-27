@@ -1,531 +1,506 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import type { Session } from '@supabase/supabase-js';
+import React, { useState, useMemo, useEffect } from 'react';
 
-// Dynamically resolve backend base URL for local dev vs. production deployment
-const API_BASE_URL = 
-  process.env.NEXT_PUBLIC_API_URL || 
-  process.env.REACT_APP_API_URL || 
-  'http://127.0.0.1:8000';
-
-interface VehicleInfo {
+// ==========================================
+// TYPES & INTERFACES
+// ==========================================
+export interface TaskboardRecallItem {
+  id: string;
+  unit_number: string;
   vin: string;
+  year: number;
   make: string;
   model: string;
-  year: number;
-}
-
-interface RecallTask {
-  id: string;
-  vehicle_id: string;
-  campaign_number: string;
+  nhtsa_campaign_number: string;
   component: string;
-  summary: string;
-  remedy: string;
-  severity_score: number;
-  status: 'pending' | 'scheduled' | 'repaired';
-  scheduled_repair_date?: string;
-  repaired_at?: string;
-  monitored_vehicles?: VehicleInfo;
+  severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  status: 'Open' | 'Scheduled' | 'In Progress' | 'Cleared' | string;
+  summary?: string;
+  consequence?: string;
+  remedy?: string;
+  created_at: string;
+  scheduled_date?: string;
+  repair_notes?: string;
+  receipt_url?: string;
 }
 
-interface TaskBoardProps {
-  session?: Session | null;
-  userId?: string;
-  planType?: 'free' | 'standard' | 'professional' | 'enterprise';
-  recalls?: any[];
-  onStatusUpdate?: (campaignNumber: string, newStatus: any) => void;
-}
+export const TaskBoard: React.FC = () => {
+  // ==========================================
+  // STATE MANAGEMENT
+  // ==========================================
+  const [recalls, setRecalls] = useState<TaskboardRecallItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-export default function TaskBoard({ 
-  session,
-  userId, 
-  planType = "free", 
-  recalls, 
-  onStatusUpdate 
-}: TaskBoardProps) {
-  // Dynamically resolve active user email from Supabase session, props, or localStorage
-  const activeUserId = session?.user?.email || 
-                       userId || 
-                       localStorage.getItem('recalllogic_ref') || 
-                       "vegasfleetmgr@commercialpro.com";
+  // 🔍 Filter & Sort States
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedMake, setSelectedMake] = useState<string>('All');
+  const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [selectedSeverity, setSelectedSeverity] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<'created_at' | 'unit_number' | 'severity'>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const [tasks, setTasks] = useState<RecallTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-  const [newVin, setNewVin] = useState('');
-  const [addingVehicle, setAddingVehicle] = useState(false);
-  const [addSuccessMsg, setAddSuccessMsg] = useState('');
+  // Status Action Modal/State
+  const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
+  const [scheduledDateInput, setScheduledDateInput] = useState<string>('');
+  const [notesInput, setNotesInput] = useState<string>('');
 
-  const [webhookUrl, setWebhookUrl] = useState('https://api.enterprise-fleet.internal/webhooks/recalls');
-  const [webhookActive, setWebhookActive] = useState(true);
-
-  const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState('');
-
-  // Normalize baseline tiers for gated feature checks
-  const isBaseTier = planType === 'free' || planType === 'standard';
-
-  // Helper function to format recall tasks cleanly from direct Supabase payload
-  const parseAndSetTasks = (rawRecalls: any[]) => {
-    const parsedTasks: RecallTask[] = rawRecalls.map((r, i) => {
-      // Clean vehicle details directly from Supabase top-level fields
-      const vehicleMake = r.make || r.monitored_vehicles?.make || "FORD";
-      const vehicleModel = r.model || r.monitored_vehicles?.model || "F-150";
-      const vehicleYear = parseInt(r.year || r.monitored_vehicles?.year) || 2022;
-      const vehicleVin = r.vin || r.monitored_vehicles?.vin || `1FTFW1ED4NFC${10000 + i}`;
-
-      // Normalize status strings
-      const rawStatus = (r.status || 'pending').toLowerCase();
-      let normalizedStatus: 'pending' | 'scheduled' | 'repaired' = 'pending';
-      if (rawStatus === 'scheduled') normalizedStatus = 'scheduled';
-      if (rawStatus === 'repaired' || rawStatus === 'completed') normalizedStatus = 'repaired';
-
-      return {
-        id: r.id || `task-${i}`,
-        vehicle_id: r.vehicle_id || `v-${i}`,
-        campaign_number: r.campaign_number || `26V-${700 + i}`,
-        component: r.component || "ELECTRICAL SYSTEM",
-        summary: r.summary || "Safety campaign active for this asset model.",
-        remedy: r.remedy || "Dealers will inspect and repair affected components free of charge.",
-        severity_score: r.calculated_severity_score || r.severity_score || 50.0,
-        status: normalizedStatus,
-        scheduled_repair_date: r.scheduled_repair_date,
-        repaired_at: r.repaired_at,
-        monitored_vehicles: {
-          vin: vehicleVin,
-          make: vehicleMake,
-          model: vehicleModel,
-          year: vehicleYear
-        }
-      };
-    });
-    setTasks(parsedTasks);
-  };
-
-  const fetchTasks = async () => {
-    // 1. If explicit recalls array is passed via props
-    if (recalls && recalls.length > 0) {
-      parseAndSetTasks(recalls);
-      setLoading(false);
-      return;
-    }
-
+  // ==========================================
+  // API FETCHING
+  // ==========================================
+  const fetchTaskboardData = async () => {
     try {
       setLoading(true);
-      setError('');
-      const response = await axios.get(`${API_BASE_URL}/api/dashboard/tasks`, {
-        params: { user_id: activeUserId } 
-      });
-
-      if (response.data && response.data.length > 0) {
-        parseAndSetTasks(response.data);
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const res = await fetch(`${baseUrl}/api/recalls/tasks`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecalls(data);
       } else {
-        // 2. FALLBACK: Check if user processed a Ghost Audit before logging in
-        const savedAuditData = localStorage.getItem('recalllogic_audit_recalls');
-        if (savedAuditData) {
-          const parsed = JSON.parse(savedAuditData);
-          parseAndSetTasks(parsed);
-        } else {
-          setTasks([]);
-        }
+        console.warn('API route not returning 200, defaulting to empty or fallback state');
       }
-    } catch (err: any) {
-      console.warn("API Fetch Error, checking local audit backup...", err);
-      // 3. FALLBACK ON API FAILURE: Load saved Ghost Audit vehicles directly from localStorage
-      const savedAuditData = localStorage.getItem('recalllogic_audit_recalls');
-      if (savedAuditData) {
-        const parsed = JSON.parse(savedAuditData);
-        parseAndSetTasks(parsed);
-      } else {
-        setError('Failed to sync safety task boards with local cloud replica.');
-      }
+    } catch (err) {
+      console.error('Error fetching taskboard data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, [activeUserId, recalls]);
+    fetchTaskboardData();
+  }, []);
 
-  const handleAddVehicle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isBaseTier) {
-      setError('Single-VIN Asset Provisioning is a premium framework capability. Please upgrade to Pro Operations.');
-      return;
-    }
+  // ==========================================
+  // DYNAMIC DATA MEMOIZATION
+  // ==========================================
+  // Get unique vehicle makes for dynamic filter dropdown
+  const uniqueMakes = useMemo(() => {
+    const makes = new Set(recalls.map((item) => item.make).filter(Boolean));
+    return ['All', ...Array.from(makes).sort()];
+  }, [recalls]);
 
-    if (!newVin.trim() || newVin.length !== 17) {
-      setError('Invalid entry. Please input a complete 17-character VIN.');
-      return;
-    }
+  // Combined Search, Filter & Multi-Sort Engine
+  const filteredRecalls = useMemo(() => {
+    return recalls
+      .filter((item) => {
+        const query = searchTerm.toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          item.unit_number?.toLowerCase().includes(query) ||
+          item.vin?.toLowerCase().includes(query) ||
+          `${item.year} ${item.make} ${item.model}`.toLowerCase().includes(query) ||
+          item.component?.toLowerCase().includes(query) ||
+          item.nhtsa_campaign_number?.toLowerCase().includes(query);
 
-    setAddingVehicle(true);
-    setError('');
-    setAddSuccessMsg('');
+        const matchesMake = selectedMake === 'All' || item.make === selectedMake;
+        const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
+        const matchesSeverity = selectedSeverity === 'All' || item.severity === selectedSeverity;
 
+        return matchesSearch && matchesMake && matchesStatus && matchesSeverity;
+      })
+      .sort((a, b) => {
+        let comparison = 0;
+        if (sortBy === 'created_at') {
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        } else if (sortBy === 'unit_number') {
+          comparison = (a.unit_number || '').localeCompare(b.unit_number || '');
+        } else if (sortBy === 'severity') {
+          const severityOrder: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+          comparison = (severityOrder[a.severity] || 0) - (severityOrder[b.severity] || 0);
+        }
+        return sortOrder === 'desc' ? -comparison : comparison;
+      });
+  }, [recalls, searchTerm, selectedMake, selectedStatus, selectedSeverity, sortBy, sortOrder]);
+
+  // Fleet Resolution & Risk KPIs
+  const metrics = useMemo(() => {
+    const total = recalls.length;
+    const open = recalls.filter((r) => r.status === 'Open').length;
+    const scheduled = recalls.filter((r) => r.status === 'Scheduled' || r.status === 'In Progress').length;
+    const cleared = recalls.filter((r) => r.status === 'Cleared').length;
+    const safeRate = total > 0 ? Math.round((cleared / total) * 100) : 100;
+
+    return { total, open, scheduled, cleared, safeRate };
+  }, [recalls]);
+
+  // ==========================================
+  // HANDLERS & ACTIONS
+  // ==========================================
+  const handleOpenDrawer = (item: TaskboardRecallItem) => {
+    setSelectedRecall(item);
+    setScheduledDateInput(item.scheduled_date || '');
+    setNotesInput(item.repair_notes || '');
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedRecall(null);
+  };
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!selectedRecall) return;
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/dashboard/vehicles`, {
-        vin: newVin.trim().toUpperCase(),
-        user_id: activeUserId
+      setUpdatingStatus(true);
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const res = await fetch(`${baseUrl}/api/recalls/tasks/${selectedRecall.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          scheduled_date: scheduledDateInput,
+          repair_notes: notesInput,
+        }),
       });
 
-      setAddSuccessMsg(response.data.message || 'Asset onboarded successfully!');
-      setNewVin('');
-      fetchTasks();
-      
-      setTimeout(() => setAddSuccessMsg(''), 5000);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Handshake failed: Vehicle is already registered.');
+      if (res.ok) {
+        setRecalls((prev) =>
+          prev.map((r) =>
+            r.id === selectedRecall.id
+              ? { ...r, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput }
+              : r
+          )
+        );
+        if (selectedRecall) {
+          setSelectedRecall({
+            ...selectedRecall,
+            status: newStatus,
+            scheduled_date: scheduledDateInput,
+            repair_notes: notesInput,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
     } finally {
-      setAddingVehicle(false);
+      setUpdatingStatus(false);
     }
   };
 
-  const handleTransitionStatus = async (taskId: string, newStatus: 'pending' | 'scheduled' | 'repaired', date?: string) => {
-    const activeTask = tasks.find(t => t.id === taskId);
-    if (activeTask && onStatusUpdate) {
-      onStatusUpdate(activeTask.campaign_number, newStatus === 'scheduled' ? 'Scheduled' : newStatus === 'repaired' ? 'Remediation Complete' : 'Detected');
-    }
+  const handleExportCSV = () => {
+    if (filteredRecalls.length === 0) return;
+    const headers = ['Unit Number', 'VIN', 'Year', 'Make', 'Model', 'Component', 'NHTSA Campaign', 'Severity', 'Status'];
+    const rows = filteredRecalls.map((r) => [
+      `"${r.unit_number || ''}"`,
+      `"${r.vin || ''}"`,
+      r.year,
+      `"${r.make || ''}"`,
+      `"${r.model || ''}"`,
+      `"${r.component || ''}"`,
+      `"${r.nhtsa_campaign_number || ''}"`,
+      `"${r.severity || ''}"`,
+      `"${r.status || ''}"`,
+    ]);
 
-    try {
-      setError('');
-      const payload: any = { status: newStatus };
-      if (date) payload.scheduled_repair_date = date;
-
-      await axios.patch(`${API_BASE_URL}/api/dashboard/tasks/${taskId}`, payload);
-      
-      setTasks(prevTasks =>
-        prevTasks.map(task =>
-          task.id === taskId
-            ? { 
-                ...task, 
-                status: newStatus, 
-                scheduled_repair_date: date || task.scheduled_repair_date,
-                repaired_at: newStatus === 'repaired' ? new Date().toISOString() : undefined 
-              }
-            : task
-        )
-      );
-      setSchedulingTaskId(null);
-      setSelectedDate('');
-    } catch (err: any) {
-      console.error(err);
-      setTasks(prevTasks =>
-        prevTasks.map(task =>
-          task.id === taskId ? { ...task, status: newStatus, scheduled_repair_date: date } : task
-        )
-      );
-      setSchedulingTaskId(null);
-    }
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `fleet_recall_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const pendingTasks = tasks.filter(t => t.status === 'pending');
-  const scheduledTasks = tasks.filter(t => t.status === 'scheduled');
-  const repairedTasks = tasks.filter(t => t.status === 'repaired');
-
+  // ==========================================
+  // RENDER UI
+  // ==========================================
   return (
-    <div className="space-y-8 animate-fadeIn">
-      
-      {/* FREEMIUM / STANDARD UNCHECKED DELTA WARNING */}
-      {isBaseTier && (
-        <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h4 className="text-rose-400 font-mono text-xs font-black uppercase tracking-wider flex items-center gap-2">
-              <span>⚠️ UNCHECKED DELTA BLIND SPOT PROJECTION</span>
-            </h4>
-            <p className="text-slate-400 text-xs max-w-2xl">
-              Up to <strong className="text-slate-200">12 potential regional vehicle profiles</strong> detected in your neighborhood match matrices remain un-indexed. Professional tier unlocks continuous automated background sweeping.
-            </p>
-          </div>
-          <button 
-            type="button"
-            onClick={() => window.location.href = '#pricing-matrix-anchor'}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-mono font-black uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap cursor-pointer"
-          >
-            Activate Active Sweeps
-          </button>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans bg-gray-50 min-h-screen">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Fleet Recall Operations</h1>
+          <p className="text-sm text-gray-500">Monitor, filter, and schedule safety recall remedies across active fleet assets.</p>
         </div>
-      )}
+        <button
+          onClick={handleExportCSV}
+          className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
+        >
+          <span>📥</span> Export CSV Report
+        </button>
+      </div>
 
-      {/* ASSET INTEGRATION CONSOLE */}
-      <section className="bg-gradient-to-r from-[#0b0f19] to-slate-950 border border-slate-900 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-white font-black uppercase text-xs tracking-wider">Asset Integration Console</h3>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md border font-bold uppercase tracking-wide ${
-                planType === 'enterprise' ? 'bg-purple-950 text-purple-400 border-purple-800' :
-                planType === 'professional' ? 'bg-cyan-950 text-cyan-400 border-cyan-800' :
-                'bg-slate-900 text-slate-400 border-slate-800'
-              }`}>
-                {planType} Account Mode
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs">
-              {isBaseTier 
-                ? 'Standard and Free tiers are limited to batch manifest drops. Upgrade to Pro to mount single-VIN scanning nodes.' 
-                : 'Provision new single-VIN assets. Real-time subassembly threat generation engine is operational.'}
-            </p>
-          </div>
-          
-          <form onSubmit={handleAddVehicle} className="flex gap-3 max-w-md w-full">
+      {/* 1. TOP KPI STATS BAR */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Required</p>
+          <p className="text-3xl font-extrabold text-red-600 mt-1">{metrics.open}</p>
+          <span className="text-xs text-red-500 font-medium">Unresolved safety risks</span>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">In Progress</p>
+          <p className="text-3xl font-extrabold text-amber-500 mt-1">{metrics.scheduled}</p>
+          <span className="text-xs text-amber-600 font-medium">Scheduled at dealership</span>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Cleared / Cleared</p>
+          <p className="text-3xl font-extrabold text-emerald-600 mt-1">{metrics.cleared}</p>
+          <span className="text-xs text-emerald-600 font-medium">Verified completed repairs</span>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fleet Safety Score</p>
+          <p className="text-3xl font-extrabold text-blue-600 mt-1">{metrics.safeRate}%</p>
+          <span className="text-xs text-blue-500 font-medium">Overall fleet compliance</span>
+        </div>
+      </div>
+
+      {/* 2. MULTI-DIMENSIONAL FILTER CONTROL BAR */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-4">
+        <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
+          {/* Search Box */}
+          <div className="relative w-full lg:w-96">
             <input
               type="text"
-              placeholder={isBaseTier ? "Upgrade to enable single-VIN lookup..." : "Enter 17-digit VIN..."}
-              value={newVin}
-              disabled={isBaseTier}
-              onChange={(e) => setNewVin(e.target.value.toUpperCase())}
-              maxLength={17}
-              className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-cyan-400 font-mono focus:border-cyan-500/80 outline-none transition-all placeholder:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              placeholder="Search Unit #, VIN, Model, NHTSA ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
             />
+          </div>
+
+          {/* Filters & Sorting */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+            <select
+              value={selectedMake}
+              onChange={(e) => setSelectedMake(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="All">All Makes</option>
+              {uniqueMakes.filter((m) => m !== 'All').map((make) => (
+                <option key={make} value={make}>{make}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedSeverity}
+              onChange={(e) => setSelectedSeverity(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="All">All Severities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Open">Open</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Cleared">Cleared</option>
+            </select>
+
+            <div className="h-6 w-px bg-gray-200 hidden sm:block mx-1"></div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="created_at">Sort by Date</option>
+              <option value="severity">Sort by Severity</option>
+              <option value="unit_number">Sort by Unit #</option>
+            </select>
+
             <button
-              type="submit"
-              disabled={addingVehicle || isBaseTier}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider rounded-xl transition shadow-lg shadow-cyan-500/10 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold"
+              title="Toggle Sort Order"
             >
-              {addingVehicle ? 'Analyzing...' : 'Add Vehicle'}
+              {sortOrder === 'desc' ? '⬇️' : '⬆️'}
             </button>
-          </form>
+          </div>
         </div>
+      </div>
 
-        {addSuccessMsg && (
-          <div className="mt-3 text-emerald-400 text-xs font-mono">✓ {addSuccessMsg}</div>
+      {/* 3. ACTIONABLE FLEET RECALL TABLE */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+            <p className="mt-2 text-sm text-gray-500 font-medium">Scanning fleet recall records...</p>
+          </div>
+        ) : filteredRecalls.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">
+            <p className="text-lg font-semibold text-gray-700">No recall tasks found</p>
+            <p className="text-sm mt-1">Try adjusting your filters or search terms above.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase text-xs tracking-wider">
+                <tr>
+                  <th className="p-4">Fleet Asset</th>
+                  <th className="p-4">Vehicle Details</th>
+                  <th className="p-4">Component & NHTSA ID</th>
+                  <th className="p-4">Severity</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredRecalls.map((item) => (
+                  <tr key={item.id} className="hover:bg-blue-50/40 transition">
+                    <td className="p-4 font-bold text-gray-900">
+                      Unit #{item.unit_number || 'Unassigned'}
+                    </td>
+                    <td className="p-4">
+                      <div className="font-semibold text-gray-800">{item.year} {item.make} {item.model}</div>
+                      <div className="text-xs text-gray-400 font-mono mt-0.5">VIN: {item.vin}</div>
+                    </td>
+                    <td className="p-4">
+                      <div className="font-medium text-gray-900">{item.component}</div>
+                      <div className="text-xs text-blue-600 font-mono mt-0.5">NHTSA #{item.nhtsa_campaign_number}</div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
+                        item.severity === 'High' ? 'bg-orange-100 text-orange-700' :
+                        item.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {item.severity || 'Medium'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
+                        item.status === 'Scheduled' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-50 text-red-600'
+                      }`}>
+                        {item.status || 'Open'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleOpenDrawer(item)}
+                        className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition"
+                      >
+                        Manage
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </div>
 
-      {/* PROMOTIONAL BROKER EXPORT BANNER FOR BASE TIERS */}
-      {isBaseTier && (
-        <section className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm shadow-inner">
-          <div className="absolute top-0 right-0 bg-slate-800 text-slate-500 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-slate-800 rounded-bl-xl font-black">
-            🔒 Premium Feature
-          </div>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-            <div className="space-y-1">
-              <h4 className="text-slate-300 font-extrabold text-sm tracking-tight flex items-center gap-2">
-                <span className="text-amber-500/80 text-base">🛡️</span> Verifiable Insurance Compliance Underwriting Card
-              </h4>
-              <p className="text-slate-500 text-xs max-w-xl">
-                Leverage a verified fleet safety record to negotiate discounted commercial premiums. Upgrade to operationalize signed compliance URLs directly to underwriters or brokers.
-              </p>
-            </div>
-            <button 
-              type="button"
-              onClick={() => window.location.href = '#pricing-matrix-anchor'}
-              className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
-            >
-              Unlock Broker Sharing Logs
-            </button>
-          </div>
-        </section>
-      )}
+      {/* 4. RECALL MANAGEMENT DRAWER MODAL */}
+      {isDrawerOpen && selectedRecall && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end">
+          <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
+            <div className="space-y-6">
+              {/* Drawer Header */}
+              <div className="flex justify-between items-center border-b pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Manage Unit #{selectedRecall.unit_number}</h2>
+                  <p className="text-xs text-gray-500">{selectedRecall.year} {selectedRecall.make} {selectedRecall.model} (VIN: {selectedRecall.vin})</p>
+                </div>
+                <button
+                  onClick={handleCloseDrawer}
+                  className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100"
+                >
+                  ✕
+                </button>
+              </div>
 
-      {/* ENTERPRISE WEBHOOK RELAY CONSOLE */}
-      {planType === 'enterprise' && (
-        <section className="bg-slate-950 border border-purple-900/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-fadeIn">
-          <div className="absolute top-0 right-0 bg-purple-500/10 text-purple-400 px-3 py-1 font-mono text-[9px] uppercase tracking-widest border-l border-b border-purple-900/30 rounded-bl-xl font-bold">
-            Enterprise Feature Active
-          </div>
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-slate-200 text-xs font-black uppercase tracking-wider font-mono">Programmable API Endpoint Relay Logs</h4>
-              <p className="text-slate-500 text-xs mt-0.5">Automate third-party compliance handshakes. Updates are piped straight to downstream brokers or internal enterprise data pipelines.</p>
+              {/* Recall Safety Details */}
+              <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-blue-600 font-mono">NHTSA #{selectedRecall.nhtsa_campaign_number}</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-700">{selectedRecall.severity} Severity</span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold uppercase text-gray-500">Defective Component</h4>
+                  <p className="text-sm font-medium text-gray-800">{selectedRecall.component}</p>
+                </div>
+                {selectedRecall.summary && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase text-gray-500">Defect Summary</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.summary}</p>
+                  </div>
+                )}
+                {selectedRecall.remedy && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase text-gray-500">Manufacturer Remedy</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.remedy}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Form */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment Date</label>
+                  <input
+                    type="date"
+                    value={scheduledDateInput}
+                    onChange={(e) => setScheduledDateInput(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Fleet Notes / Repair Invoice #</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Add dealership invoice numbers, technician notes, or service location details..."
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 items-center">
-              <input
-                type="text"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                className="w-full sm:flex-1 px-4 py-2 text-xs rounded-xl border border-slate-800 bg-[#050914] text-purple-300 font-mono focus:border-purple-500 outline-none"
-              />
+
+            {/* Footer Action Buttons */}
+            <div className="border-t pt-4 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => handleUpdateStatus('Scheduled')}
+                  disabled={updatingStatus}
+                  className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition"
+                >
+                  Mark Scheduled
+                </button>
+                <button
+                  onClick={() => handleUpdateStatus('In Progress')}
+                  disabled={updatingStatus}
+                  className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition"
+                >
+                  In Progress
+                </button>
+                <button
+                  onClick={() => handleUpdateStatus('Cleared')}
+                  disabled={updatingStatus}
+                  className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition"
+                >
+                  Mark Cleared
+                </button>
+              </div>
               <button
-                type="button"
-                onClick={() => setWebhookActive(!webhookActive)}
-                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-[10px] font-mono uppercase tracking-wide transition font-bold border cursor-pointer ${
-                  webhookActive 
-                    ? 'bg-emerald-950 border-emerald-800 text-emerald-400' 
-                    : 'bg-slate-900 border-slate-700 text-slate-400'
-                }`}
+                onClick={handleCloseDrawer}
+                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition"
               >
-                {webhookActive ? '● Routing Active' : '○ Pipeline Paused'}
+                Close Drawer
               </button>
             </div>
           </div>
-        </section>
-      )}
-
-      {error && (
-        <div className="p-4 bg-red-950/10 border border-red-900/30 rounded-xl text-red-400 font-mono text-xs">
-          ⚠️ {error}
         </div>
       )}
-
-      {/* KANBAN BOARD LANES */}
-      {loading ? (
-        <div className="text-center py-12 text-xs font-mono tracking-widest text-slate-500 uppercase animate-pulse">
-          Synchronizing Ledger Arrays...
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* PENDING THREATS LANE */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🔴 Pending Threats ({pendingTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {pendingTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Pending Alerts</div>
-              ) : (
-                pendingTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-red-500/30 transition duration-300 relative group shadow-md">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-[10px] font-mono bg-red-950/60 text-red-400 px-2.5 py-0.5 rounded border border-red-900/40 font-bold">
-                        {task.campaign_number}
-                      </span>
-                      <span className="text-xs font-black text-slate-300 font-mono">Score: {task.severity_score}</span>
-                    </div>
-                    <h4 className="text-slate-200 text-sm font-bold mt-1">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-mono bg-cyan-950/40 text-cyan-400 px-2 py-0.5 rounded uppercase border border-cyan-900/30">
-                        {task.component}
-                      </span>
-                      {isBaseTier ? (
-                        <span className="text-[10px] font-mono bg-amber-950/50 text-amber-500 px-2 py-0.5 rounded uppercase border border-amber-900/20 animate-pulse">
-                          🔥 Local High-Ambient Risk Active
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono bg-rose-950/60 text-rose-400 px-2 py-0.5 rounded uppercase border border-rose-900/40 font-bold">
-                          🔥 Extreme Thermal Multiplier: +{(task.severity_score * 0.15).toFixed(1)} Failure Likelihood
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.summary}</p>
-                    
-                    {task.remedy && (
-                      <p className="text-slate-500 text-[11px] italic mt-2 border-l-2 border-slate-800 pl-2">
-                        Remedy: {task.remedy}
-                      </p>
-                    )}
-
-                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setSchedulingTaskId(task.id)}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-                      >
-                        Route to Dealership
-                      </button>
-                    </div>
-
-                    {schedulingTaskId === task.id && (
-                      <div className="mt-3 p-3 bg-slate-950 border border-slate-800 rounded-lg space-y-2">
-                        <label className="block text-[9px] font-mono text-slate-400 uppercase">Select Maintenance Date</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="bg-slate-900 border border-slate-800 rounded p-1 text-xs text-white flex-1 outline-none font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleTransitionStatus(task.id, 'scheduled', selectedDate)}
-                            disabled={!selectedDate}
-                            className="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-mono uppercase tracking-wide disabled:opacity-30 cursor-pointer"
-                          >
-                            Confirm
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* SCHEDULED REMEDIATION LANE */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟡 Scheduled Remediation ({scheduledTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {scheduledTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Scheduled Actions</div>
-              ) : (
-                scheduledTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/80 border border-slate-900 rounded-xl hover:border-amber-500/30 transition duration-300 shadow-md">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-mono bg-amber-950/60 text-amber-400 px-2.5 py-0.5 rounded border border-amber-900/40 font-bold">
-                        {task.campaign_number}
-                      </span>
-                    </div>
-                    <h4 className="text-slate-200 text-sm font-bold mt-1">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    {task.scheduled_repair_date && (
-                      <p className="text-xs font-mono text-amber-400 mt-1">🗓 Repair Appt: {task.scheduled_repair_date}</p>
-                    )}
-                    <p className="text-slate-400 text-xs line-clamp-2 mt-3 leading-relaxed">{task.remedy}</p>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-900 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleTransitionStatus(task.id, 'repaired')}
-                        className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900/80 border border-emerald-900/50 font-mono text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-                      >
-                        Sign-off Remediation
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* CLEARED LEDGERS LANE */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">🟢 Cleared Ledgers ({repairedTasks.length})</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            </div>
-            <div className="space-y-4 min-h-[500px] bg-slate-950/20 border border-slate-900/40 rounded-2xl p-4">
-              {repairedTasks.length === 0 ? (
-                <div className="text-center py-12 text-slate-600 text-xs font-mono uppercase">0 Logs Found</div>
-              ) : (
-                repairedTasks.map(task => (
-                  <div key={task.id} className="p-5 bg-[#0b0f19]/40 border border-slate-950/80 rounded-xl hover:border-emerald-500/20 transition duration-300 opacity-70 shadow-inner">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-mono bg-emerald-950/30 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-900/20 font-bold">
-                        {task.campaign_number}
-                      </span>
-                    </div>
-                    <h4 className="text-slate-400 text-sm font-bold mt-1 line-through">
-                      {task.monitored_vehicles?.year} {task.monitored_vehicles?.make} {task.monitored_vehicles?.model}
-                    </h4>
-                    <p className="text-[10px] font-mono text-slate-500 mt-2">
-                      Audit Trail Persistence Logged
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {isBaseTier && <div id="pricing-matrix-anchor" className="h-1" />}
     </div>
   );
-}
+};

@@ -1,6 +1,7 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import init_vertex, get_settings
+from app.services.pdf_report import router as pdf_router
 
 # Explicitly import all system and feature routers
 from app.routers import (
@@ -53,7 +54,8 @@ def create_app() -> FastAPI:
     app.include_router(webhook_router.router, prefix="/api")
     app.include_router(dashboard_router.router, prefix="/api")
     app.include_router(sandbox.router, prefix="/api")
-    app.include_router(payment_router.router, prefix="/api")  # Routes /api/payments/...
+    app.include_router(payment_router.router, prefix="/api")
+    app.include_router(pdf_router)  # Routes /api/payments/...
 
     return app
 

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
-import TaskBoard from './components/TaskBoard';
+import { TaskBoard } from './components/TaskBoard';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
