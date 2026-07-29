@@ -45,7 +45,16 @@ def run_daily_ingestion():
         # The file inside the zip is typically FLAT_RCL.txt
         txt_filename = z.namelist()[0]
         with z.open(txt_filename) as f:
-            df = pd.read_csv(f, sep='\t', encoding='latin-1', header=None, low_memory=False)
+            # Updated robust CSV reader for messy NHTSA tab-delimited files
+        df = pd.read_csv(
+            f, 
+            sep='\t', 
+            encoding='latin-1', 
+            header=None, 
+            low_memory=False,
+            on_bad_lines='skip',  # Skips malformed rows instead of crashing
+            quoting=3             # Ignore embedded quotation marks in summaries
+        )
 
     print(f"Downloaded and parsed {len(df)} recall records from NHTSA.")
 
