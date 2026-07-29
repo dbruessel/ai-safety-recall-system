@@ -18,7 +18,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Official daily NHTSA recall flat file URL
-NHTSA_FLAT_FILE_URL = "http://www-odi.nhtsa.dot.gov/downloads/folders/Recalls/FLAT_RCL.zip"
+# Replace this line:
+# NHTSA_FLAT_FILE_URL = "http://www-odi.nhtsa.dot.gov/downloads/folders/Recalls/FLAT_RCL.zip"
+
+# With NHTSA's current HTTPS dataset endpoint:
+NHTSA_FLAT_FILE_URL = "https://static.nhtsa.gov/odi/ffdd/rcl/FLAT_RCL_POST_2010.zip"
 
 def calculate_severity(summary_text: str) -> int:
     """Calculates severity score based on key risk terms."""
