@@ -124,6 +124,14 @@ export default function App() {
     hydrateProspectSession();
   }, []);
 
+  // Clear modal inputs when opened to protect sensitive pre-fills
+  const handleOpenLoginModal = () => {
+    setUserEmail('');
+    setLoginPassword('');
+    setLoginError('');
+    setShowLoginModal(true);
+  };
+
   // ====================================================================
   // PROSPECT GHOST AUDIT PROCESSOR (INLINE HOMEPAGE RESULTS)
   // ====================================================================
@@ -191,9 +199,8 @@ export default function App() {
     setLoginError('');
 
     try {
-      const targetEmail = userEmail || 'vegasfleetmgr@commercialpro.com';
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: targetEmail,
+        email: userEmail,
         password: loginPassword,
       });
 
@@ -201,7 +208,7 @@ export default function App() {
       
       setSession(data.session);
       setShowLoginModal(false);
-      fetchUserProfile(targetEmail);
+      fetchUserProfile(userEmail);
     } catch (err: any) {
       setLoginError(err.message || 'Invalid login credentials. Please try again.');
     } finally {
@@ -281,10 +288,10 @@ export default function App() {
           
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setShowLoginModal(true)}
+              onClick={handleOpenLoginModal}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition font-mono text-[11px] uppercase font-bold tracking-wider rounded-lg cursor-pointer"
             >
-              Subscriber Sign In
+              Sign In
             </button>
           </div>
         </div>
@@ -377,7 +384,7 @@ export default function App() {
             <div className="bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border border-cyan-500/40 rounded-2xl p-6 text-center space-y-3 shadow-2xl">
               <h4 className="text-base font-bold text-white tracking-tight">Ready to Track & Resolve These Safety Liability Issues?</h4>
               <p className="text-xs text-slate-400 max-w-xl mx-auto">
-                Activate a workspace subscription below to convert these findings into an active <strong className="text-slate-200">Kanban TaskBoard</strong> with continuous active monitoring, dealer scheduling, and broker compliance cards.
+                Activate a workspace subscription below to convert these findings into an active environment with continuous monitoring, dealer scheduling, and broker compliance controls.
               </p>
               <a 
                 href="#pricing-matrix-anchor"
@@ -413,7 +420,7 @@ export default function App() {
                 <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
                   <li className="flex items-center gap-2">✓ Up to 50 Vehicles Monitored</li>
                   <li className="flex items-center gap-2">✓ Continuous Active Monitoring</li>
-                  <li className="flex items-center gap-2">✓ Full Kanban TaskBoard Access</li>
+                  <li className="flex items-center gap-2">✓ Full Workspace Access</li>
                 </ul>
               </div>
               <UpgradeButton planType="standard" email={userEmail} className="w-full py-3" />
@@ -444,7 +451,7 @@ export default function App() {
               <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
             </div>
 
-{/* ENTERPRISE TIER */}
+            {/* ENTERPRISE TIER */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div>
@@ -496,35 +503,41 @@ export default function App() {
 
             <div className="space-y-2">
               <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/20">
-                Paid Workspace Portal
+                Verified Access
               </span>
-              <h3 className="text-xl font-bold text-white tracking-tight">Subscriber Sign In</h3>
+              <h3 className="text-xl font-bold text-white tracking-tight">Sign In to Your Workspace</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Enter your credentials to access your active TaskBoard workspace.
+                Enter your credentials to access your organization's workspace.
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold">Email Address:</label>
-                <input
-                  type="email"
-                  required
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="vegasfleetmgr@commercialpro.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono text-white focus:outline-none focus:border-cyan-500 transition mb-3"
-                />
+            <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Work Email</label>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="off"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="name@company.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
 
-                <label className="text-[10px] font-mono uppercase text-slate-400 font-bold">Account Password:</label>
-                <input
-                  type="password"
-                  required
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-mono text-white focus:outline-none focus:border-cyan-500 transition"
-                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
+                  />
+                </div>
               </div>
 
               {loginError && (
@@ -536,9 +549,9 @@ export default function App() {
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-xs tracking-wider rounded-xl transition cursor-pointer"
+                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold uppercase text-xs tracking-wider rounded-xl transition cursor-pointer"
               >
-                {loginLoading ? 'Authenticating...' : 'Enter TaskBoard Workspace'}
+                {loginLoading ? 'Authenticating...' : 'Launch Workspace →'}
               </button>
             </form>
           </div>
@@ -562,7 +575,7 @@ export default function App() {
               </span>
               <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Safety Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription below to unlock all {blockedVinCount} vehicles in a live TaskBoard.
+                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription below to unlock all {blockedVinCount} vehicles in an active workspace.
               </p>
             </div>
 
