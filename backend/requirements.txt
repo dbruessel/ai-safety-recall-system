@@ -10,3 +10,4 @@ python-dotenv
 stripe
 gunicorn
 reportlab
+pandas
