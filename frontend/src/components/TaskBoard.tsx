@@ -50,6 +50,10 @@ export const TaskBoard: React.FC = () => {
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
   const [scheduledDateInput, setScheduledDateInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
+  
+  // 📎 Receipt Upload State
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState<boolean>(false);
 
   // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
@@ -58,7 +62,6 @@ export const TaskBoard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Query only columns that exist on monitored_vehicles to avoid 400 PostgREST errors
       const { data, error } = await supabase
         .from('recall_tasks')
         .select(`
@@ -70,6 +73,9 @@ export const TaskBoard: React.FC = () => {
           severity_score,
           status,
           created_at,
+          scheduled_repair_date,
+          repair_notes,
+          receipt_url,
           monitored_vehicles (
             vin,
             make,
@@ -115,7 +121,10 @@ export const TaskBoard: React.FC = () => {
           status: statusLabel,
           summary: item.summary,
           remedy: item.remedy,
-          created_at: item.created_at || new Date().toISOString()
+          created_at: item.created_at || new Date().toISOString(),
+          scheduled_date: item.scheduled_repair_date || '',
+          repair_notes: item.repair_notes || '',
+          receipt_url: item.receipt_url || ''
         };
       });
 
@@ -189,12 +198,45 @@ export const TaskBoard: React.FC = () => {
     setSelectedRecall(item);
     setScheduledDateInput(item.scheduled_date || '');
     setNotesInput(item.repair_notes || '');
+    setReceiptFile(null);
     setIsDrawerOpen(true);
   };
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
     setSelectedRecall(null);
+    setReceiptFile(null);
+  };
+
+  // 📎 File Upload Handler for Receipts
+  const uploadReceiptToStorage = async (file: File, taskId: string): Promise<string | null> => {
+    try {
+      setUploadingReceipt(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${taskId}_${Date.now()}.${fileExt}`;
+      const filePath = `receipts/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('repair-receipts')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error('Storage Upload Error:', uploadError);
+        return null;
+      }
+
+      // Retrieve public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('repair-receipts')
+        .getPublicUrl(filePath);
+
+      return publicUrlData.publicUrl || null;
+    } catch (err) {
+      console.error('Failed to upload receipt file:', err);
+      return null;
+    } finally {
+      setUploadingReceipt(false);
+    }
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -202,6 +244,16 @@ export const TaskBoard: React.FC = () => {
     try {
       setUpdatingStatus(true);
       
+      let uploadedUrl = selectedRecall.receipt_url || '';
+
+      // Upload receipt file to Supabase Storage if user selected a new file
+      if (receiptFile) {
+        const publicUrl = await uploadReceiptToStorage(receiptFile, selectedRecall.id);
+        if (publicUrl) {
+          uploadedUrl = publicUrl;
+        }
+      }
+
       // Map UI status back to DB constrained status string ('pending', 'scheduled', 'repaired')
       let dbStatus = 'pending';
       if (newStatus === 'Scheduled' || newStatus === 'In Progress') dbStatus = 'scheduled';
@@ -212,6 +264,8 @@ export const TaskBoard: React.FC = () => {
         .update({
           status: dbStatus,
           scheduled_repair_date: scheduledDateInput || null,
+          repair_notes: notesInput || null,
+          receipt_url: uploadedUrl || null
         })
         .eq('id', selectedRecall.id);
 
@@ -221,7 +275,13 @@ export const TaskBoard: React.FC = () => {
       setRecalls((prev) =>
         prev.map((r) =>
           r.id === selectedRecall.id
-            ? { ...r, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput }
+            ? {
+                ...r,
+                status: newStatus,
+                scheduled_date: scheduledDateInput,
+                repair_notes: notesInput,
+                receipt_url: uploadedUrl
+              }
             : r
         )
       );
@@ -233,9 +293,12 @@ export const TaskBoard: React.FC = () => {
               status: newStatus,
               scheduled_date: scheduledDateInput,
               repair_notes: notesInput,
+              receipt_url: uploadedUrl
             }
           : null
       );
+
+      setReceiptFile(null);
     } catch (err) {
       console.error('Failed to update status in Supabase:', err);
     } finally {
@@ -245,7 +308,7 @@ export const TaskBoard: React.FC = () => {
 
   const handleExportCSV = () => {
     if (filteredRecalls.length === 0) return;
-    const headers = ['Unit Number', 'VIN', 'Year', 'Make', 'Model', 'Component', 'NHTSA Campaign', 'Severity', 'Status'];
+    const headers = ['Unit Number', 'VIN', 'Year', 'Make', 'Model', 'Component', 'NHTSA Campaign', 'Severity', 'Status', 'Receipt URL'];
     const rows = filteredRecalls.map((r) => [
       `"${r.unit_number || ''}"`,
       `"${r.vin || ''}"`,
@@ -256,6 +319,7 @@ export const TaskBoard: React.FC = () => {
       `"${r.nhtsa_campaign_number || ''}"`,
       `"${r.severity || ''}"`,
       `"${r.status || ''}"`,
+      `"${r.receipt_url || ''}"`,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -423,6 +487,7 @@ export const TaskBoard: React.FC = () => {
                   <th className="p-4">Component & NHTSA ID</th>
                   <th className="p-4">Severity</th>
                   <th className="p-4">Status</th>
+                  <th className="p-4">Proof of Remedy</th>
                   <th className="p-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -458,6 +523,20 @@ export const TaskBoard: React.FC = () => {
                       }`}>
                         {item.status || 'Open'}
                       </span>
+                    </td>
+                    <td className="p-4">
+                      {item.receipt_url ? (
+                        <a
+                          href={item.receipt_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold hover:underline"
+                        >
+                          <span>🧾</span> Verified Invoice
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">No document</span>
+                      )}
                     </td>
                     <td className="p-4 text-right">
                       <button
@@ -523,12 +602,12 @@ export const TaskBoard: React.FC = () => {
                 <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment Date</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment / Repair Date</label>
                   <input
                     type="date"
                     value={scheduledDateInput}
                     onChange={(e) => setScheduledDateInput(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
 
@@ -539,8 +618,45 @@ export const TaskBoard: React.FC = () => {
                     placeholder="Add dealership invoice numbers, technician notes, or service location details..."
                     value={notesInput}
                     onChange={(e) => setNotesInput(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
+                </div>
+
+                {/* 🧾 PROOF OF REMEDY RECEIPT ATTACHMENT */}
+                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
+                  <label className="block text-xs font-bold text-gray-800">
+                    Proof of Remedy / Repair Invoice (PDF or Image)
+                  </label>
+                  
+                  {selectedRecall.receipt_url ? (
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                        <span>✅</span> Attached Repair Proof
+                      </div>
+                      <a
+                        href={selectedRecall.receipt_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded border border-emerald-200 transition"
+                      >
+                        View Document ↗
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Upload the dealership repair order or receipt to establish a legal audit trail before clearing this recall.
+                    </p>
+                  )}
+
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setReceiptFile(e.target.files ? e.target.files[0] : null)}
+                    className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                  />
+                  {receiptFile && (
+                    <p className="text-xs text-blue-600 font-medium">Selected: {receiptFile.name}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -550,24 +666,24 @@ export const TaskBoard: React.FC = () => {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => handleUpdateStatus('Scheduled')}
-                  disabled={updatingStatus}
-                  className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition"
+                  disabled={updatingStatus || uploadingReceipt}
+                  className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
                 >
                   Mark Scheduled
                 </button>
                 <button
                   onClick={() => handleUpdateStatus('In Progress')}
-                  disabled={updatingStatus}
-                  className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition"
+                  disabled={updatingStatus || uploadingReceipt}
+                  className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
                 >
                   In Progress
                 </button>
                 <button
                   onClick={() => handleUpdateStatus('Cleared')}
-                  disabled={updatingStatus}
-                  className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition"
+                  disabled={updatingStatus || uploadingReceipt}
+                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
                 >
-                  Mark Cleared
+                  {uploadingReceipt ? 'Uploading...' : 'Mark Cleared'}
                 </button>
               </div>
               <button
