@@ -52,24 +52,44 @@ export const TaskBoard: React.FC = () => {
   const [notesInput, setNotesInput] = useState<string>('');
 
   // ==========================================
-  // DIRECT SUPABASE FETCHING
+  // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
   // ==========================================
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
 
-      // Direct select on recall_tasks to avoid 403 join permission errors
+      // Join monitored_vehicles table to fetch actual vehicle database fields
       const { data, error } = await supabase
         .from('recall_tasks')
-        .select('*');
+        .select(`
+          id,
+          campaign_number,
+          component,
+          summary,
+          remedy,
+          severity_score,
+          status,
+          created_at,
+          monitored_vehicles (
+            vin,
+            make,
+            model,
+            year,
+            unit_number
+          )
+        `);
 
       if (error) {
         console.error('Supabase Query Error:', error);
         throw error;
       }
 
-      // Transform raw Supabase rows to UI TaskboardRecallItem type
-      const formattedData: TaskboardRecallItem[] = (data || []).map((item: any, index: number) => {
+      // Map raw relational database response to UI TaskboardRecallItem type
+      const formattedData: TaskboardRecallItem[] = (data || []).map((item: any) => {
+        const vehicle = Array.isArray(item.monitored_vehicles)
+          ? item.monitored_vehicles[0]
+          : item.monitored_vehicles;
+
         // Severity mapping logic based on score
         let severityLabel = 'Medium';
         if (item.severity_score >= 8.5) severityLabel = 'Critical';
@@ -83,22 +103,13 @@ export const TaskBoard: React.FC = () => {
         else if (rawStatus === 'repaired' || rawStatus === 'cleared') statusLabel = 'Cleared';
         else if (rawStatus === 'pending') statusLabel = 'Open';
 
-        // Fallback vehicle info array for mock display
-        const defaultVehicles = [
-          { unit: 'LV-101', make: 'Ford', model: 'F-150', year: 2021, vin: '1FTFW1ED4MFC12345' },
-          { unit: 'LV-102', make: 'GMC', model: 'Yukon XL', year: 2022, vin: '1GKS2BKC8MR567890' },
-          { unit: 'LV-103', make: 'Tesla', model: 'Model S', year: 2021, vin: '5YJSA1E28MF987654' },
-          { unit: 'LV-104', make: 'Ford', model: 'Fusion', year: 2018, vin: '3FA6P0H77JR112233' },
-        ];
-        const vehicle = defaultVehicles[index % defaultVehicles.length];
-
         return {
           id: item.id,
-          unit_number: vehicle.unit,
-          vin: vehicle.vin,
-          year: vehicle.year,
-          make: vehicle.make,
-          model: vehicle.model,
+          unit_number: vehicle?.unit_number || (vehicle?.vin ? `LV-${vehicle.vin.slice(-3)}` : 'LV-101'),
+          vin: vehicle?.vin || 'N/A',
+          year: vehicle?.year || 2022,
+          make: vehicle?.make || 'Unknown',
+          model: vehicle?.model || 'Asset',
           nhtsa_campaign_number: item.campaign_number || 'N/A',
           component: item.component || 'Safety System',
           severity: severityLabel,
@@ -305,7 +316,7 @@ export const TaskBoard: React.FC = () => {
         </div>
 
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Cleared / Cleared</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">CLEARED REPAIRS</p>
           <p className="text-3xl font-extrabold text-emerald-600 mt-1">{metrics.cleared}</p>
           <span className="text-xs text-emerald-600 font-medium">Verified completed repairs</span>
         </div>
