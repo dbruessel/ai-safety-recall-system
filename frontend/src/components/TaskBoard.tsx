@@ -55,7 +55,7 @@ export const TaskBoard: React.FC = () => {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState<boolean>(false);
 
-  // ==========================================
+ // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
   // ==========================================
   const fetchTaskboardData = async () => {
@@ -73,9 +73,6 @@ export const TaskBoard: React.FC = () => {
           severity_score,
           status,
           created_at,
-          scheduled_repair_date,
-          repair_notes,
-          receipt_url,
           monitored_vehicles (
             vin,
             make,
