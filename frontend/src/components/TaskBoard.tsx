@@ -6,6 +6,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Default test profile ID matching database records
+const CURRENT_PROFILE_ID = '07136e5d-0b6e-4ccf-b774-c2f3f01154bf';
+
 // ==========================================
 // TYPES & INTERFACES
 // ==========================================
@@ -55,7 +58,13 @@ export const TaskBoard: React.FC = () => {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState<boolean>(false);
 
- // ==========================================
+  // 📥 Bulk CSV Import Modal States
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState<boolean>(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+
+  // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
   // ==========================================
   const fetchTaskboardData = async () => {
@@ -189,6 +198,83 @@ export const TaskBoard: React.FC = () => {
   }, [recalls]);
 
   // ==========================================
+  // BULK CSV PARSING & IMPORT LOGIC
+  // ==========================================
+  const handleProcessCsvImport = async () => {
+    if (!csvFile) return;
+
+    try {
+      setImporting(true);
+      setImportFeedback('Reading CSV payload...');
+
+      const text = await csvFile.text();
+      const lines = text.split(/\r\n|\n/).filter((line) => line.trim().length > 0);
+
+      if (lines.length < 2) {
+        setImportFeedback('Error: CSV file is empty or missing headers.');
+        return;
+      }
+
+      // Extract header row
+      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/["']/g, ''));
+      
+      const vinIndex = headers.findIndex((h) => h.includes('vin'));
+      const makeIndex = headers.findIndex((h) => h.includes('make'));
+      const modelIndex = headers.findIndex((h) => h.includes('model'));
+      const yearIndex = headers.findIndex((h) => h.includes('year'));
+
+      if (vinIndex === -1) {
+        setImportFeedback('Error: CSV must contain a "VIN" column.');
+        return;
+      }
+
+      const vehiclesToInsert: any[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',').map((cell) => cell.trim().replace(/["']/g, ''));
+        const vin = row[vinIndex];
+
+        if (vin && vin.length >= 11) {
+          vehiclesToInsert.push({
+            profile_id: CURRENT_PROFILE_ID,
+            vin: vin.toUpperCase(),
+            make: makeIndex !== -1 ? row[makeIndex] || 'Unknown' : 'Unknown',
+            model: modelIndex !== -1 ? row[modelIndex] || 'Asset' : 'Asset',
+            year: yearIndex !== -1 ? parseInt(row[yearIndex], 10) || 2022 : 2022,
+          });
+        }
+      }
+
+      if (vehiclesToInsert.length === 0) {
+        setImportFeedback('Error: No valid VIN rows found in file.');
+        return;
+      }
+
+      setImportFeedback(`Uploading ${vehiclesToInsert.length} vehicle(s) to Supabase...`);
+
+      // Upsert into monitored_vehicles
+      const { error } = await supabase
+        .from('monitored_vehicles')
+        .upsert(vehiclesToInsert, { onConflict: 'profile_id,vin' });
+
+      if (error) throw error;
+
+      setImportFeedback(`Success! ${vehiclesToInsert.length} vehicles added/updated.`);
+      setTimeout(() => {
+        setIsImportModalOpen(false);
+        setCsvFile(null);
+        setImportFeedback(null);
+        fetchTaskboardData();
+      }, 1200);
+    } catch (err: any) {
+      console.error('CSV Import Error:', err);
+      setImportFeedback(`Import Failed: ${err.message || 'Unknown database error'}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // ==========================================
   // HANDLERS & ACTIONS
   // ==========================================
   const handleOpenDrawer = (item: TaskboardRecallItem) => {
@@ -222,7 +308,6 @@ export const TaskBoard: React.FC = () => {
         return null;
       }
 
-      // Retrieve public URL
       const { data: publicUrlData } = supabase.storage
         .from('repair-receipts')
         .getPublicUrl(filePath);
@@ -243,7 +328,6 @@ export const TaskBoard: React.FC = () => {
       
       let uploadedUrl = selectedRecall.receipt_url || '';
 
-      // Upload receipt file to Supabase Storage if user selected a new file
       if (receiptFile) {
         const publicUrl = await uploadReceiptToStorage(receiptFile, selectedRecall.id);
         if (publicUrl) {
@@ -251,7 +335,6 @@ export const TaskBoard: React.FC = () => {
         }
       }
 
-      // Map UI status back to DB constrained status string ('pending', 'scheduled', 'repaired')
       let dbStatus = 'pending';
       if (newStatus === 'Scheduled' || newStatus === 'In Progress') dbStatus = 'scheduled';
       if (newStatus === 'Cleared') dbStatus = 'repaired';
@@ -268,7 +351,6 @@ export const TaskBoard: React.FC = () => {
 
       if (error) throw error;
 
-      // Update UI state locally
       setRecalls((prev) =>
         prev.map((r) =>
           r.id === selectedRecall.id
@@ -356,7 +438,7 @@ export const TaskBoard: React.FC = () => {
             onClick={handleExportCSV}
             className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
           >
-            <span>📥</span> Export CSV Report
+            <span>📊</span> Export CSV Report
           </button>
         </div>
       </div>
@@ -388,26 +470,49 @@ export const TaskBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. MULTI-DIMENSIONAL FILTER CONTROL BAR */}
+      {/* 2. MULTI-DIMENSIONAL FILTER & ASSET IMPORT CONTROL BAR */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-4">
         <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
-          {/* Search Box */}
-          <div className="relative w-full lg:w-96">
-            <input
-              type="text"
-              placeholder="Search Unit #, VIN, Model, NHTSA ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition"
-            />
+          
+          {/* Enhanced Search Input with Explicit CTA & Icon */}
+          <div className="flex items-center gap-2 w-full lg:w-auto flex-1 max-w-lg">
+            <div className="relative w-full">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            
+            {/* Inline Import CSV Button right next to search */}
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
+              title="Import VIN list via CSV"
+            >
+              <span>📥</span> Import CSV
+            </button>
           </div>
 
-          {/* Filters & Sorting */}
+          {/* Dropdown Filters & Sorting */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
             <select
               value={selectedMake}
               onChange={(e) => setSelectedMake(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Makes</option>
               {uniqueMakes.filter((m) => m !== 'All').map((make) => (
@@ -418,7 +523,7 @@ export const TaskBoard: React.FC = () => {
             <select
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Severities</option>
               <option value="Critical">Critical</option>
@@ -430,7 +535,7 @@ export const TaskBoard: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Statuses</option>
               <option value="Open">Open</option>
@@ -444,7 +549,7 @@ export const TaskBoard: React.FC = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="created_at">Sort by Date</option>
               <option value="severity">Sort by Severity</option>
@@ -453,7 +558,7 @@ export const TaskBoard: React.FC = () => {
 
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold"
+              className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm"
               title="Toggle Sort Order"
             >
               {sortOrder === 'desc' ? '⬇️' : '⬆️'}
@@ -619,7 +724,7 @@ export const TaskBoard: React.FC = () => {
                   />
                 </div>
 
-                {/* 🧾 PROOF OF REMEDY RECEIPT ATTACHMENT */}
+                {/* PROOF OF REMEDY RECEIPT ATTACHMENT */}
                 <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
                   <label className="block text-xs font-bold text-gray-800">
                     Proof of Remedy / Repair Invoice (PDF or Image)
@@ -688,6 +793,67 @@ export const TaskBoard: React.FC = () => {
                 className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition"
               >
                 Close Drawer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. BULK FLEET CSV IMPORT MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-lg font-bold text-gray-900">Bulk Import Fleet VINs</h3>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column (optional: <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">make</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">model</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">year</code>).
+            </p>
+
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)}
+                className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+              />
+              {csvFile && (
+                <p className="text-xs text-emerald-600 font-bold mt-2">Ready: {csvFile.name}</p>
+              )}
+            </div>
+
+            {importFeedback && (
+              <p className={`text-xs font-semibold p-3 rounded-lg ${
+                importFeedback.startsWith('Error')
+                  ? 'bg-red-50 text-red-600'
+                  : importFeedback.startsWith('Success')
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : 'bg-blue-50 text-blue-600'
+              }`}>
+                {importFeedback}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProcessCsvImport}
+                disabled={!csvFile || importing}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50"
+              >
+                {importing ? 'Processing...' : 'Upload & Sync Fleet'}
               </button>
             </div>
           </div>
