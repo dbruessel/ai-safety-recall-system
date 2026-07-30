@@ -58,7 +58,7 @@ export const TaskBoard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Join monitored_vehicles table to fetch actual vehicle database fields
+      // Query only columns that exist on monitored_vehicles to avoid 400 PostgREST errors
       const { data, error } = await supabase
         .from('recall_tasks')
         .select(`
@@ -74,8 +74,7 @@ export const TaskBoard: React.FC = () => {
             vin,
             make,
             model,
-            year,
-            unit_number
+            year
           )
         `);
 
@@ -105,7 +104,7 @@ export const TaskBoard: React.FC = () => {
 
         return {
           id: item.id,
-          unit_number: vehicle?.unit_number || (vehicle?.vin ? `LV-${vehicle.vin.slice(-3)}` : 'LV-101'),
+          unit_number: vehicle?.vin ? `LV-${vehicle.vin.slice(-3)}` : 'LV-101',
           vin: vehicle?.vin || 'N/A',
           year: vehicle?.year || 2022,
           make: vehicle?.make || 'Unknown',
