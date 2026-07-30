@@ -12,6 +12,8 @@ const CURRENT_PROFILE_ID = '07136e5d-0b6e-4ccf-b774-c2f3f01154bf';
 // ==========================================
 // TYPES & INTERFACES
 // ==========================================
+export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
+
 export interface TaskboardRecallItem {
   id: string;
   unit_number: string;
@@ -55,6 +57,12 @@ export const TaskBoard: React.FC = () => {
   const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
+  // 💳 Subscription Tier States (Change tier here to test gating: 'free' | 'standard' | 'professional' | 'enterprise')
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  const [vinChecksUsed, setVinChecksUsed] = useState<number>(10); // Mock set to 10 to demonstrate hard stop
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [gateReason, setGateReason] = useState<string>('');
+
   // 🔍 Filter & Sort States
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMake, setSelectedMake] = useState<string>('All');
@@ -85,6 +93,21 @@ export const TaskBoard: React.FC = () => {
   const [scanResult, setScanResult] = useState<SingleVinScanResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [addingToFleet, setAddingToFleet] = useState<boolean>(false);
+
+  // Derive Tier Limit Caps based on defined tiers
+  const vehicleLimit = useMemo(() => {
+    switch (subscriptionTier) {
+      case 'free': return 10;
+      case 'standard': return 50;
+      case 'professional': return 250;
+      case 'enterprise': return 999999;
+      default: return 10;
+    }
+  }, [subscriptionTier]);
+
+  const isHardGated = useMemo(() => {
+    return subscriptionTier === 'free' && (vinChecksUsed >= 10 || recalls.length >= 10);
+  }, [subscriptionTier, vinChecksUsed, recalls.length]);
 
   // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
@@ -216,7 +239,35 @@ export const TaskBoard: React.FC = () => {
   }, [recalls]);
 
   // ==========================================
-  // ⚡ INSTANT SINGLE-VIN SCAN CONSOLE LOGIC
+  // TIER GATE HANDLERS
+  // ==========================================
+  const triggerUpgradeModal = (reason: string) => {
+    setGateReason(reason);
+    setIsUpgradeModalOpen(true);
+  };
+
+  const handleOpenSingleVinConsole = () => {
+    if (subscriptionTier === 'free' || subscriptionTier === 'standard') {
+      triggerUpgradeModal('Instant Single-VIN Scan Console is exclusive to Professional & Enterprise plans.');
+      return;
+    }
+    setSingleVinInput('');
+    setScanResult(null);
+    setScanError(null);
+    setIsScanModalOpen(true);
+  };
+
+  const handleDownloadPDF = () => {
+    if (subscriptionTier === 'free' || subscriptionTier === 'standard') {
+      triggerUpgradeModal('Signed Underwriter Compliance Certificates (PDF) are exclusive to Professional & Enterprise plans.');
+      return;
+    }
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
+  };
+
+  // ==========================================
+  // ⚡ INSTANT SINGLE-VIN SCAN LOGIC
   // ==========================================
   const handleRunSingleVinScan = async () => {
     const cleanVin = singleVinInput.trim().toUpperCase();
@@ -230,10 +281,8 @@ export const TaskBoard: React.FC = () => {
       setScanError(null);
       setScanResult(null);
 
-      // Call NHTSA API directly from browser
       const response = await fetch(`https://api.nhtsa.gov/recalls/recallsByVin?vin=${cleanVin}&format=json`);
       const data = await response.json();
-
       const rawResults = data.results || [];
       
       const mappedRecalls = rawResults.map((r: any) => ({
@@ -243,7 +292,6 @@ export const TaskBoard: React.FC = () => {
         remedy: r.Remedy || 'Contact dealer for remedy details.'
       }));
 
-      // Decode VIN year/make/model basics if available or infer fallback
       setScanResult({
         vin: cleanVin,
         make: rawResults[0]?.Make || 'Scanned',
@@ -263,10 +311,14 @@ export const TaskBoard: React.FC = () => {
   const handleAddScannedVinToFleet = async () => {
     if (!scanResult) return;
 
+    if (recalls.length >= vehicleLimit) {
+      triggerUpgradeModal(`You have reached your tier capacity of ${vehicleLimit} vehicles.`);
+      return;
+    }
+
     try {
       setAddingToFleet(true);
 
-      // 1. Insert into monitored_vehicles
       const { data: vehicleData, error: vehicleErr } = await supabase
         .from('monitored_vehicles')
         .upsert({
@@ -281,7 +333,6 @@ export const TaskBoard: React.FC = () => {
 
       if (vehicleErr) throw vehicleErr;
 
-      // 2. Insert recall tasks if found
       if (scanResult.recalls.length > 0 && vehicleData?.id) {
         const tasksToInsert = scanResult.recalls.map((r) => ({
           vehicle_id: vehicleData.id,
@@ -327,7 +378,6 @@ export const TaskBoard: React.FC = () => {
       }
 
       const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/["']/g, ''));
-      
       const vinIndex = headers.findIndex((h) => h.includes('vin'));
       const makeIndex = headers.findIndex((h) => h.includes('make'));
       const modelIndex = headers.findIndex((h) => h.includes('model'));
@@ -355,8 +405,8 @@ export const TaskBoard: React.FC = () => {
         }
       }
 
-      if (vehiclesToInsert.length === 0) {
-        setImportFeedback('Error: No valid VIN rows found in file.');
+      if (recalls.length + vehiclesToInsert.length > vehicleLimit) {
+        setImportFeedback(`Error: Importing ${vehiclesToInsert.length} vehicles exceeds your ${subscriptionTier.toUpperCase()} limit of ${vehicleLimit} vehicles.`);
         return;
       }
 
@@ -411,10 +461,7 @@ export const TaskBoard: React.FC = () => {
         .from('repair-receipts')
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) {
-        console.error('Storage Upload Error:', uploadError);
-        return null;
-      }
+      if (uploadError) return null;
 
       const { data: publicUrlData } = supabase.storage
         .from('repair-receipts')
@@ -433,14 +480,11 @@ export const TaskBoard: React.FC = () => {
     if (!selectedRecall) return;
     try {
       setUpdatingStatus(true);
-      
       let uploadedUrl = selectedRecall.receipt_url || '';
 
       if (receiptFile) {
         const publicUrl = await uploadReceiptToStorage(receiptFile, selectedRecall.id);
-        if (publicUrl) {
-          uploadedUrl = publicUrl;
-        }
+        if (publicUrl) uploadedUrl = publicUrl;
       }
 
       let dbStatus = 'pending';
@@ -462,27 +506,13 @@ export const TaskBoard: React.FC = () => {
       setRecalls((prev) =>
         prev.map((r) =>
           r.id === selectedRecall.id
-            ? {
-                ...r,
-                status: newStatus,
-                scheduled_date: scheduledDateInput,
-                repair_notes: notesInput,
-                receipt_url: uploadedUrl
-              }
+            ? { ...r, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput, receipt_url: uploadedUrl }
             : r
         )
       );
 
       setSelectedRecall((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: newStatus,
-              scheduled_date: scheduledDateInput,
-              repair_notes: notesInput,
-              receipt_url: uploadedUrl
-            }
-          : null
+        prev ? { ...prev, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput, receipt_url: uploadedUrl } : null
       );
 
       setReceiptFile(null);
@@ -519,34 +549,110 @@ export const TaskBoard: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleDownloadPDF = () => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-    window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
-  };
-
   // ==========================================
   // RENDER UI
   // ==========================================
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans bg-gray-50 min-h-screen">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans bg-gray-50 min-h-screen relative">
+      
+      {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
+      {isHardGated && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100">
+            <div className="inline-flex p-4 bg-amber-100 text-amber-600 rounded-full text-3xl">
+              🔒
+            </div>
+            <div>
+              <h2 className="text-2xl font-extrabold text-gray-900">10 Free VIN Teaser Limit Reached</h2>
+              <p className="text-sm text-gray-600 mt-2">
+                You have reached the 10 VIN check limit on your Free Plan. Upgrade your account to continue monitoring safety risks across your fleet.
+              </p>
+            </div>
+
+            {/* Quick Plan Pick Grid */}
+            <div className="grid grid-cols-2 gap-4 text-left pt-2">
+              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
+                <span className="text-xs font-bold text-gray-500 uppercase">Standard</span>
+                <p className="text-xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>✓ Up to 50 Vehicles Monitored</li>
+                  <li>✓ Continuous Active Scanning</li>
+                  <li>✓ CSV Audit Exports</li>
+                </ul>
+                <button
+                  onClick={() => setSubscriptionTier('standard')}
+                  className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
+                >
+                  Upgrade to Standard
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/30 space-y-2 relative">
+                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Popular</span>
+                <span className="text-xs font-bold text-indigo-600 uppercase">Professional</span>
+                <p className="text-xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>✓ Up to 250 Vehicles Monitored</li>
+                  <li>✓ Instant Single-VIN Scan Console</li>
+                  <li>✓ Underwriter PDF Risk Certificate</li>
+                </ul>
+                <button
+                  onClick={() => setSubscriptionTier('professional')}
+                  className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
+                >
+                  Upgrade to Professional
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fleet Recall Operations</h1>
           <p className="text-sm text-gray-500">Monitor, filter, and schedule safety recall remedies across active fleet assets.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+
+        {/* 💳 TIER USAGE BADGE & ACTIONS */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+            <div>
+              <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                {subscriptionTier.toUpperCase()} PLAN
+              </p>
+              <p className="text-xs font-bold text-gray-900">
+                {recalls.length} <span className="text-gray-400">/ {vehicleLimit === 999999 ? '∞' : vehicleLimit} Vehicles</span>
+              </p>
+            </div>
+            <div className="w-16 bg-gray-100 h-2 rounded-full overflow-hidden">
+              <div 
+                className={`h-full ${recalls.length >= vehicleLimit ? 'bg-red-500' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min((recalls.length / vehicleLimit) * 100, 100)}%` }}
+              ></div>
+            </div>
+            {subscriptionTier !== 'enterprise' && (
+              <button
+                onClick={() => triggerUpgradeModal('Manage your subscription tier')}
+                className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition"
+              >
+                Upgrade
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleDownloadPDF}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
           >
-            <span>📄</span> Download Risk Certificate (PDF)
+            <span>📄</span> Risk Certificate (PDF)
           </button>
           <button
             onClick={handleExportCSV}
             className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
           >
-            <span>📊</span> Export CSV Report
+            <span>📊</span> Export CSV
           </button>
         </div>
       </div>
@@ -584,7 +690,6 @@ export const TaskBoard: React.FC = () => {
         {/* ROW 1: SEARCH BAR & SCAN / IMPORT CTA BUTTONS */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          {/* Enhanced Search Bar */}
           <div className="relative w-full sm:flex-1 max-w-xl">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
               🔍
@@ -606,15 +711,9 @@ export const TaskBoard: React.FC = () => {
             )}
           </div>
 
-          {/* Action CTAs: Single VIN Scan & Bulk CSV Import */}
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
             <button
-              onClick={() => {
-                setSingleVinInput('');
-                setScanResult(null);
-                setScanError(null);
-                setIsScanModalOpen(true);
-              }}
+              onClick={handleOpenSingleVinConsole}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
               title="Instant single vehicle lookup"
             >
@@ -1076,6 +1175,96 @@ export const TaskBoard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 💳 PRICING / UPGRADE MODAL */}
+      {isUpgradeModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Upgrade Subscription Plan</h3>
+                {gateReason && <p className="text-xs text-blue-600 font-semibold mt-0.5">{gateReason}</p>}
+              </div>
+              <button
+                onClick={() => setIsUpgradeModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+              {/* Standard */}
+              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">Standard</span>
+                  <p className="text-2xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
+                    <li>✓ Up to 50 Vehicles</li>
+                    <li>✓ Continuous Monitoring</li>
+                    <li>✓ Full Workspace Access</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setSubscriptionTier('standard');
+                    setIsUpgradeModalOpen(false);
+                  }}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition"
+                >
+                  Select Standard
+                </button>
+              </div>
+
+              {/* Professional */}
+              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/20 flex flex-col justify-between space-y-3 relative">
+                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
+                <div>
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase">Professional</span>
+                  <p className="text-2xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
+                    <li>✓ Up to 250 Vehicles</li>
+                    <li>✓ Single-VIN Scan Console</li>
+                    <li>✓ Signed PDF Compliance Card</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setSubscriptionTier('professional');
+                    setIsUpgradeModalOpen(false);
+                  }}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition"
+                >
+                  Select Professional
+                </button>
+              </div>
+
+              {/* Enterprise */}
+              <div className="p-4 rounded-xl border border-gray-200 bg-gray-900 text-white flex flex-col justify-between space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Enterprise</span>
+                  <p className="text-2xl font-extrabold text-white">Custom</p>
+                  <ul className="text-xs text-gray-300 space-y-1.5 mt-2">
+                    <li>✓ Unlimited Vehicles</li>
+                    <li>✓ Telematics (Geotab/Samsara)</li>
+                    <li>✓ Dedicated Broker QBR</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setSubscriptionTier('enterprise');
+                    setIsUpgradeModalOpen(false);
+                  }}
+                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition"
+                >
+                  Select Enterprise
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
