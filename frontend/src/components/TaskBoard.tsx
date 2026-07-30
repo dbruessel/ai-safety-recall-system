@@ -32,6 +32,20 @@ export interface TaskboardRecallItem {
   receipt_url?: string;
 }
 
+interface SingleVinScanResult {
+  vin: string;
+  make?: string;
+  model?: string;
+  year?: number;
+  recallsCount: number;
+  recalls: Array<{
+    campaignNumber: string;
+    component: string;
+    summary: string;
+    remedy: string;
+  }>;
+}
+
 export const TaskBoard: React.FC = () => {
   // ==========================================
   // STATE MANAGEMENT
@@ -64,6 +78,14 @@ export const TaskBoard: React.FC = () => {
   const [importing, setImporting] = useState<boolean>(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
+  // ⚡ Single-VIN Scan Console States
+  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
+  const [singleVinInput, setSingleVinInput] = useState<string>('');
+  const [scanning, setScanning] = useState<boolean>(false);
+  const [scanResult, setScanResult] = useState<SingleVinScanResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [addingToFleet, setAddingToFleet] = useState<boolean>(false);
+
   // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
   // ==========================================
@@ -95,19 +117,16 @@ export const TaskBoard: React.FC = () => {
         throw error;
       }
 
-      // Map raw relational database response to UI TaskboardRecallItem type
       const formattedData: TaskboardRecallItem[] = (data || []).map((item: any) => {
         const vehicle = Array.isArray(item.monitored_vehicles)
           ? item.monitored_vehicles[0]
           : item.monitored_vehicles;
 
-        // Severity mapping logic based on score
         let severityLabel = 'Medium';
         if (item.severity_score >= 8.5) severityLabel = 'Critical';
         else if (item.severity_score >= 7.0) severityLabel = 'High';
         else if (item.severity_score < 4.0) severityLabel = 'Low';
 
-        // Status mapping to match UI badges & KPI metrics
         let statusLabel = 'Open';
         const rawStatus = (item.status || '').toLowerCase();
         if (rawStatus === 'scheduled' || rawStatus === 'in progress') statusLabel = 'Scheduled';
@@ -186,7 +205,6 @@ export const TaskBoard: React.FC = () => {
       });
   }, [recalls, searchTerm, selectedMake, selectedStatus, selectedSeverity, sortBy, sortOrder]);
 
-  // Fleet Resolution & Risk KPIs
   const metrics = useMemo(() => {
     const total = recalls.length;
     const open = recalls.filter((r) => r.status === 'Open').length;
@@ -196,6 +214,99 @@ export const TaskBoard: React.FC = () => {
 
     return { total, open, scheduled, cleared, safeRate };
   }, [recalls]);
+
+  // ==========================================
+  // ⚡ INSTANT SINGLE-VIN SCAN CONSOLE LOGIC
+  // ==========================================
+  const handleRunSingleVinScan = async () => {
+    const cleanVin = singleVinInput.trim().toUpperCase();
+    if (!cleanVin || cleanVin.length < 11) {
+      setScanError('Please enter a valid 17-digit vehicle VIN.');
+      return;
+    }
+
+    try {
+      setScanning(true);
+      setScanError(null);
+      setScanResult(null);
+
+      // Call NHTSA API directly from browser
+      const response = await fetch(`https://api.nhtsa.gov/recalls/recallsByVin?vin=${cleanVin}&format=json`);
+      const data = await response.json();
+
+      const rawResults = data.results || [];
+      
+      const mappedRecalls = rawResults.map((r: any) => ({
+        campaignNumber: r.NHTSACampaignNumber || 'N/A',
+        component: r.Component || 'Safety System',
+        summary: r.Summary || 'No defect summary available.',
+        remedy: r.Remedy || 'Contact dealer for remedy details.'
+      }));
+
+      // Decode VIN year/make/model basics if available or infer fallback
+      setScanResult({
+        vin: cleanVin,
+        make: rawResults[0]?.Make || 'Scanned',
+        model: rawResults[0]?.Model || 'Vehicle',
+        year: rawResults[0]?.ModelYear ? parseInt(rawResults[0].ModelYear, 10) : 2022,
+        recallsCount: mappedRecalls.length,
+        recalls: mappedRecalls
+      });
+    } catch (err) {
+      console.error('NHTSA Scan Error:', err);
+      setScanError('Failed to query NHTSA database. Check the VIN and try again.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleAddScannedVinToFleet = async () => {
+    if (!scanResult) return;
+
+    try {
+      setAddingToFleet(true);
+
+      // 1. Insert into monitored_vehicles
+      const { data: vehicleData, error: vehicleErr } = await supabase
+        .from('monitored_vehicles')
+        .upsert({
+          profile_id: CURRENT_PROFILE_ID,
+          vin: scanResult.vin,
+          make: scanResult.make,
+          model: scanResult.model,
+          year: scanResult.year
+        }, { onConflict: 'profile_id,vin' })
+        .select('id')
+        .single();
+
+      if (vehicleErr) throw vehicleErr;
+
+      // 2. Insert recall tasks if found
+      if (scanResult.recalls.length > 0 && vehicleData?.id) {
+        const tasksToInsert = scanResult.recalls.map((r) => ({
+          vehicle_id: vehicleData.id,
+          campaign_number: r.campaignNumber,
+          component: r.component,
+          summary: r.summary,
+          remedy: r.remedy,
+          severity_score: 7.5,
+          status: 'pending'
+        }));
+
+        await supabase.from('recall_tasks').insert(tasksToInsert);
+      }
+
+      setIsScanModalOpen(false);
+      setSingleVinInput('');
+      setScanResult(null);
+      fetchTaskboardData();
+    } catch (err: any) {
+      console.error('Add to Fleet Error:', err);
+      setScanError(`Failed to save asset: ${err.message || 'Database error'}`);
+    } finally {
+      setAddingToFleet(false);
+    }
+  };
 
   // ==========================================
   // BULK CSV PARSING & IMPORT LOGIC
@@ -215,7 +326,6 @@ export const TaskBoard: React.FC = () => {
         return;
       }
 
-      // Extract header row
       const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/["']/g, ''));
       
       const vinIndex = headers.findIndex((h) => h.includes('vin'));
@@ -252,7 +362,6 @@ export const TaskBoard: React.FC = () => {
 
       setImportFeedback(`Uploading ${vehiclesToInsert.length} vehicle(s) to Supabase...`);
 
-      // Upsert into monitored_vehicles
       const { error } = await supabase
         .from('monitored_vehicles')
         .upsert(vehiclesToInsert, { onConflict: 'profile_id,vin' });
@@ -291,7 +400,6 @@ export const TaskBoard: React.FC = () => {
     setReceiptFile(null);
   };
 
-  // 📎 File Upload Handler for Receipts
   const uploadReceiptToStorage = async (file: File, taskId: string): Promise<string | null> => {
     try {
       setUploadingReceipt(true);
@@ -470,49 +578,70 @@ export const TaskBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. MULTI-DIMENSIONAL FILTER & ASSET IMPORT CONTROL BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-4">
-        <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
+      {/* 2. TWO-ROW ASSET INGESTION & FILTER CONTROL BAR */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3">
+        
+        {/* ROW 1: SEARCH BAR & SCAN / IMPORT CTA BUTTONS */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          {/* Enhanced Search Input with Explicit CTA & Icon */}
-          <div className="flex items-center gap-2 w-full lg:w-auto flex-1 max-w-lg">
-            <div className="relative w-full">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                🔍
-              </span>
-              <input
-                type="text"
-                placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            
-            {/* Inline Import CSV Button right next to search */}
+          {/* Enhanced Search Bar */}
+          <div className="relative w-full sm:flex-1 max-w-xl">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+              🔍
+            </span>
+            <input
+              type="text"
+              placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Action CTAs: Single VIN Scan & Bulk CSV Import */}
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => {
+                setSingleVinInput('');
+                setScanResult(null);
+                setScanError(null);
+                setIsScanModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
+              title="Instant single vehicle lookup"
+            >
+              <span>⚡</span> Single-VIN Scan
+            </button>
+
             <button
               onClick={() => setIsImportModalOpen(true)}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
               title="Import VIN list via CSV"
             >
-              <span>📥</span> Import CSV
+              <span>📥</span> Bulk CSV Import
             </button>
           </div>
+        </div>
 
-          {/* Dropdown Filters & Sorting */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+        <div className="border-t border-gray-100 my-1"></div>
+
+        {/* ROW 2: DROPDOWN FILTERS & SORTING */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter By:</span>
+            
             <select
               value={selectedMake}
               onChange={(e) => setSelectedMake(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Makes</option>
               {uniqueMakes.filter((m) => m !== 'All').map((make) => (
@@ -523,7 +652,7 @@ export const TaskBoard: React.FC = () => {
             <select
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Severities</option>
               <option value="Critical">Critical</option>
@@ -535,7 +664,7 @@ export const TaskBoard: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="All">All Statuses</option>
               <option value="Open">Open</option>
@@ -543,13 +672,14 @@ export const TaskBoard: React.FC = () => {
               <option value="In Progress">In Progress</option>
               <option value="Cleared">Cleared</option>
             </select>
+          </div>
 
-            <div className="h-6 w-px bg-gray-200 hidden sm:block mx-1"></div>
-
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sort:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm"
             >
               <option value="created_at">Sort by Date</option>
               <option value="severity">Sort by Severity</option>
@@ -558,7 +688,7 @@ export const TaskBoard: React.FC = () => {
 
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm"
+              className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm"
               title="Toggle Sort Order"
             >
               {sortOrder === 'desc' ? '⬇️' : '⬆️'}
@@ -661,7 +791,6 @@ export const TaskBoard: React.FC = () => {
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end">
           <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
             <div className="space-y-6">
-              {/* Drawer Header */}
               <div className="flex justify-between items-center border-b pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">Manage Unit #{selectedRecall.unit_number}</h2>
@@ -675,7 +804,6 @@ export const TaskBoard: React.FC = () => {
                 </button>
               </div>
 
-              {/* Recall Safety Details */}
               <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-blue-600 font-mono">NHTSA #{selectedRecall.nhtsa_campaign_number}</span>
@@ -699,7 +827,6 @@ export const TaskBoard: React.FC = () => {
                 )}
               </div>
 
-              {/* Action Form */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
                 
@@ -724,7 +851,6 @@ export const TaskBoard: React.FC = () => {
                   />
                 </div>
 
-                {/* PROOF OF REMEDY RECEIPT ATTACHMENT */}
                 <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
                   <label className="block text-xs font-bold text-gray-800">
                     Proof of Remedy / Repair Invoice (PDF or Image)
@@ -763,7 +889,6 @@ export const TaskBoard: React.FC = () => {
               </div>
             </div>
 
-            {/* Footer Action Buttons */}
             <div className="border-t pt-4 space-y-2">
               <div className="grid grid-cols-3 gap-2">
                 <button
@@ -799,7 +924,99 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* 5. BULK FLEET CSV IMPORT MODAL */}
+      {/* 5. ⚡ INSTANT SINGLE-VIN SCAN CONSOLE MODAL */}
+      {isScanModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span>⚡</span> Instant Single-VIN Scan Console
+                </h3>
+                <p className="text-xs text-gray-500">Query live NHTSA safety defect databases on demand.</p>
+              </div>
+              <button
+                onClick={() => setIsScanModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                Enter 17-Digit Vehicle Identification Number (VIN)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  maxLength={17}
+                  placeholder="e.g. 1FTFW1ED4MFC12345"
+                  value={singleVinInput}
+                  onChange={(e) => setSingleVinInput(e.target.value.toUpperCase())}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 uppercase"
+                />
+                <button
+                  onClick={handleRunSingleVinScan}
+                  disabled={scanning || !singleVinInput}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50"
+                >
+                  {scanning ? 'Scanning...' : 'Scan VIN'}
+                </button>
+              </div>
+              {scanError && (
+                <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
+                  {scanError}
+                </p>
+              )}
+            </div>
+
+            {scanResult && (
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border">
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">{scanResult.year} {scanResult.make} {scanResult.model}</p>
+                    <p className="text-xs font-mono text-gray-500">VIN: {scanResult.vin}</p>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    scanResult.recallsCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {scanResult.recallsCount} Open Recalls Found
+                  </span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  {scanResult.recalls.length === 0 ? (
+                    <p className="text-xs text-emerald-600 font-semibold text-center py-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                      ✅ No safety recalls currently registered with NHTSA for this VIN.
+                    </p>
+                  ) : (
+                    scanResult.recalls.map((r, i) => (
+                      <div key={i} className="p-3 bg-red-50/60 border border-red-100 rounded-lg text-xs space-y-1">
+                        <div className="flex justify-between font-bold text-red-800">
+                          <span>{r.component}</span>
+                          <span className="font-mono text-red-600">#{r.campaignNumber}</span>
+                        </div>
+                        <p className="text-gray-700">{r.summary}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={handleAddScannedVinToFleet}
+                  disabled={addingToFleet}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
+                >
+                  {addingToFleet ? 'Saving Asset...' : '➕ Add Vehicle to Monitored Fleet'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 6. BULK FLEET CSV IMPORT MODAL */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
