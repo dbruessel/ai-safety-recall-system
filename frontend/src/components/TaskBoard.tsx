@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient'; // Adjust path if your client is located elsewhere
 
 // ==========================================
 // TYPES & INTERFACES
@@ -46,21 +47,72 @@ export const TaskBoard: React.FC = () => {
   const [notesInput, setNotesInput] = useState<string>('');
 
   // ==========================================
-  // API FETCHING
+  // DIRECT SUPABASE API FETCHING
   // ==========================================
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
-      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-      const res = await fetch(`${baseUrl}/api/recalls/tasks`);
-      if (res.ok) {
-        const data = await res.json();
-        setRecalls(data);
-      } else {
-        console.warn('API route not returning 200, defaulting to empty or fallback state');
-      }
+
+      const { data, error } = await supabase
+        .from('recall_tasks')
+        .select(`
+          id,
+          campaign_number,
+          component,
+          summary,
+          remedy,
+          severity_score,
+          status,
+          created_at,
+          monitored_vehicles!inner (
+            vin,
+            make,
+            model,
+            year,
+            profile_id
+          )
+        `)
+        .eq('monitored_vehicles.profile_id', '07136e5d-0b6e-4ccf-b774-c2f3f01154bf');
+
+      if (error) throw error;
+
+      // Transform raw Supabase rows to UI TaskboardRecallItem type
+      const formattedData: TaskboardRecallItem[] = (data || []).map((item: any) => {
+        const vehicle = item.monitored_vehicles;
+        
+        // Severity mapping logic based on score
+        let severityLabel = 'Medium';
+        if (item.severity_score >= 8.5) severityLabel = 'Critical';
+        else if (item.severity_score >= 7.0) severityLabel = 'High';
+        else if (item.severity_score < 4.0) severityLabel = 'Low';
+
+        // Status mapping to match UI badges
+        let statusLabel = 'Open';
+        const rawStatus = (item.status || '').toLowerCase();
+        if (rawStatus === 'scheduled' || rawStatus === 'in progress') statusLabel = 'Scheduled';
+        else if (rawStatus === 'repaired' || rawStatus === 'cleared') statusLabel = 'Cleared';
+        else if (rawStatus === 'pending') statusLabel = 'Open';
+
+        return {
+          id: item.id,
+          unit_number: vehicle?.vin ? `LV-${vehicle.vin.slice(-3)}` : 'LV-101',
+          vin: vehicle?.vin || 'N/A',
+          year: vehicle?.year || 2022,
+          make: vehicle?.make || 'Unknown',
+          model: vehicle?.model || 'Asset',
+          nhtsa_campaign_number: item.campaign_number || 'N/A',
+          component: item.component || 'Safety System',
+          severity: severityLabel,
+          status: statusLabel,
+          summary: item.summary,
+          remedy: item.remedy,
+          created_at: item.created_at
+        };
+      });
+
+      setRecalls(formattedData);
     } catch (err) {
-      console.error('Error fetching taskboard data:', err);
+      console.error('Error fetching taskboard data from Supabase:', err);
     } finally {
       setLoading(false);
     }
@@ -73,13 +125,11 @@ export const TaskBoard: React.FC = () => {
   // ==========================================
   // DYNAMIC DATA MEMOIZATION
   // ==========================================
-  // Get unique vehicle makes for dynamic filter dropdown
   const uniqueMakes = useMemo(() => {
     const makes = new Set(recalls.map((item) => item.make).filter(Boolean));
     return ['All', ...Array.from(makes).sort()];
   }, [recalls]);
 
-  // Combined Search, Filter & Multi-Sort Engine
   const filteredRecalls = useMemo(() => {
     return recalls
       .filter((item) => {
@@ -142,36 +192,43 @@ export const TaskBoard: React.FC = () => {
     if (!selectedRecall) return;
     try {
       setUpdatingStatus(true);
-      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-      const res = await fetch(`${baseUrl}/api/recalls/tasks/${selectedRecall.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: newStatus,
-          scheduled_date: scheduledDateInput,
-          repair_notes: notesInput,
-        }),
-      });
+      
+      // Map UI status back to DB constrained status string
+      let dbStatus = 'pending';
+      if (newStatus === 'Scheduled' || newStatus === 'In Progress') dbStatus = 'scheduled';
+      if (newStatus === 'Cleared') dbStatus = 'repaired';
 
-      if (res.ok) {
-        setRecalls((prev) =>
-          prev.map((r) =>
-            r.id === selectedRecall.id
-              ? { ...r, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput }
-              : r
-          )
-        );
-        if (selectedRecall) {
-          setSelectedRecall({
-            ...selectedRecall,
-            status: newStatus,
-            scheduled_date: scheduledDateInput,
-            repair_notes: notesInput,
-          });
-        }
-      }
+      const { error } = await supabase
+        .from('recall_tasks')
+        .update({
+          status: dbStatus,
+          scheduled_repair_date: scheduledDateInput || null,
+        })
+        .eq('id', selectedRecall.id);
+
+      if (error) throw error;
+
+      // Update UI state locally
+      setRecalls((prev) =>
+        prev.map((r) =>
+          r.id === selectedRecall.id
+            ? { ...r, status: newStatus, scheduled_date: scheduledDateInput, repair_notes: notesInput }
+            : r
+        )
+      );
+
+      setSelectedRecall((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: newStatus,
+              scheduled_date: scheduledDateInput,
+              repair_notes: notesInput,
+            }
+          : null
+      );
     } catch (err) {
-      console.error('Failed to update status:', err);
+      console.error('Failed to update status in Supabase:', err);
     } finally {
       setUpdatingStatus(false);
     }
@@ -387,7 +444,7 @@ export const TaskBoard: React.FC = () => {
                     <td className="p-4">
                       <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
                         item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
-                        item.status === 'Scheduled' ? 'bg-amber-100 text-amber-700' :
+                        item.status === 'Scheduled' || item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
                         'bg-red-50 text-red-600'
                       }`}>
                         {item.status || 'Open'}
