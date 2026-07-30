@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient'; // Adjust path if your client is located elsewhere
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase directly using Vite environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ==========================================
 // TYPES & INTERFACES
@@ -47,7 +52,7 @@ export const TaskBoard: React.FC = () => {
   const [notesInput, setNotesInput] = useState<string>('');
 
   // ==========================================
-  // DIRECT SUPABASE API FETCHING
+  // DIRECT SUPABASE FETCHING
   // ==========================================
   const fetchTaskboardData = async () => {
     try {
@@ -86,7 +91,7 @@ export const TaskBoard: React.FC = () => {
         else if (item.severity_score >= 7.0) severityLabel = 'High';
         else if (item.severity_score < 4.0) severityLabel = 'Low';
 
-        // Status mapping to match UI badges
+        // Status mapping to match UI badges & KPI metrics
         let statusLabel = 'Open';
         const rawStatus = (item.status || '').toLowerCase();
         if (rawStatus === 'scheduled' || rawStatus === 'in progress') statusLabel = 'Scheduled';
@@ -193,7 +198,7 @@ export const TaskBoard: React.FC = () => {
     try {
       setUpdatingStatus(true);
       
-      // Map UI status back to DB constrained status string
+      // Map UI status back to DB constrained status string ('pending', 'scheduled', 'repaired')
       let dbStatus = 'pending';
       if (newStatus === 'Scheduled' || newStatus === 'In Progress') dbStatus = 'scheduled';
       if (newStatus === 'Cleared') dbStatus = 'repaired';
