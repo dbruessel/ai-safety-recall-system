@@ -16,9 +16,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Active HTTPS endpoint for post-2010 NHTSA recalls
 NHTSA_FLAT_FILE_URL = "https://static.nhtsa.gov/odi/ffdd/rcl/FLAT_RCL_POST_2010.zip"
 
 def calculate_severity(summary_text: str) -> int:
+    """Calculates severity score based on key risk terms."""
     summary = str(summary_text).lower()
     if any(word in summary for word in ["fire", "crash", "loss of control", "brake"]):
         return 85
@@ -27,13 +29,13 @@ def calculate_severity(summary_text: str) -> int:
     return 40
 
 def run_daily_ingestion():
-    print("Starting ultra-lean daily 3 AM recall ingestion...")
+    print("Starting optimized daily recall ingestion...")
 
-    # Create a temporary directory to store files on disk instead of holding in RAM
+    # Create temporary directory to store files on disk (prevents OOM errors)
     with tempfile.TemporaryDirectory() as temp_dir:
         zip_path = os.path.join(temp_dir, "recalls.zip")
 
-        # 2. Stream download to disk in 8KB chunks (RAM stays flat)
+        # 2. Stream download to disk in chunks
         print("Downloading NHTSA zip file to disk...")
         with requests.get(NHTSA_FLAT_FILE_URL, stream=True, timeout=120) as r:
             r.raise_for_status()
@@ -48,7 +50,7 @@ def run_daily_ingestion():
             extracted_files = [f for f in z.namelist() if not f.startswith("__MACOSX")]
             txt_path = os.path.join(temp_dir, extracted_files[0])
 
-        # 4. Read the extracted file from disk line-by-line / chunk-by-chunk
+        # 4. Read extracted file in chunks from disk
         print("Processing CSV in chunks...")
         chunks = pd.read_csv(
             txt_path, 
@@ -59,8 +61,7 @@ def run_daily_ingestion():
             on_bad_lines='skip',
             quoting=3,
             chunksize=1000,
-            # usecols speeds up parsing & reduces pandas overhead dramatically
-            usecols=[1, 2, 3, 4, 6, 20] 
+            usecols=[1, 2, 3, 4, 6, 20]  # Only load columns we need
         )
 
         total_processed = 0
@@ -70,10 +71,9 @@ def run_daily_ingestion():
 
             for _, row in chunk.iterrows():
                 try:
-                    # Column mapping based on usecols=[1, 2, 3, 4, 6, 20]:
-                    # row[1]=col 1, row[2]=col 2, row[3]=col 3, row[4]=col 4, row[6]=col 6, row[20]=col 20
-                    campaign_number = str(row[1]) if pd.notnull(row[1]) else None
-                    if not campaign_number or campaign_number.strip() == "":
+                    # Index mapping matching usecols=[1, 2, 3, 4, 6, 20]:
+                    campaign_number = str(row[1]).strip() if pd.notnull(row[1]) else None
+                    if not campaign_number:
                         continue
 
                     summary_text = str(row[20]) if pd.notnull(row[20]) else ""
@@ -93,17 +93,20 @@ def run_daily_ingestion():
 
             # Batch upsert to Supabase
             if definitions:
+                # DEDUPLICATION FIX: Deduplicate within the batch to prevent Postgres ON CONFLICT 21000 error
+                unique_definitions = list({d["campaign_number"]: d for d in definitions}.values())
+
                 try:
                     sb.table("recall_definitions").upsert(
-                        definitions, 
+                        unique_definitions, 
                         on_conflict="campaign_number"
                     ).execute()
-                    total_processed += len(definitions)
+                    total_processed += len(unique_definitions)
                 except Exception as e:
                     print(f"Error on chunk {chunk_idx}: {e}")
 
             if chunk_idx % 10 == 0:
-                print(f"Processed chunk {chunk_idx} (~{total_processed} records synced)...")
+                print(f"Processed chunk {chunk_idx} (~{total_processed} records synced so far)...")
 
     print(f"SUCCESS! Daily ingestion complete. Total records processed: {total_processed}")
 
