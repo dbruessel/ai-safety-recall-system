@@ -46,9 +46,9 @@ export default function App() {
   const [blockedVinCount, setBlockedVinCount] = useState(0);
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
 
-  // ⚡ DYNAMIC SUPABASE GLOBAL METRICS STATE
+  // DYNAMIC SUPABASE GLOBAL METRICS STATE
   const [globalMetrics, setGlobalMetrics] = useState({
-    indexedVulnerabilityDefinitions: 30192, // Default fallback matching your database count
+    indexedVulnerabilityDefinitions: 30192,
     activeFederalSyncPulses: "Continuous Active Monitoring",
     regionalThermalHazardCount: 30192
   });
@@ -177,6 +177,8 @@ export default function App() {
       if (lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
+        setLoading(false);
+        return;
       }
 
       setTimeout(async () => {
@@ -582,40 +584,110 @@ export default function App() {
         </div>
       )}
 
-      {/* UPGRADE INTERCEPTOR MODAL FOR PROSPECTS */}
+      {/* MULTI-TIER UPGRADE INTERCEPTOR MODAL FOR PROSPECTS */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
+          <div className="bg-slate-900 border border-cyan-500/30 max-w-lg w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
             <button 
               onClick={() => setShowUpgradeModal(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white font-mono text-sm cursor-pointer"
             >
               ✕
             </button>
-            
+
             <div className="space-y-2">
-              <span className="text-xs font-mono text-rose-400 uppercase tracking-wider font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20">
+              <span className="text-[10px] font-mono text-rose-400 uppercase tracking-widest font-bold bg-rose-500/10 px-2.5 py-0.5 rounded border border-rose-500/20">
                 Freemium Limit Intercepted
               </span>
               <h3 className="text-xl font-bold text-white tracking-tight">Unlock Full Safety Compliance</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription below to unlock all {blockedVinCount} vehicles in an active workspace.
+                You uploaded <strong className="text-white">{blockedVinCount} assets</strong>. Free Ghost Audits are capped at 10 vehicles. Select a subscription tier below to unlock your full fleet workspace.
               </p>
             </div>
 
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
-              <div className="flex justify-between text-slate-400">
-                <span>Selected Tier:</span>
-                <span className="text-cyan-400 uppercase font-bold">{selectedTier}</span>
-              </div>
-              <div className="flex justify-between text-slate-400">
-                <span>Monthly Subscription:</span>
-                <span className="text-white font-bold">
-                  {selectedTier === 'standard' ? '$99.00' : selectedTier === 'professional' ? '$249.00' : '$499.00'}/mo
-                </span>
-              </div>
+            {/* TIER SELECTION TABS */}
+            <div className="grid grid-cols-3 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedTier('standard')}
+                className={`py-2 px-3 rounded-lg text-xs font-mono font-bold transition cursor-pointer flex flex-col items-center gap-0.5 ${
+                  selectedTier === 'standard'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>STANDARD</span>
+                <span className="text-[10px] opacity-80">$99/mo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedTier('professional')}
+                className={`py-2 px-3 rounded-lg text-xs font-mono font-bold transition cursor-pointer flex flex-col items-center gap-0.5 relative ${
+                  selectedTier === 'professional'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>PRO</span>
+                <span className="text-[10px] opacity-80">$249/mo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedTier('enterprise')}
+                className={`py-2 px-3 rounded-lg text-xs font-mono font-bold transition cursor-pointer flex flex-col items-center gap-0.5 ${
+                  selectedTier === 'enterprise'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>ENTERPRISE</span>
+                <span className="text-[10px] opacity-80">$499/mo</span>
+              </button>
             </div>
 
+            {/* DYNAMIC TIER FEATURE SUMMARY */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <span className="text-slate-400">Selected Plan:</span>
+                <span className="text-cyan-400 font-bold uppercase tracking-wider">
+                  {selectedTier === 'standard' && 'Standard (Up to 50 Vehicles)'}
+                  {selectedTier === 'professional' && 'Professional (Up to 250 Vehicles)'}
+                  {selectedTier === 'enterprise' && 'Enterprise (Unlimited Vehicles)'}
+                </span>
+              </div>
+
+              <ul className="space-y-1.5 text-[11px] text-slate-300">
+                {selectedTier === 'standard' && (
+                  <>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Up to 50 Vehicles Monitored</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Full Kanban Taskboard Workspace</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Daily Automated 3 AM NHTSA Sync</li>
+                  </>
+                )}
+
+                {selectedTier === 'professional' && (
+                  <>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Up to 250 Vehicles Monitored</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Instant Single-VIN Scan Console</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Extreme Thermal Risk Calculations</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Signed Underwriter Compliance Cards</li>
+                  </>
+                )}
+
+                {selectedTier === 'enterprise' && (
+                  <>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Unlimited Monitored Fleet Size</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Samsara / Geotab / Fleetio API Sync</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Co-Branded Insurance Renewal Packets</li>
+                    <li className="flex items-center gap-1.5 text-emerald-400">✓ Custom Batch Webhook Relay</li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            {/* CTA BUTTON */}
             <div className="space-y-3">
               <UpgradeButton planType={selectedTier} email={userEmail} className="w-full py-3" />
               <button
