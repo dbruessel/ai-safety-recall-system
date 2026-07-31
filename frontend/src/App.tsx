@@ -46,11 +46,35 @@ export default function App() {
   const [blockedVinCount, setBlockedVinCount] = useState(0);
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
 
-  const globalMetrics = {
-    indexedVulnerabilityDefinitions: 25041,
+  // ⚡ DYNAMIC SUPABASE GLOBAL METRICS STATE
+  const [globalMetrics, setGlobalMetrics] = useState({
+    indexedVulnerabilityDefinitions: 30192, // Default fallback matching your database count
     activeFederalSyncPulses: "Continuous Active Monitoring",
-    regionalThermalHazardCount: 15405
-  };
+    regionalThermalHazardCount: 30192
+  });
+
+  // Fetch real-time count from `recall_definitions` table in Supabase
+  useEffect(() => {
+    const fetchGlobalRecallsCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('recall_definitions')
+          .select('*', { count: 'exact', head: true });
+
+        if (count && !error) {
+          setGlobalMetrics(prev => ({
+            ...prev,
+            indexedVulnerabilityDefinitions: count,
+            regionalThermalHazardCount: count
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic recall definitions count:", err);
+      }
+    };
+
+    fetchGlobalRecallsCount();
+  }, []);
 
   // ====================================================================
   // ROUTE INTERCEPTOR: POST-CHECKOUT STRIPE RETURN DETECTOR
@@ -263,10 +287,10 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 text-xs font-mono">
           <div className="flex items-center gap-2 text-rose-300 uppercase tracking-wider">
             <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
-            <span>Live Security Advisory: <strong>{globalMetrics.regionalThermalHazardCount.toLocaleString()} Thermal-Risk Recalls</strong> active across regional transport corridors.</span>
+            <span>Live Security Advisory: <strong>{globalMetrics.regionalThermalHazardCount.toLocaleString()} Active Recalls</strong> indexed across national transportation databases.</span>
           </div>
           <div className="hidden sm:block text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-0.5 rounded text-[11px]">
-            Continuous Active Monitoring
+            {globalMetrics.activeFederalSyncPulses}
           </div>
         </div>
       </div>
