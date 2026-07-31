@@ -11,3 +11,4 @@ stripe
 gunicorn
 reportlab
 pandas
+resend
