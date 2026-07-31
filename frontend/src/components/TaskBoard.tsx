@@ -57,9 +57,10 @@ export const TaskBoard: React.FC = () => {
   const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-  // 💳 Subscription Tier States (Change tier here to test gating: 'free' | 'standard' | 'professional' | 'enterprise')
+  // 💳 Subscription Tier States
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
-  const [vinChecksUsed, setVinChecksUsed] = useState<number>(10); // Mock set to 10 to demonstrate hard stop
+  const [vinChecksUsed, setVinChecksUsed] = useState<number>(0);
+  const [isHardStopDismissed, setIsHardStopDismissed] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [gateReason, setGateReason] = useState<string>('');
 
@@ -105,9 +106,13 @@ export const TaskBoard: React.FC = () => {
     }
   }, [subscriptionTier]);
 
-  const isHardGated = useMemo(() => {
-    return subscriptionTier === 'free' && (vinChecksUsed >= 10 || recalls.length >= 10);
-  }, [subscriptionTier, vinChecksUsed, recalls.length]);
+  // Modal triggers ONLY when NOT standard/professional/enterprise AND user has checked > 10 VINs
+  const showHardGatedModal = useMemo(() => {
+    const isPaidPlan = ['standard', 'professional', 'enterprise'].includes(subscriptionTier);
+    if (isPaidPlan || isHardStopDismissed) return false;
+    
+    return subscriptionTier === 'free' && (vinChecksUsed > 10 || recalls.length > 10);
+  }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed]);
 
   // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
@@ -291,6 +296,8 @@ export const TaskBoard: React.FC = () => {
         summary: r.Summary || 'No defect summary available.',
         remedy: r.Remedy || 'Contact dealer for remedy details.'
       }));
+
+      setVinChecksUsed((prev) => prev + 1);
 
       setScanResult({
         vin: cleanVin,
@@ -555,17 +562,27 @@ export const TaskBoard: React.FC = () => {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans bg-gray-50 min-h-screen relative">
       
-      {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
-      {isHardGated && (
+      {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL (Only shows for free tier with > 10 VINs checked) */}
+      {showHardGatedModal && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative">
+            
+            {/* Close Button to dismiss modal */}
+            <button
+              onClick={() => setIsHardStopDismissed(true)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition"
+              title="Close Preview"
+            >
+              ✕
+            </button>
+
             <div className="inline-flex p-4 bg-amber-100 text-amber-600 rounded-full text-3xl">
               🔒
             </div>
             <div>
               <h2 className="text-2xl font-extrabold text-gray-900">10 Free VIN Teaser Limit Reached</h2>
               <p className="text-sm text-gray-600 mt-2">
-                You have reached the 10 VIN check limit on your Free Plan. Upgrade your account to continue monitoring safety risks across your fleet.
+                You have checked more than 10 VINs on your Free Account. Upgrade to a paid plan to unlock continuous monitoring across your fleet.
               </p>
             </div>
 
@@ -580,7 +597,10 @@ export const TaskBoard: React.FC = () => {
                   <li>✓ CSV Audit Exports</li>
                 </ul>
                 <button
-                  onClick={() => setSubscriptionTier('standard')}
+                  onClick={() => {
+                    setSubscriptionTier('standard');
+                    setIsHardStopDismissed(true);
+                  }}
                   className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
                 >
                   Upgrade to Standard
@@ -597,12 +617,24 @@ export const TaskBoard: React.FC = () => {
                   <li>✓ Underwriter PDF Risk Certificate</li>
                 </ul>
                 <button
-                  onClick={() => setSubscriptionTier('professional')}
+                  onClick={() => {
+                    setSubscriptionTier('professional');
+                    setIsHardStopDismissed(true);
+                  }}
                   className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
                 >
                   Upgrade to Professional
                 </button>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setIsHardStopDismissed(true)}
+                className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline"
+              >
+                Dismiss and continue viewing current workspace
+              </button>
             </div>
           </div>
         </div>
