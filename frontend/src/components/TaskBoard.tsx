@@ -53,6 +53,108 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
+// STREAMLINED ACCOUNT DROPDOWN MENU
+// ==========================================
+interface AccountMenuProps {
+  userEmail: string;
+  userRole: UserRole;
+  subscriptionTier: SubscriptionTier;
+  onOpenTeamModal: () => void;
+  onOpenUpgradeModal: () => void;
+  onSignOut: () => void;
+}
+
+function AccountMenu({
+  userEmail,
+  userRole,
+  subscriptionTier,
+  onOpenTeamModal,
+  onOpenUpgradeModal,
+  onSignOut,
+}: AccountMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block text-left">
+      {/* UNIFIED ACCOUNT BUTTON */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-sm cursor-pointer"
+      >
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span className="font-bold text-white max-w-[160px] truncate">{userEmail || 'Account'}</span>
+        <span className="text-slate-400 text-[10px]">▼</span>
+      </button>
+
+      {/* ACCOUNT DROPDOWN POPOVER */}
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
+
+          <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
+            {/* USER INFO HEADER */}
+            <div className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Signed In As</p>
+              <p className="text-xs font-bold text-white truncate">{userEmail || 'Active Workspace User'}</p>
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                  Role: {userRole}
+                </span>
+                <span className="bg-slate-800 text-slate-300 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                  {subscriptionTier}
+                </span>
+              </div>
+            </div>
+
+            {/* QUICK ACTIONS */}
+            <div className="space-y-1">
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenTeamModal();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+                >
+                  <span>👥 Team & Permissions</span>
+                  <span className="text-slate-500">→</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && subscriptionTier !== 'enterprise' && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenUpgradeModal();
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-cyan-400 font-bold transition flex items-center justify-between cursor-pointer"
+                >
+                  <span>💳 Manage Plan Tier</span>
+                  <span className="text-slate-500">→</span>
+                </button>
+              )}
+            </div>
+
+            <div className="border-t border-slate-800 pt-2">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onSignOut();
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-bold transition flex items-center justify-between cursor-pointer"
+              >
+                <span>Sign Out</span>
+                <span>🚪</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
 // UNDERWRITER REPORT VIEW COMPONENT (BROKER READY)
 // ==========================================
 function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
@@ -100,9 +202,8 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* ENHANCED METRICS GRID WITH SAVINGS & CARRIER STATUS BADGES */}
+      {/* METRICS GRID WITH CARRIER STATUS BADGES */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-mono">
-        {/* Metric 1: Remediation Rate + Status Badge */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
           <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
@@ -123,14 +224,12 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           </div>
         </div>
 
-        {/* Metric 2: Avg Resolution Time */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Avg. Resolution Time</span>
           <div className="text-3xl font-black text-cyan-400">{Math.round(avgDaysToRemediate)} Days</div>
           <span className="text-[10px] text-slate-500 block">Industry Avg: 45 Days</span>
         </div>
 
-        {/* Metric 3: Verified Receipts */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Verified Proof-of-Remedies</span>
           <div className="text-3xl font-black text-purple-400">
@@ -139,7 +238,6 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           <span className="text-[10px] text-slate-500 block">Dealer Invoices Attached</span>
         </div>
 
-        {/* Metric 4: Estimated ROI Callout */}
         <div className="bg-slate-950 border border-cyan-500/30 p-4 rounded-xl space-y-2">
           <span className="text-xs text-cyan-400 font-bold uppercase">Estimated Annual Credit</span>
           <div className="text-3xl font-black text-white">
@@ -213,8 +311,9 @@ export const TaskBoard: React.FC = () => {
   const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-  // 🛡️ RBAC User Role & Team Modal States
+  // 🛡️ RBAC User Role, Account, & Team Modal States
   const [userRole, setUserRole] = useState<UserRole>('admin');
+  const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'workspace' | 'underwriter'>('workspace');
@@ -259,13 +358,15 @@ export const TaskBoard: React.FC = () => {
 
   // Define RBAC permissions map based on role
   const permissions = useMemo(() => {
+    const isAdmin = userRole === 'admin';
+    const isViewer = userRole === 'viewer';
     return {
-      canManageBilling: userRole === 'admin',
-      canInviteUsers: userRole === 'admin',
-      canExportUnderwriterReport: userRole === 'admin',
-      canUpdateTaskStatus: userRole === 'admin' || userRole === 'mechanic',
-      canUploadReceipts: userRole === 'admin' || userRole === 'mechanic',
-      isReadOnly: userRole === 'viewer',
+      canManageBilling: isAdmin,
+      canInviteUsers: isAdmin,
+      canExportUnderwriterReport: isAdmin || isViewer,
+      canUpdateTaskStatus: isAdmin || userRole === 'mechanic',
+      canUploadReceipts: isAdmin || userRole === 'mechanic',
+      isReadOnly: isViewer,
     };
   }, [userRole]);
 
@@ -275,6 +376,7 @@ export const TaskBoard: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        setUserEmail(user.email || '');
         const { data } = await supabase
           .from('profiles')
           .select('role, subscription_tier')
@@ -470,6 +572,11 @@ export const TaskBoard: React.FC = () => {
     }
     const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   // ==========================================
@@ -867,25 +974,22 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* HEADER SECTION */}
+      {/* HEADER SECTION WITH STREAMLINED ACCOUNT MENU */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">
               {activeTab === 'underwriter' ? 'Underwriter Compliance & Risk Portal' : 'Fleet Recall Operations'}
             </h1>
-            <span className="bg-slate-200 text-slate-700 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full uppercase">
-              Role: {userRole}
-            </span>
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mt-0.5">
             {activeTab === 'underwriter'
               ? 'Executive risk metrics and audit-grade proof of recall remediation for insurance carriers.'
               : 'Monitor, filter, and schedule safety recall remedies across active fleet assets.'}
           </p>
         </div>
 
-        {/* TAB SWITCHER & OPERATIONAL CONTROLS */}
+        {/* TAB SWITCHER & STREAMLINED ACCOUNT DROPDOWN */}
         <div className="flex flex-wrap items-center gap-3">
           {/* TAB NAVIGATION BUTTONS */}
           <div className="bg-gray-200 p-1 rounded-xl flex gap-1 text-xs font-mono">
@@ -909,58 +1013,33 @@ export const TaskBoard: React.FC = () => {
             )}
           </div>
 
-          {/* OPERATIONAL CONTROLS (ONLY VISIBLE ON TASK BOARD TAB) */}
+          {/* OPERATIONAL QUICK ACTION (TASK BOARD VIEW ONLY) */}
           {activeTab === 'workspace' && (
-            <>
-              {permissions.canInviteUsers && (
-                <button
-                  onClick={() => setIsTeamModalOpen(true)}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
-                >
-                  👥 Team & Permissions
-                </button>
-              )}
-
-              {/* 💳 TIER USAGE BADGE */}
-              <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                <div>
-                  <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                    {subscriptionTier.toUpperCase()} PLAN
-                  </p>
-                  <p className="text-xs font-bold text-gray-900">
-                    {recalls.length} <span className="text-gray-400">/ {vehicleLimit === 999999 ? '∞' : vehicleLimit} Vehicles</span>
-                  </p>
-                </div>
-                <div className="w-16 bg-gray-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${recalls.length >= vehicleLimit ? 'bg-red-500' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min((recalls.length / vehicleLimit) * 100, 100)}%` }}
-                  ></div>
-                </div>
-                {permissions.canManageBilling && subscriptionTier !== 'enterprise' && (
-                  <button
-                    onClick={() => triggerUpgradeModal('Manage your subscription tier')}
-                    className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition cursor-pointer"
-                  >
-                    Upgrade
-                  </button>
-                )}
-              </div>
-
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleDownloadPDF}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📄</span> Risk Certificate
               </button>
               <button
                 onClick={handleExportCSV}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📊</span> Export CSV
               </button>
-            </>
+            </div>
           )}
+
+          {/* UNIFIED ACCOUNT DROPDOWN */}
+          <AccountMenu
+            userEmail={userEmail}
+            userRole={userRole}
+            subscriptionTier={subscriptionTier}
+            onOpenTeamModal={() => setIsTeamModalOpen(true)}
+            onOpenUpgradeModal={() => triggerUpgradeModal('Manage your subscription tier')}
+            onSignOut={handleSignOut}
+          />
         </div>
       </div>
 
