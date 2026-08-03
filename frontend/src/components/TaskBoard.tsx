@@ -53,7 +53,7 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
-// UNDERWRITER REPORT VIEW COMPONENT
+// UNDERWRITER REPORT VIEW COMPONENT (BROKER READY)
 // ==========================================
 function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
   const completedTasks = tasks.filter((t) => t.status === 'Cleared');
@@ -68,8 +68,12 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
       return acc + (closed - created) / (1000 * 3600 * 24);
     }, 0) / (completedTasks.length || 1);
 
+  // Estimate potential savings ($200 avg credit per vehicle/yr at 90%+ compliance)
+  const estimatedSavings = complianceScore >= 90 ? totalTasks * 200 : 0;
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl">
+      {/* HEADER WITH BROKER SHARE BUTTONS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
         <div>
           <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">
@@ -77,34 +81,71 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           </span>
           <h3 className="text-xl font-bold text-white font-mono mt-1">Commercial Risk & Compliance Scorecard</h3>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-extrabold rounded-xl transition shadow-lg"
-        >
-          Export Underwriter Packet (PDF)
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert('Copied secure read-only underwriter link to clipboard!');
+            }}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-mono text-xs font-bold rounded-xl border border-cyan-500/30 transition flex items-center gap-1.5 cursor-pointer"
+          >
+            🔗 Copy Broker Link
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-extrabold rounded-xl transition shadow-lg cursor-pointer"
+          >
+            Export Audit PDF
+          </button>
+        </div>
       </div>
 
-      {/* KPI METRICS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+      {/* ENHANCED METRICS GRID WITH SAVINGS & CARRIER STATUS BADGES */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-mono">
+        {/* Metric 1: Remediation Rate + Status Badge */}
+        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
-          <div className="text-3xl font-black text-emerald-400 mt-1">{complianceScore}%</div>
-          <span className="text-[10px] text-slate-500">Target for Carrier Discount: &gt;95%</span>
+          <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
+          <div>
+            {complianceScore >= 95 ? (
+              <span className="inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold">
+                🟢 Premium Credit Eligible
+              </span>
+            ) : complianceScore >= 80 ? (
+              <span className="inline-block bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold">
+                🟡 Standard Carrier Appetite
+              </span>
+            ) : (
+              <span className="inline-block bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold">
+                🔴 Surcharge / Audit Risk
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+        {/* Metric 2: Avg Resolution Time */}
+        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Avg. Resolution Time</span>
-          <div className="text-3xl font-black text-cyan-400 mt-1">{Math.round(avgDaysToRemediate)} Days</div>
-          <span className="text-[10px] text-slate-500">Industry Standard: 45 Days</span>
+          <div className="text-3xl font-black text-cyan-400">{Math.round(avgDaysToRemediate)} Days</div>
+          <span className="text-[10px] text-slate-500 block">Industry Avg: 45 Days</span>
         </div>
 
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+        {/* Metric 3: Verified Receipts */}
+        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Verified Proof-of-Remedies</span>
-          <div className="text-3xl font-black text-purple-400 mt-1">
+          <div className="text-3xl font-black text-purple-400">
             {completedTasks.filter((t) => t.receipt_url).length} / {completedTasks.length}
           </div>
-          <span className="text-[10px] text-slate-500">Dealer Invoices Attached</span>
+          <span className="text-[10px] text-slate-500 block">Dealer Invoices Attached</span>
+        </div>
+
+        {/* Metric 4: Estimated ROI Callout */}
+        <div className="bg-slate-950 border border-cyan-500/30 p-4 rounded-xl space-y-2">
+          <span className="text-xs text-cyan-400 font-bold uppercase">Estimated Annual Credit</span>
+          <div className="text-3xl font-black text-white">
+            ${estimatedSavings.toLocaleString()} <span className="text-xs font-normal text-slate-400">/yr</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block">Est. 5% carrier policy savings</span>
         </div>
       </div>
 
@@ -126,7 +167,7 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
               {completedTasks.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-4 text-center text-slate-500">
-                    No cleared recalls recorded yet.
+                    No cleared recalls recorded yet. Upload a dealer receipt to clear open tasks.
                   </td>
                 </tr>
               ) : (
@@ -236,11 +277,14 @@ export const TaskBoard: React.FC = () => {
         setCurrentUserId(user.id);
         const { data } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, subscription_tier')
           .eq('id', user.id)
           .single();
         if (data?.role) {
           setUserRole(data.role as UserRole);
+        }
+        if (data?.subscription_tier) {
+          setSubscriptionTier(data.subscription_tier as SubscriptionTier);
         }
       }
     }
@@ -261,10 +305,10 @@ export const TaskBoard: React.FC = () => {
   // Modal triggers ONLY when NOT standard/professional/enterprise AND user has checked > 10 VINs
   const showHardGatedModal = useMemo(() => {
     const isPaidPlan = ['standard', 'professional', 'enterprise'].includes(subscriptionTier);
-    if (isPaidPlan || isHardStopDismissed) return false;
+    if (isPaidPlan || isHardStopDismissed || currentUserId) return false;
 
     return subscriptionTier === 'free' && (vinChecksUsed > 10 || recalls.length > 10);
-  }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed]);
+  }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed, currentUserId]);
 
   // ==========================================
   // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
@@ -754,7 +798,7 @@ export const TaskBoard: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative">
             <button
               onClick={() => setIsHardStopDismissed(true)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
               title="Close Preview"
             >
               ✕
@@ -784,7 +828,7 @@ export const TaskBoard: React.FC = () => {
                     setSubscriptionTier('standard');
                     setIsHardStopDismissed(true);
                   }}
-                  className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
+                  className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
                 >
                   Upgrade to Standard
                 </button>
@@ -804,7 +848,7 @@ export const TaskBoard: React.FC = () => {
                     setSubscriptionTier('professional');
                     setIsHardStopDismissed(true);
                   }}
-                  className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm"
+                  className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
                 >
                   Upgrade to Professional
                 </button>
@@ -814,7 +858,7 @@ export const TaskBoard: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={() => setIsHardStopDismissed(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline"
+                className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline cursor-pointer"
               >
                 Dismiss and continue viewing current workspace
               </button>
@@ -840,7 +884,7 @@ export const TaskBoard: React.FC = () => {
           <div className="bg-gray-200 p-1 rounded-xl flex gap-1 text-xs font-mono">
             <button
               onClick={() => setActiveTab('workspace')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                 activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -849,7 +893,7 @@ export const TaskBoard: React.FC = () => {
             {permissions.canExportUnderwriterReport && (
               <button
                 onClick={() => setActiveTab('underwriter')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                   activeTab === 'underwriter' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -861,7 +905,7 @@ export const TaskBoard: React.FC = () => {
           {permissions.canInviteUsers && (
             <button
               onClick={() => setIsTeamModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 shadow-sm"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
             >
               👥 Team & Permissions
             </button>
@@ -886,7 +930,7 @@ export const TaskBoard: React.FC = () => {
             {permissions.canManageBilling && subscriptionTier !== 'enterprise' && (
               <button
                 onClick={() => triggerUpgradeModal('Manage your subscription tier')}
-                className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition"
+                className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition cursor-pointer"
               >
                 Upgrade
               </button>
@@ -895,13 +939,13 @@ export const TaskBoard: React.FC = () => {
 
           <button
             onClick={handleDownloadPDF}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
           >
             <span>📄</span> Risk Certificate
           </button>
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2"
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
           >
             <span>📊</span> Export CSV
           </button>
@@ -957,7 +1001,7 @@ export const TaskBoard: React.FC = () => {
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
                   >
                     ✕
                   </button>
@@ -967,7 +1011,7 @@ export const TaskBoard: React.FC = () => {
               <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button
                   onClick={handleOpenSingleVinConsole}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
                   title="Instant single vehicle lookup"
                 >
                   <span>⚡</span> Single-VIN Scan
@@ -975,7 +1019,7 @@ export const TaskBoard: React.FC = () => {
 
                 <button
                   onClick={() => setIsImportModalOpen(true)}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
                   title="Import VIN list via CSV"
                 >
                   <span>📥</span> Bulk CSV Import
@@ -992,7 +1036,7 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={selectedMake}
                   onChange={(e) => setSelectedMake(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
                 >
                   <option value="All">All Makes</option>
                   {uniqueMakes.filter((m) => m !== 'All').map((make) => (
@@ -1003,7 +1047,7 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={selectedSeverity}
                   onChange={(e) => setSelectedSeverity(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
                 >
                   <option value="All">All Severities</option>
                   <option value="Critical">Critical</option>
@@ -1015,7 +1059,7 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
                 >
                   <option value="All">All Statuses</option>
                   <option value="Open">Open</option>
@@ -1030,7 +1074,7 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
                 >
                   <option value="created_at">Sort by Date</option>
                   <option value="severity">Sort by Severity</option>
@@ -1039,7 +1083,7 @@ export const TaskBoard: React.FC = () => {
 
                 <button
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm"
+                  className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
                   title="Toggle Sort Order"
                 >
                   {sortOrder === 'desc' ? '⬇️' : '⬆️'}
@@ -1124,7 +1168,7 @@ export const TaskBoard: React.FC = () => {
                         <td className="p-4 text-right">
                           <button
                             onClick={() => handleOpenDrawer(item)}
-                            className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition"
+                            className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition cursor-pointer"
                           >
                             Manage
                           </button>
@@ -1151,7 +1195,7 @@ export const TaskBoard: React.FC = () => {
                 </div>
                 <button
                   onClick={handleCloseDrawer}
-                  className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100"
+                  className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -1252,21 +1296,21 @@ export const TaskBoard: React.FC = () => {
                   <button
                     onClick={() => handleUpdateStatus('Scheduled')}
                     disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
+                    className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
                   >
                     Mark Scheduled
                   </button>
                   <button
                     onClick={() => handleUpdateStatus('In Progress')}
                     disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
+                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
                   >
                     In Progress
                   </button>
                   <button
                     onClick={() => handleUpdateStatus('Cleared')}
                     disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50"
+                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
                   >
                     {uploadingReceipt ? 'Uploading...' : 'Mark Cleared'}
                   </button>
@@ -1278,7 +1322,7 @@ export const TaskBoard: React.FC = () => {
               )}
               <button
                 onClick={handleCloseDrawer}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition"
+                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
               >
                 Close Drawer
               </button>
@@ -1300,7 +1344,7 @@ export const TaskBoard: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsScanModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -1322,7 +1366,7 @@ export const TaskBoard: React.FC = () => {
                 <button
                   onClick={handleRunSingleVinScan}
                   disabled={scanning || !singleVinInput}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
                   {scanning ? 'Scanning...' : 'Scan VIN'}
                 </button>
@@ -1369,7 +1413,7 @@ export const TaskBoard: React.FC = () => {
                 <button
                   onClick={handleAddScannedVinToFleet}
                   disabled={addingToFleet}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer"
                 >
                   {addingToFleet ? 'Saving Asset...' : '➕ Add Vehicle to Monitored Fleet'}
                 </button>
@@ -1387,7 +1431,7 @@ export const TaskBoard: React.FC = () => {
               <h3 className="text-lg font-bold text-gray-900">Bulk Import Fleet VINs</h3>
               <button
                 onClick={() => setIsImportModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -1424,14 +1468,14 @@ export const TaskBoard: React.FC = () => {
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleProcessCsvImport}
                 disabled={!csvFile || importing}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
               >
                 {importing ? 'Processing...' : 'Upload & Sync Fleet'}
               </button>
@@ -1451,7 +1495,7 @@ export const TaskBoard: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsUpgradeModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg"
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -1474,7 +1518,7 @@ export const TaskBoard: React.FC = () => {
                     setSubscriptionTier('standard');
                     setIsUpgradeModalOpen(false);
                   }}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition"
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
                 >
                   Select Standard
                 </button>
@@ -1497,7 +1541,7 @@ export const TaskBoard: React.FC = () => {
                     setSubscriptionTier('professional');
                     setIsUpgradeModalOpen(false);
                   }}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition"
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
                 >
                   Select Professional
                 </button>
@@ -1519,7 +1563,7 @@ export const TaskBoard: React.FC = () => {
                     setSubscriptionTier('enterprise');
                     setIsUpgradeModalOpen(false);
                   }}
-                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition"
+                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition cursor-pointer"
                 >
                   Select Enterprise
                 </button>
