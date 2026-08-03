@@ -53,7 +53,7 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
-// STREAMLINED ACCOUNT DROPDOWN MENU
+// GLOBAL TOP NAVBAR ACCOUNT DROPDOWN MENU
 // ==========================================
 interface AccountMenuProps {
   userEmail: string;
@@ -76,13 +76,13 @@ function AccountMenu({
 
   return (
     <div className="relative inline-block text-left">
-      {/* UNIFIED ACCOUNT BUTTON */}
+      {/* UNIFIED ACCOUNT BUTTON IN TOP NAVBAR */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-sm cursor-pointer"
       >
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span className="font-bold text-white max-w-[160px] truncate">{userEmail || 'Account'}</span>
+        <span className="font-bold text-white max-w-[180px] truncate">{userEmail || 'Account'}</span>
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
 
@@ -170,12 +170,10 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
       return acc + (closed - created) / (1000 * 3600 * 24);
     }, 0) / (completedTasks.length || 1);
 
-  // Estimate potential savings ($200 avg credit per vehicle/yr at 90%+ compliance)
   const estimatedSavings = complianceScore >= 90 ? totalTasks * 200 : 0;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl">
-      {/* HEADER WITH BROKER SHARE BUTTONS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
         <div>
           <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">
@@ -202,7 +200,6 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* METRICS GRID WITH CARRIER STATUS BADGES */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-mono">
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
@@ -247,7 +244,6 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* VERIFIED AUDIT LOG TABLE */}
       <div className="space-y-3">
         <h4 className="text-xs font-mono uppercase font-bold text-slate-300">Verified Remediation Log</h4>
         <div className="border border-slate-800 rounded-xl overflow-hidden text-xs font-mono">
@@ -898,778 +894,793 @@ export const TaskBoard: React.FC = () => {
   // RENDER UI
   // ==========================================
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans bg-gray-50 min-h-screen relative">
-      {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
-      {showHardGatedModal && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative">
-            <button
-              onClick={() => setIsHardStopDismissed(true)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-              title="Close Preview"
-            >
-              ✕
-            </button>
-
-            <div className="inline-flex p-4 bg-amber-100 text-amber-600 rounded-full text-3xl">
-              🔒
-            </div>
-            <div>
-              <h2 className="text-2xl font-extrabold text-gray-900">10 Free VIN Teaser Limit Reached</h2>
-              <p className="text-sm text-gray-600 mt-2">
-                You have checked more than 10 VINs on your Free Account. Upgrade to a paid plan to unlock continuous monitoring across your fleet.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-left pt-2">
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
-                <span className="text-xs font-bold text-gray-500 uppercase">Standard</span>
-                <p className="text-xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>✓ Up to 50 Vehicles Monitored</li>
-                  <li>✓ Continuous Active Scanning</li>
-                  <li>✓ CSV Audit Exports</li>
-                </ul>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('standard');
-                    setIsHardStopDismissed(true);
-                  }}
-                  className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
-                >
-                  Upgrade to Standard
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/30 space-y-2 relative">
-                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Popular</span>
-                <span className="text-xs font-bold text-indigo-600 uppercase">Professional</span>
-                <p className="text-xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>✓ Up to 250 Vehicles Monitored</li>
-                  <li>✓ Instant Single-VIN Scan Console</li>
-                  <li>✓ Underwriter PDF Risk Certificate</li>
-                </ul>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('professional');
-                    setIsHardStopDismissed(true);
-                  }}
-                  className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
-                >
-                  Upgrade to Professional
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() => setIsHardStopDismissed(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline cursor-pointer"
-              >
-                Dismiss and continue viewing current workspace
-              </button>
-            </div>
+    <div className="bg-slate-950 min-h-screen text-slate-100 font-sans">
+      
+      {/* 🌟 GLOBAL TOP NAVIGATION BAR */}
+      <header className="bg-slate-950 border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md bg-slate-950/90">
+        <div className="flex items-center gap-3">
+          <div className="bg-cyan-500/10 border border-cyan-500/30 p-1.5 rounded-lg">
+            <span className="text-cyan-400 font-bold text-sm font-mono">⚡</span>
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-white font-mono tracking-wide">RECALLLOGIC WORKSPACE</h1>
+            <p className="text-[10px] text-slate-400 font-mono">Active Operational Risk Control</p>
           </div>
         </div>
-      )}
 
-      {/* HEADER SECTION WITH STREAMLINED ACCOUNT MENU */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-4">
-        <div>
-          <div className="flex items-center gap-3">
+        {/* TOP RIGHT GLOBAL ACCOUNT MENU */}
+        <AccountMenu
+          userEmail={userEmail}
+          userRole={userRole}
+          subscriptionTier={subscriptionTier}
+          onOpenTeamModal={() => setIsTeamModalOpen(true)}
+          onOpenUpgradeModal={() => triggerUpgradeModal('Manage your subscription tier')}
+          onSignOut={handleSignOut}
+        />
+      </header>
+
+      {/* MAIN CONTAINER */}
+      <div className="p-6 space-y-6 max-w-7xl mx-auto relative">
+        
+        {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
+        {showHardGatedModal && (
+          <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative text-gray-900">
+              <button
+                onClick={() => setIsHardStopDismissed(true)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                title="Close Preview"
+              >
+                ✕
+              </button>
+
+              <div className="inline-flex p-4 bg-amber-100 text-amber-600 rounded-full text-3xl">
+                🔒
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold text-gray-900">10 Free VIN Teaser Limit Reached</h2>
+                <p className="text-sm text-gray-600 mt-2">
+                  You have checked more than 10 VINs on your Free Account. Upgrade to a paid plan to unlock continuous monitoring across your fleet.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-left pt-2">
+                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Standard</span>
+                  <p className="text-xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    <li>✓ Up to 50 Vehicles Monitored</li>
+                    <li>✓ Continuous Active Scanning</li>
+                    <li>✓ CSV Audit Exports</li>
+                  </ul>
+                  <button
+                    onClick={() => {
+                      setSubscriptionTier('standard');
+                      setIsHardStopDismissed(true);
+                    }}
+                    className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
+                  >
+                    Upgrade to Standard
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/30 space-y-2 relative">
+                  <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Popular</span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase">Professional</span>
+                  <p className="text-xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    <li>✓ Up to 250 Vehicles Monitored</li>
+                    <li>✓ Instant Single-VIN Scan Console</li>
+                    <li>✓ Underwriter PDF Risk Certificate</li>
+                  </ul>
+                  <button
+                    onClick={() => {
+                      setSubscriptionTier('professional');
+                      setIsHardStopDismissed(true);
+                    }}
+                    className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
+                  >
+                    Upgrade to Professional
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setIsHardStopDismissed(true)}
+                  className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline cursor-pointer"
+                >
+                  Dismiss and continue viewing current workspace
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* WORKSPACE VIEW HEADER & TAB SWITCHER */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {activeTab === 'underwriter' ? 'Underwriter Compliance & Risk Portal' : 'Fleet Recall Operations'}
             </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {activeTab === 'underwriter'
+                ? 'Executive risk metrics and audit-grade proof of recall remediation for insurance carriers.'
+                : 'Monitor, filter, and schedule safety recall remedies across active fleet assets.'}
+            </p>
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {activeTab === 'underwriter'
-              ? 'Executive risk metrics and audit-grade proof of recall remediation for insurance carriers.'
-              : 'Monitor, filter, and schedule safety recall remedies across active fleet assets.'}
-          </p>
-        </div>
 
-        {/* TAB SWITCHER & STREAMLINED ACCOUNT DROPDOWN */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* TAB NAVIGATION BUTTONS */}
-          <div className="bg-gray-200 p-1 rounded-xl flex gap-1 text-xs font-mono">
-            <button
-              onClick={() => setActiveTab('workspace')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Task Board
-            </button>
-            {permissions.canExportUnderwriterReport && (
+          <div className="flex flex-wrap items-center gap-3">
+            {/* TAB NAVIGATION SWITCHER */}
+            <div className="bg-gray-100 p-1 rounded-xl flex gap-1 text-xs font-mono">
               <button
-                onClick={() => setActiveTab('underwriter')}
+                onClick={() => setActiveTab('workspace')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                  activeTab === 'underwriter' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                🛡️ Underwriter Audit
+                Task Board
               </button>
+              {permissions.canExportUnderwriterReport && (
+                <button
+                  onClick={() => setActiveTab('underwriter')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                    activeTab === 'underwriter' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🛡️ Underwriter Audit
+                </button>
+              )}
+            </div>
+
+            {/* OPERATIONAL EXPORTS (ONLY VISIBLE ON TASK BOARD TAB) */}
+            {activeTab === 'workspace' && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📄</span> Risk Certificate
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📊</span> Export CSV
+                </button>
+              </div>
             )}
           </div>
-
-          {/* OPERATIONAL QUICK ACTION (TASK BOARD VIEW ONLY) */}
-          {activeTab === 'workspace' && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleDownloadPDF}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>📄</span> Risk Certificate
-              </button>
-              <button
-                onClick={handleExportCSV}
-                className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>📊</span> Export CSV
-              </button>
-            </div>
-          )}
-
-          {/* UNIFIED ACCOUNT DROPDOWN */}
-          <AccountMenu
-            userEmail={userEmail}
-            userRole={userRole}
-            subscriptionTier={subscriptionTier}
-            onOpenTeamModal={() => setIsTeamModalOpen(true)}
-            onOpenUpgradeModal={() => triggerUpgradeModal('Manage your subscription tier')}
-            onSignOut={handleSignOut}
-          />
         </div>
-      </div>
 
-      {/* RENDER VIEW SWITCH: TASKBOARD WORKSPACE VS UNDERWRITER AUDIT VIEW */}
-      {activeTab === 'underwriter' ? (
-        <UnderwriterReportView tasks={recalls} />
-      ) : (
-        <>
-          {/* 1. TOP KPI STATS BAR */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Required</p>
-              <p className="text-3xl font-extrabold text-red-600 mt-1">{metrics.open}</p>
-              <span className="text-xs text-red-500 font-medium">Unresolved safety risks</span>
+        {/* RENDER VIEW SWITCH: TASKBOARD WORKSPACE VS UNDERWRITER AUDIT VIEW */}
+        {activeTab === 'underwriter' ? (
+          <UnderwriterReportView tasks={recalls} />
+        ) : (
+          <>
+            {/* 1. TOP KPI STATS BAR */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-gray-900">
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Required</p>
+                <p className="text-3xl font-extrabold text-red-600 mt-1">{metrics.open}</p>
+                <span className="text-xs text-red-500 font-medium">Unresolved safety risks</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">In Progress</p>
+                <p className="text-3xl font-extrabold text-amber-500 mt-1">{metrics.scheduled}</p>
+                <span className="text-xs text-amber-600 font-medium">Scheduled at dealership</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">CLEARED REPAIRS</p>
+                <p className="text-3xl font-extrabold text-emerald-600 mt-1">{metrics.cleared}</p>
+                <span className="text-xs text-emerald-600 font-medium">Verified completed repairs</span>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fleet Safety Score</p>
+                <p className="text-3xl font-extrabold text-blue-600 mt-1">{metrics.safeRate}%</p>
+                <span className="text-xs text-blue-500 font-medium">Overall fleet compliance</span>
+              </div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">In Progress</p>
-              <p className="text-3xl font-extrabold text-amber-500 mt-1">{metrics.scheduled}</p>
-              <span className="text-xs text-amber-600 font-medium">Scheduled at dealership</span>
-            </div>
+            {/* 2. TWO-ROW ASSET INGESTION & FILTER CONTROL BAR */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3 text-gray-900">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:flex-1 max-w-xl">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                    🔍
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">CLEARED REPAIRS</p>
-              <p className="text-3xl font-extrabold text-emerald-600 mt-1">{metrics.cleared}</p>
-              <span className="text-xs text-emerald-600 font-medium">Verified completed repairs</span>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fleet Safety Score</p>
-              <p className="text-3xl font-extrabold text-blue-600 mt-1">{metrics.safeRate}%</p>
-              <span className="text-xs text-blue-500 font-medium">Overall fleet compliance</span>
-            </div>
-          </div>
-
-          {/* 2. TWO-ROW ASSET INGESTION & FILTER CONTROL BAR */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:flex-1 max-w-xl">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                  🔍
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
-                />
-                {searchTerm && (
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                   <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
+                    onClick={handleOpenSingleVinConsole}
+                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                    title="Instant single vehicle lookup"
+                  >
+                    <span>⚡</span> Single-VIN Scan
+                  </button>
+
+                  <button
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                    title="Import VIN list via CSV"
+                  >
+                    <span>📥</span> Bulk CSV Import
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 my-1"></div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter By:</span>
+
+                  <select
+                    value={selectedMake}
+                    onChange={(e) => setSelectedMake(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  >
+                    <option value="All">All Makes</option>
+                    {uniqueMakes.filter((m) => m !== 'All').map((make) => (
+                      <option key={make} value={make}>{make}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedSeverity}
+                    onChange={(e) => setSelectedSeverity(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  >
+                    <option value="All">All Severities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Cleared">Cleared</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sort:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  >
+                    <option value="created_at">Sort by Date</option>
+                    <option value="severity">Sort by Severity</option>
+                    <option value="unit_number">Sort by Unit #</option>
+                  </select>
+
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
+                    title="Toggle Sort Order"
+                  >
+                    {sortOrder === 'desc' ? '⬇️' : '⬆️'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. ACTIONABLE FLEET RECALL TABLE */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden text-gray-900">
+              {loading ? (
+                <div className="p-12 text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                  <p className="mt-2 text-sm text-gray-500 font-medium">Scanning fleet recall records...</p>
+                </div>
+              ) : filteredRecalls.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <p className="text-lg font-semibold text-gray-700">No recall tasks found</p>
+                  <p className="text-sm mt-1">Try adjusting your filters or search terms above.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase text-xs tracking-wider">
+                      <tr>
+                        <th className="p-4">Fleet Asset</th>
+                        <th className="p-4">Vehicle Details</th>
+                        <th className="p-4">Component & NHTSA ID</th>
+                        <th className="p-4">Severity</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Proof of Remedy</th>
+                        <th className="p-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredRecalls.map((item) => (
+                        <tr key={item.id} className="hover:bg-blue-50/40 transition">
+                          <td className="p-4 font-bold text-gray-900">
+                            Unit #{item.unit_number || 'Unassigned'}
+                          </td>
+                          <td className="p-4">
+                            <div className="font-semibold text-gray-800">{item.year} {item.make} {item.model}</div>
+                            <div className="text-xs text-gray-400 font-mono mt-0.5">VIN: {item.vin}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-medium text-gray-900">{item.component}</div>
+                            <div className="text-xs text-blue-600 font-mono mt-0.5">NHTSA #{item.nhtsa_campaign_number}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
+                              item.severity === 'High' ? 'bg-orange-100 text-orange-700' :
+                              item.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {item.severity || 'Medium'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
+                              item.status === 'Scheduled' || item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-50 text-red-600'
+                            }`}>
+                              {item.status || 'Open'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {item.receipt_url ? (
+                              <a
+                                href={item.receipt_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold hover:underline"
+                              >
+                                <span>🧾</span> Verified Invoice
+                              </a>
+                            ) : (
+                              <span className="text-xs text-gray-400">No document</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => handleOpenDrawer(item)}
+                              className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition cursor-pointer"
+                            >
+                              Manage
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* 4. RECALL MANAGEMENT DRAWER MODAL */}
+        {isDrawerOpen && selectedRecall && (
+          <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end text-gray-900">
+            <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Manage Unit #{selectedRecall.unit_number}</h2>
+                    <p className="text-xs text-gray-500">{selectedRecall.year} {selectedRecall.make} {selectedRecall.model} (VIN: {selectedRecall.vin})</p>
+                  </div>
+                  <button
+                    onClick={handleCloseDrawer}
+                    className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100 cursor-pointer"
                   >
                     ✕
                   </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                <button
-                  onClick={handleOpenSingleVinConsole}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  title="Instant single vehicle lookup"
-                >
-                  <span>⚡</span> Single-VIN Scan
-                </button>
-
-                <button
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  title="Import VIN list via CSV"
-                >
-                  <span>📥</span> Bulk CSV Import
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 my-1"></div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter By:</span>
-
-                <select
-                  value={selectedMake}
-                  onChange={(e) => setSelectedMake(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
-                >
-                  <option value="All">All Makes</option>
-                  {uniqueMakes.filter((m) => m !== 'All').map((make) => (
-                    <option key={make} value={make}>{make}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedSeverity}
-                  onChange={(e) => setSelectedSeverity(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
-                >
-                  <option value="All">All Severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Cleared">Cleared</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
-                >
-                  <option value="created_at">Sort by Date</option>
-                  <option value="severity">Sort by Severity</option>
-                  <option value="unit_number">Sort by Unit #</option>
-                </select>
-
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
-                  title="Toggle Sort Order"
-                >
-                  {sortOrder === 'desc' ? '⬇️' : '⬆️'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. ACTIONABLE FLEET RECALL TABLE */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden">
-            {loading ? (
-              <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                <p className="mt-2 text-sm text-gray-500 font-medium">Scanning fleet recall records...</p>
-              </div>
-            ) : filteredRecalls.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                <p className="text-lg font-semibold text-gray-700">No recall tasks found</p>
-                <p className="text-sm mt-1">Try adjusting your filters or search terms above.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase text-xs tracking-wider">
-                    <tr>
-                      <th className="p-4">Fleet Asset</th>
-                      <th className="p-4">Vehicle Details</th>
-                      <th className="p-4">Component & NHTSA ID</th>
-                      <th className="p-4">Severity</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Proof of Remedy</th>
-                      <th className="p-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredRecalls.map((item) => (
-                      <tr key={item.id} className="hover:bg-blue-50/40 transition">
-                        <td className="p-4 font-bold text-gray-900">
-                          Unit #{item.unit_number || 'Unassigned'}
-                        </td>
-                        <td className="p-4">
-                          <div className="font-semibold text-gray-800">{item.year} {item.make} {item.model}</div>
-                          <div className="text-xs text-gray-400 font-mono mt-0.5">VIN: {item.vin}</div>
-                        </td>
-                        <td className="p-4">
-                          <div className="font-medium text-gray-900">{item.component}</div>
-                          <div className="text-xs text-blue-600 font-mono mt-0.5">NHTSA #{item.nhtsa_campaign_number}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                            item.severity === 'High' ? 'bg-orange-100 text-orange-700' :
-                            item.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {item.severity || 'Medium'}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
-                            item.status === 'Scheduled' || item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-50 text-red-600'
-                          }`}>
-                            {item.status || 'Open'}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          {item.receipt_url ? (
-                            <a
-                              href={item.receipt_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold hover:underline"
-                            >
-                              <span>🧾</span> Verified Invoice
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-400">No document</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right">
-                          <button
-                            onClick={() => handleOpenDrawer(item)}
-                            className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition cursor-pointer"
-                          >
-                            Manage
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* 4. RECALL MANAGEMENT DRAWER MODAL */}
-      {isDrawerOpen && selectedRecall && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end">
-          <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center border-b pb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Manage Unit #{selectedRecall.unit_number}</h2>
-                  <p className="text-xs text-gray-500">{selectedRecall.year} {selectedRecall.make} {selectedRecall.model} (VIN: {selectedRecall.vin})</p>
                 </div>
+
+                <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-blue-600 font-mono">NHTSA #{selectedRecall.nhtsa_campaign_number}</span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-700">{selectedRecall.severity} Severity</span>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase text-gray-500">Defective Component</h4>
+                    <p className="text-sm font-medium text-gray-800">{selectedRecall.component}</p>
+                  </div>
+                  {selectedRecall.summary && (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase text-gray-500">Defect Summary</h4>
+                      <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.summary}</p>
+                    </div>
+                  )}
+                  {selectedRecall.remedy && (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase text-gray-500">Manufacturer Remedy</h4>
+                      <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.remedy}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Appointment / Repair Date</label>
+                    <input
+                      type="date"
+                      disabled={!permissions.canUpdateTaskStatus}
+                      value={scheduledDateInput}
+                      onChange={(e) => setScheduledDateInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Fleet Notes / Repair Invoice #</label>
+                    <textarea
+                      rows={3}
+                      disabled={!permissions.canUpdateTaskStatus}
+                      placeholder="Add dealership invoice numbers, technician notes, or service location details..."
+                      value={notesInput}
+                      onChange={(e) => setNotesInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
+                    <label className="block text-xs font-bold text-gray-800">
+                      Proof of Remedy / Repair Invoice (PDF or Image)
+                    </label>
+
+                    {selectedRecall.receipt_url ? (
+                      <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                          <span>✅</span> Attached Repair Proof
+                        </div>
+                        <a
+                          href={selectedRecall.receipt_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded border border-emerald-200 transition"
+                        >
+                          View Document ↗
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500">
+                        Upload the dealership repair order or receipt to establish an unshakeable audit trail before clearing this recall.
+                      </p>
+                    )}
+
+                    {permissions.canUploadReceipts && (
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => setReceiptFile(e.target.files ? e.target.files[0] : null)}
+                        className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                      />
+                    )}
+                    {receiptFile && (
+                      <p className="text-xs text-blue-600 font-medium">Selected: {receiptFile.name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                {permissions.canUpdateTaskStatus ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleUpdateStatus('Scheduled')}
+                      disabled={updatingStatus || uploadingReceipt}
+                      className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    >
+                      Mark Scheduled
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus('In Progress')}
+                      disabled={updatingStatus || uploadingReceipt}
+                      className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    >
+                      In Progress
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus('Cleared')}
+                      disabled={updatingStatus || uploadingReceipt}
+                      className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {uploadingReceipt ? 'Uploading...' : 'Mark Cleared'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-gray-100 text-gray-600 text-center rounded-lg text-xs font-mono">
+                    🔒 Read-Only Access (Role: {userRole})
+                  </div>
+                )}
                 <button
                   onClick={handleCloseDrawer}
-                  className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100 cursor-pointer"
+                  className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
+                >
+                  Close Drawer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. ⚡ INSTANT SINGLE-VIN SCAN CONSOLE MODAL */}
+        {isScanModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
+              <div className="flex justify-between items-center border-b pb-3">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <span>⚡</span> Instant Single-VIN Scan Console
+                  </h3>
+                  <p className="text-xs text-gray-500">Query live NHTSA safety defect databases on demand.</p>
+                </div>
+                <button
+                  onClick={() => setIsScanModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-blue-600 font-mono">NHTSA #{selectedRecall.nhtsa_campaign_number}</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-700">{selectedRecall.severity} Severity</span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold uppercase text-gray-500">Defective Component</h4>
-                  <p className="text-sm font-medium text-gray-800">{selectedRecall.component}</p>
-                </div>
-                {selectedRecall.summary && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase text-gray-500">Defect Summary</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.summary}</p>
-                  </div>
-                )}
-                {selectedRecall.remedy && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase text-gray-500">Manufacturer Remedy</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.remedy}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment / Repair Date</label>
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  Enter 17-Digit Vehicle Identification Number (VIN)
+                </label>
+                <div className="flex gap-2">
                   <input
-                    type="date"
-                    disabled={!permissions.canUpdateTaskStatus}
-                    value={scheduledDateInput}
-                    onChange={(e) => setScheduledDateInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    type="text"
+                    maxLength={17}
+                    placeholder="e.g. 1FTFW1ED4MFC12345"
+                    value={singleVinInput}
+                    onChange={(e) => setSingleVinInput(e.target.value.toUpperCase())}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 uppercase"
                   />
+                  <button
+                    onClick={handleRunSingleVinScan}
+                    disabled={scanning || !singleVinInput}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {scanning ? 'Scanning...' : 'Scan VIN'}
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Fleet Notes / Repair Invoice #</label>
-                  <textarea
-                    rows={3}
-                    disabled={!permissions.canUpdateTaskStatus}
-                    placeholder="Add dealership invoice numbers, technician notes, or service location details..."
-                    value={notesInput}
-                    onChange={(e) => setNotesInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
-                  <label className="block text-xs font-bold text-gray-800">
-                    Proof of Remedy / Repair Invoice (PDF or Image)
-                  </label>
-
-                  {selectedRecall.receipt_url ? (
-                    <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                        <span>✅</span> Attached Repair Proof
-                      </div>
-                      <a
-                        href={selectedRecall.receipt_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded border border-emerald-200 transition"
-                      >
-                        View Document ↗
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      Upload the dealership repair order or receipt to establish an unshakeable audit trail before clearing this recall.
-                    </p>
-                  )}
-
-                  {permissions.canUploadReceipts && (
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => setReceiptFile(e.target.files ? e.target.files[0] : null)}
-                      className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
-                    />
-                  )}
-                  {receiptFile && (
-                    <p className="text-xs text-blue-600 font-medium">Selected: {receiptFile.name}</p>
-                  )}
-                </div>
+                {scanError && (
+                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
+                    {scanError}
+                  </p>
+                )}
               </div>
-            </div>
 
-            <div className="border-t pt-4 space-y-2">
-              {permissions.canUpdateTaskStatus ? (
-                <div className="grid grid-cols-3 gap-2">
+              {scanResult && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border">
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{scanResult.year} {scanResult.make} {scanResult.model}</p>
+                      <p className="text-xs font-mono text-gray-500">VIN: {scanResult.vin}</p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      scanResult.recallsCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {scanResult.recallsCount} Open Recalls Found
+                    </span>
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    {scanResult.recalls.length === 0 ? (
+                      <p className="text-xs text-emerald-600 font-semibold text-center py-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                        ✅ No safety recalls currently registered with NHTSA for this VIN.
+                      </p>
+                    ) : (
+                      scanResult.recalls.map((r, i) => (
+                        <div key={i} className="p-3 bg-red-50/60 border border-red-100 rounded-lg text-xs space-y-1">
+                          <div className="flex justify-between font-bold text-red-800">
+                            <span>{r.component}</span>
+                            <span className="font-mono text-red-600">#{r.campaignNumber}</span>
+                          </div>
+                          <p className="text-gray-700">{r.summary}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
                   <button
-                    onClick={() => handleUpdateStatus('Scheduled')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    onClick={handleAddScannedVinToFleet}
+                    disabled={addingToFleet}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer"
                   >
-                    Mark Scheduled
+                    {addingToFleet ? 'Saving Asset...' : '➕ Add Vehicle to Monitored Fleet'}
                   </button>
-                  <button
-                    onClick={() => handleUpdateStatus('In Progress')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
-                  >
-                    In Progress
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('Cleared')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {uploadingReceipt ? 'Uploading...' : 'Mark Cleared'}
-                  </button>
-                </div>
-              ) : (
-                <div className="p-3 bg-gray-100 text-gray-600 text-center rounded-lg text-xs font-mono">
-                  🔒 Read-Only Access (Role: {userRole})
                 </div>
               )}
-              <button
-                onClick={handleCloseDrawer}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
-              >
-                Close Drawer
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 5. ⚡ INSTANT SINGLE-VIN SCAN CONSOLE MODAL */}
-      {isScanModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <span>⚡</span> Instant Single-VIN Scan Console
-                </h3>
-                <p className="text-xs text-gray-500">Query live NHTSA safety defect databases on demand.</p>
-              </div>
-              <button
-                onClick={() => setIsScanModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-                Enter 17-Digit Vehicle Identification Number (VIN)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  maxLength={17}
-                  placeholder="e.g. 1FTFW1ED4MFC12345"
-                  value={singleVinInput}
-                  onChange={(e) => setSingleVinInput(e.target.value.toUpperCase())}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 uppercase"
-                />
+        {/* 6. BULK FLEET CSV IMPORT MODAL */}
+        {isImportModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="text-lg font-bold text-gray-900">Bulk Import Fleet VINs</h3>
                 <button
-                  onClick={handleRunSingleVinScan}
-                  disabled={scanning || !singleVinInput}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
                 >
-                  {scanning ? 'Scanning...' : 'Scan VIN'}
+                  ✕
                 </button>
               </div>
-              {scanError && (
-                <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
-                  {scanError}
+
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column (optional: <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">make</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">model</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">year</code>).
+              </p>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+                />
+                {csvFile && (
+                  <p className="text-xs text-emerald-600 font-bold mt-2">Ready: {csvFile.name}</p>
+                )}
+              </div>
+
+              {importFeedback && (
+                <p className={`text-xs font-semibold p-3 rounded-lg ${
+                  importFeedback.startsWith('Error')
+                    ? 'bg-red-50 text-red-600'
+                    : importFeedback.startsWith('Success')
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-blue-50 text-blue-600'
+                }`}>
+                  {importFeedback}
                 </p>
               )}
-            </div>
 
-            {scanResult && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border">
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProcessCsvImport}
+                  disabled={!csvFile || importing}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
+                >
+                  {importing ? 'Processing...' : 'Upload & Sync Fleet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 💳 PRICING / UPGRADE MODAL */}
+        {isUpgradeModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5">
+              <div className="flex justify-between items-center border-b pb-3">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Upgrade Subscription Plan</h3>
+                  {gateReason && <p className="text-xs text-blue-600 font-semibold mt-0.5">{gateReason}</p>}
+                </div>
+                <button
+                  onClick={() => setIsUpgradeModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                {/* Standard */}
+                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between space-y-3">
                   <div>
-                    <p className="text-xs font-bold text-gray-900">{scanResult.year} {scanResult.make} {scanResult.model}</p>
-                    <p className="text-xs font-mono text-gray-500">VIN: {scanResult.vin}</p>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Standard</span>
+                    <p className="text-2xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                    <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
+                      <li>✓ Up to 50 Vehicles</li>
+                      <li>✓ Continuous Monitoring</li>
+                      <li>✓ Full Workspace Access</li>
+                    </ul>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    scanResult.recallsCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {scanResult.recallsCount} Open Recalls Found
-                  </span>
+                  <button
+                    onClick={() => {
+                      setSubscriptionTier('standard');
+                      setIsUpgradeModalOpen(false);
+                    }}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                  >
+                    Select Standard
+                  </button>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                  {scanResult.recalls.length === 0 ? (
-                    <p className="text-xs text-emerald-600 font-semibold text-center py-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                      ✅ No safety recalls currently registered with NHTSA for this VIN.
-                    </p>
-                  ) : (
-                    scanResult.recalls.map((r, i) => (
-                      <div key={i} className="p-3 bg-red-50/60 border border-red-100 rounded-lg text-xs space-y-1">
-                        <div className="flex justify-between font-bold text-red-800">
-                          <span>{r.component}</span>
-                          <span className="font-mono text-red-600">#{r.campaignNumber}</span>
-                        </div>
-                        <p className="text-gray-700">{r.summary}</p>
-                      </div>
-                    ))
-                  )}
+                {/* Professional */}
+                <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/20 flex flex-col justify-between space-y-3 relative">
+                  <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-600 uppercase">Professional</span>
+                    <p className="text-2xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
+                    <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
+                      <li>✓ Up to 250 Vehicles</li>
+                      <li>✓ Single-VIN Scan Console</li>
+                      <li>✓ Signed PDF Compliance Card</li>
+                    </ul>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSubscriptionTier('professional');
+                      setIsUpgradeModalOpen(false);
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                  >
+                    Select Professional
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleAddScannedVinToFleet}
-                  disabled={addingToFleet}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer"
-                >
-                  {addingToFleet ? 'Saving Asset...' : '➕ Add Vehicle to Monitored Fleet'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 6. BULK FLEET CSV IMPORT MODAL */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-lg font-bold text-gray-900">Bulk Import Fleet VINs</h3>
-              <button
-                onClick={() => setIsImportModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column (optional: <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">make</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">model</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">year</code>).
-            </p>
-
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
-              />
-              {csvFile && (
-                <p className="text-xs text-emerald-600 font-bold mt-2">Ready: {csvFile.name}</p>
-              )}
-            </div>
-
-            {importFeedback && (
-              <p className={`text-xs font-semibold p-3 rounded-lg ${
-                importFeedback.startsWith('Error')
-                  ? 'bg-red-50 text-red-600'
-                  : importFeedback.startsWith('Success')
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-blue-50 text-blue-600'
-              }`}>
-                {importFeedback}
-              </p>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleProcessCsvImport}
-                disabled={!csvFile || importing}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
-              >
-                {importing ? 'Processing...' : 'Upload & Sync Fleet'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 💳 PRICING / UPGRADE MODAL */}
-      {isUpgradeModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Upgrade Subscription Plan</h3>
-                {gateReason && <p className="text-xs text-blue-600 font-semibold mt-0.5">{gateReason}</p>}
-              </div>
-              <button
-                onClick={() => setIsUpgradeModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-              {/* Standard */}
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase">Standard</span>
-                  <p className="text-2xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
-                    <li>✓ Up to 50 Vehicles</li>
-                    <li>✓ Continuous Monitoring</li>
-                    <li>✓ Full Workspace Access</li>
-                  </ul>
+                {/* Enterprise */}
+                <div className="p-4 rounded-xl border border-gray-200 bg-gray-900 text-white flex flex-col justify-between space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Enterprise</span>
+                    <p className="text-2xl font-extrabold text-white">Custom</p>
+                    <ul className="text-xs text-gray-300 space-y-1.5 mt-2">
+                      <li>✓ Unlimited Vehicles</li>
+                      <li>✓ Telematics (Geotab/Samsara)</li>
+                      <li>✓ Dedicated Broker QBR</li>
+                    </ul>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSubscriptionTier('enterprise');
+                      setIsUpgradeModalOpen(false);
+                    }}
+                    className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition cursor-pointer"
+                  >
+                    Select Enterprise
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('standard');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Standard
-                </button>
-              </div>
-
-              {/* Professional */}
-              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/20 flex flex-col justify-between space-y-3 relative">
-                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase">Professional</span>
-                  <p className="text-2xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
-                    <li>✓ Up to 250 Vehicles</li>
-                    <li>✓ Single-VIN Scan Console</li>
-                    <li>✓ Signed PDF Compliance Card</li>
-                  </ul>
-                </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('professional');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Professional
-                </button>
-              </div>
-
-              {/* Enterprise */}
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-900 text-white flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Enterprise</span>
-                  <p className="text-2xl font-extrabold text-white">Custom</p>
-                  <ul className="text-xs text-gray-300 space-y-1.5 mt-2">
-                    <li>✓ Unlimited Vehicles</li>
-                    <li>✓ Telematics (Geotab/Samsara)</li>
-                    <li>✓ Dedicated Broker QBR</li>
-                  </ul>
-                </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('enterprise');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Enterprise
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TEAM ACCESS CONTROL MODAL */}
-      <TeamManagementModal
-        isOpen={isTeamModalOpen}
-        onClose={() => setIsTeamModalOpen(false)}
-        currentUserId={currentUserId}
-      />
+        {/* TEAM ACCESS CONTROL MODAL */}
+        <TeamManagementModal
+          isOpen={isTeamModalOpen}
+          onClose={() => setIsTeamModalOpen(false)}
+          currentUserId={currentUserId}
+        />
+      </div>
     </div>
   );
 };
