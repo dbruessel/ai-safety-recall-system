@@ -53,7 +53,7 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
-// REUSABLE GLOBAL NAVBAR ACCOUNT MENU DROPDOWN
+// CONSOLIDATED ACCOUNT DROPDOWN (4 BLOCKS)
 // ==========================================
 interface AccountMenuProps {
   userEmail: string;
@@ -61,6 +61,8 @@ interface AccountMenuProps {
   subscriptionTier: SubscriptionTier;
   onOpenTeamModal: () => void;
   onOpenUpgradeModal: () => void;
+  onCopyUnderwriterLink: () => void;
+  onDownloadRiskCard: () => void;
   onSignOut: () => void;
 }
 
@@ -70,18 +72,20 @@ export function AccountMenu({
   subscriptionTier,
   onOpenTeamModal,
   onOpenUpgradeModal,
+  onCopyUnderwriterLink,
+  onDownloadRiskCard,
   onSignOut,
 }: AccountMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="relative inline-block text-left">
-      {/* CONSOLIDATED ACCOUNT BUTTON */}
+      {/* ACCOUNT DROPDOWN TRIGGER BUTTON */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-sm cursor-pointer"
+        className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-md cursor-pointer"
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
         <span className="font-bold text-white max-w-[180px] truncate">{userEmail || 'Account'}</span>
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
@@ -91,23 +95,25 @@ export function AccountMenu({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
-          <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
+          <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
+            
             {/* 1. IDENTITY & ACTIVE SESSION HEADER */}
-            <div className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Signed In As</p>
-              <p className="text-xs font-bold text-white truncate">{userEmail || 'Active User'}</p>
+            <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Active Account</p>
+              <p className="text-xs font-bold text-white truncate">{userEmail || 'lasvegas_fleet_test@example.com'}</p>
               <div className="flex items-center gap-1.5 pt-1">
                 <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
                   Role: {userRole}
                 </span>
                 <span className="bg-slate-800 text-slate-300 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
-                  {subscriptionTier}
+                  {subscriptionTier} Plan
                 </span>
               </div>
             </div>
 
-            {/* 2. ADMINISTRATIVE & SECURITY CONTROLS */}
+            {/* 2. ADMINISTRATIVE & SECURITY CONTROLS (ROLE GATED) */}
             <div className="space-y-1">
+              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
               {userRole === 'admin' && (
                 <button
                   onClick={() => {
@@ -129,13 +135,38 @@ export function AccountMenu({
                   }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-cyan-400 font-bold transition flex items-center justify-between cursor-pointer"
                 >
-                  <span>💳 Plan & Subscription</span>
+                  <span>💳 Plan & Billing Surcharge</span>
                   <span className="text-slate-500">→</span>
                 </button>
               )}
             </div>
 
-            {/* 3. SESSION CONTROL */}
+            {/* 3. BROKER & RISK TOOLS (QUICK ACTIONS) */}
+            <div className="space-y-1 border-t border-slate-800/80 pt-2">
+              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Underwriter Quick Tools</p>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onCopyUnderwriterLink();
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+              >
+                <span>🔗 Copy Broker Share Link</span>
+                <span className="text-slate-500">📋</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onDownloadRiskCard();
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+              >
+                <span>📄 Download Compliance Card</span>
+                <span className="text-slate-500">⬇️</span>
+              </button>
+            </div>
+
+            {/* 4. SESSION CONTROLS */}
             <div className="border-t border-slate-800 pt-2">
               <button
                 onClick={() => {
@@ -203,8 +234,9 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* METRICS GRID WITH CARRIER STATUS BADGES */}
+      {/* ENHANCED METRICS GRID WITH SAVINGS & CARRIER STATUS BADGES */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Metric 1: Remediation Rate + Status Badge */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
           <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
@@ -225,12 +257,14 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           </div>
         </div>
 
+        {/* Metric 2: Avg Resolution Time */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Avg. Resolution Time</span>
           <div className="text-3xl font-black text-cyan-400">{Math.round(avgDaysToRemediate)} Days</div>
           <span className="text-[10px] text-slate-500 block">Industry Avg: 45 Days</span>
         </div>
 
+        {/* Metric 3: Verified Receipts */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Verified Proof-of-Remedies</span>
           <div className="text-3xl font-black text-purple-400">
@@ -239,6 +273,7 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           <span className="text-[10px] text-slate-500 block">Dealer Invoices Attached</span>
         </div>
 
+        {/* Metric 4: Estimated ROI Callout */}
         <div className="bg-slate-950 border border-cyan-500/30 p-4 rounded-xl space-y-2">
           <span className="text-xs text-cyan-400 font-bold uppercase">Estimated Annual Credit</span>
           <div className="text-3xl font-black text-white">
@@ -899,7 +934,7 @@ export const TaskBoard: React.FC = () => {
   // RENDER UI
   // ==========================================
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative text-slate-100">
       
       {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
       {showHardGatedModal && (
@@ -976,7 +1011,33 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* WORKSPACE HEADER & TAB NAVIGATION */}
+      {/* 🌟 INTEGRATED TOP CONTROL BAR (CONTAINING ACCOUNT MENU DROPDOWN) */}
+      <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
+        <div className="flex items-center gap-3">
+          <span className="text-cyan-400 font-bold font-mono text-lg">⚡</span>
+          <div>
+            <h2 className="text-sm font-bold font-mono text-white">RECALLLOGIC WORKSPACE</h2>
+            <p className="text-[10px] font-mono text-slate-400">Active Operational Risk Control</p>
+          </div>
+        </div>
+
+        {/* CONSOLIDATED ACCOUNT BUTTON DROPDOWN */}
+        <AccountMenu
+          userEmail={userEmail}
+          userRole={userRole}
+          subscriptionTier={subscriptionTier}
+          onOpenTeamModal={() => setIsTeamModalOpen(true)}
+          onOpenUpgradeModal={() => triggerUpgradeModal('Manage your subscription tier')}
+          onCopyUnderwriterLink={() => {
+            navigator.clipboard.writeText(window.location.href);
+            alert('Copied secure read-only underwriter link to clipboard!');
+          }}
+          onDownloadRiskCard={handleDownloadPDF}
+          onSignOut={handleSignOut}
+        />
+      </div>
+
+      {/* WORKSPACE VIEW HEADER & TAB NAVIGATION */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
