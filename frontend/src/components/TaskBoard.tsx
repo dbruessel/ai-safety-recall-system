@@ -76,7 +76,7 @@ export function AccountMenu({
 
   return (
     <div className="relative inline-block text-left">
-      {/* SINGLE UNIFIED ACCOUNT BUTTON */}
+      {/* CONSOLIDATED ACCOUNT BUTTON */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-sm cursor-pointer"
@@ -86,16 +86,16 @@ export function AccountMenu({
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
 
-      {/* ACCOUNT DROPDOWN POPOVER */}
+      {/* DROPDOWN POPOVER MENU */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
           <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
-            {/* USER INFO HEADER */}
+            {/* 1. IDENTITY & ACTIVE SESSION HEADER */}
             <div className="p-2.5 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Signed In As</p>
-              <p className="text-xs font-bold text-white truncate">{userEmail || 'Active Workspace User'}</p>
+              <p className="text-xs font-bold text-white truncate">{userEmail || 'Active User'}</p>
               <div className="flex items-center gap-1.5 pt-1">
                 <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
                   Role: {userRole}
@@ -106,7 +106,7 @@ export function AccountMenu({
               </div>
             </div>
 
-            {/* QUICK ACTIONS */}
+            {/* 2. ADMINISTRATIVE & SECURITY CONTROLS */}
             <div className="space-y-1">
               {userRole === 'admin' && (
                 <button
@@ -121,7 +121,7 @@ export function AccountMenu({
                 </button>
               )}
 
-              {userRole === 'admin' && subscriptionTier !== 'enterprise' && (
+              {userRole === 'admin' && (
                 <button
                   onClick={() => {
                     setIsOpen(false);
@@ -129,12 +129,13 @@ export function AccountMenu({
                   }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-cyan-400 font-bold transition flex items-center justify-between cursor-pointer"
                 >
-                  <span>💳 Manage Plan Tier</span>
+                  <span>💳 Plan & Subscription</span>
                   <span className="text-slate-500">→</span>
                 </button>
               )}
             </div>
 
+            {/* 3. SESSION CONTROL */}
             <div className="border-t border-slate-800 pt-2">
               <button
                 onClick={() => {
@@ -170,10 +171,12 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
       return acc + (closed - created) / (1000 * 3600 * 24);
     }, 0) / (completedTasks.length || 1);
 
+  // Estimate potential savings ($200 avg credit per vehicle/yr at 90%+ compliance)
   const estimatedSavings = complianceScore >= 90 ? totalTasks * 200 : 0;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl font-mono">
+      {/* HEADER WITH BROKER SHARE BUTTONS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
         <div>
           <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">
@@ -200,7 +203,8 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-mono">
+      {/* METRICS GRID WITH CARRIER STATUS BADGES */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
           <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
@@ -244,6 +248,7 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
+      {/* VERIFIED AUDIT LOG TABLE */}
       <div className="space-y-3">
         <h4 className="text-xs font-mono uppercase font-bold text-slate-300">Verified Remediation Log</h4>
         <div className="border border-slate-800 rounded-xl overflow-hidden text-xs font-mono">
@@ -568,6 +573,11 @@ export const TaskBoard: React.FC = () => {
     }
     const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   // ==========================================
