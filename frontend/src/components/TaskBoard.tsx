@@ -871,16 +871,23 @@ export const TaskBoard: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Fleet Recall Operations</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {activeTab === 'underwriter' ? 'Underwriter Compliance & Risk Portal' : 'Fleet Recall Operations'}
+            </h1>
             <span className="bg-slate-200 text-slate-700 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full uppercase">
               Role: {userRole}
             </span>
           </div>
-          <p className="text-sm text-gray-500">Monitor, filter, and schedule safety recall remedies across active fleet assets.</p>
+          <p className="text-sm text-gray-500">
+            {activeTab === 'underwriter'
+              ? 'Executive risk metrics and audit-grade proof of recall remediation for insurance carriers.'
+              : 'Monitor, filter, and schedule safety recall remedies across active fleet assets.'}
+          </p>
         </div>
 
-        {/* NAVIGATION TAB & TEAM CONTROLS */}
+        {/* TAB SWITCHER & OPERATIONAL CONTROLS */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* TAB NAVIGATION BUTTONS */}
           <div className="bg-gray-200 p-1 rounded-xl flex gap-1 text-xs font-mono">
             <button
               onClick={() => setActiveTab('workspace')}
@@ -902,53 +909,58 @@ export const TaskBoard: React.FC = () => {
             )}
           </div>
 
-          {permissions.canInviteUsers && (
-            <button
-              onClick={() => setIsTeamModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
-            >
-              👥 Team & Permissions
-            </button>
-          )}
+          {/* OPERATIONAL CONTROLS (ONLY VISIBLE ON TASK BOARD TAB) */}
+          {activeTab === 'workspace' && (
+            <>
+              {permissions.canInviteUsers && (
+                <button
+                  onClick={() => setIsTeamModalOpen(true)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  👥 Team & Permissions
+                </button>
+              )}
 
-          {/* 💳 TIER USAGE BADGE & ACTIONS */}
-          <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-            <div>
-              <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
-                {subscriptionTier.toUpperCase()} PLAN
-              </p>
-              <p className="text-xs font-bold text-gray-900">
-                {recalls.length} <span className="text-gray-400">/ {vehicleLimit === 999999 ? '∞' : vehicleLimit} Vehicles</span>
-              </p>
-            </div>
-            <div className="w-16 bg-gray-100 h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${recalls.length >= vehicleLimit ? 'bg-red-500' : 'bg-emerald-500'}`}
-                style={{ width: `${Math.min((recalls.length / vehicleLimit) * 100, 100)}%` }}
-              ></div>
-            </div>
-            {permissions.canManageBilling && subscriptionTier !== 'enterprise' && (
+              {/* 💳 TIER USAGE BADGE */}
+              <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <div>
+                  <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                    {subscriptionTier.toUpperCase()} PLAN
+                  </p>
+                  <p className="text-xs font-bold text-gray-900">
+                    {recalls.length} <span className="text-gray-400">/ {vehicleLimit === 999999 ? '∞' : vehicleLimit} Vehicles</span>
+                  </p>
+                </div>
+                <div className="w-16 bg-gray-100 h-2 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${recalls.length >= vehicleLimit ? 'bg-red-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${Math.min((recalls.length / vehicleLimit) * 100, 100)}%` }}
+                  ></div>
+                </div>
+                {permissions.canManageBilling && subscriptionTier !== 'enterprise' && (
+                  <button
+                    onClick={() => triggerUpgradeModal('Manage your subscription tier')}
+                    className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition cursor-pointer"
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+
               <button
-                onClick={() => triggerUpgradeModal('Manage your subscription tier')}
-                className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg shadow transition cursor-pointer"
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
               >
-                Upgrade
+                <span>📄</span> Risk Certificate
               </button>
-            )}
-          </div>
-
-          <button
-            onClick={handleDownloadPDF}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
-          >
-            <span>📄</span> Risk Certificate
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
-          >
-            <span>📊</span> Export CSV
-          </button>
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition flex items-center gap-2 cursor-pointer"
+              >
+                <span>📊</span> Export CSV
+              </button>
+            </>
+          )}
         </div>
       </div>
 
