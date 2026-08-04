@@ -97,12 +97,22 @@ export default function App() {
 
     if (data && !error) {
       if (data.company_name) setCompanyName(data.company_name);
-      
-      // Explicitly check both database field variants
-      const activeTier = data.subscription_tier || data.plan_type || 'free';
-      setPlanType(activeTier as SubscriptionTier);
-      
       if (data.role) setUserRole(data.role as UserRole);
+
+      // Smart Tier Resolution (Prioritizes pro flag or pro plan names over stale fields)
+      let resolvedTier: SubscriptionTier = 'free';
+
+      if (data.subscription_tier && data.subscription_tier !== 'free') {
+        resolvedTier = data.subscription_tier as SubscriptionTier;
+      } else if (data.plan_type && data.plan_type !== 'free') {
+        resolvedTier = data.plan_type as SubscriptionTier;
+      } else if (data.tier && data.tier !== 'free') {
+        resolvedTier = data.tier as SubscriptionTier;
+      } else if (data.is_pro) {
+        resolvedTier = 'professional';
+      }
+
+      setPlanType(resolvedTier);
     }
   } catch (err) {
     console.warn("Error loading user profile tier:", err);
