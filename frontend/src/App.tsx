@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
-import { TaskBoard, AccountMenu, UserRole, SubscriptionTier } from './components/TaskBoard';
+import { TaskBoard, AccountMenu } from './components/TaskBoard';
+
+export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
+export type UserRole = 'admin' | 'mechanic' | 'viewer';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -84,26 +87,27 @@ export default function App() {
                        window.location.search.includes('session_id');
 
   // Helper to pull subscriber tier, role & profile data from Supabase
-  const fetchUserProfile = async (email: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('company_name, email, plan_type, role, subscription_tier, free_audit_completed')
-        .eq('email', email)
-        .maybeSingle();
+ const fetchUserProfile = async (email: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
 
-      if (data && !error) {
-        if (data.company_name) setCompanyName(data.company_name);
-        if (data.plan_type || data.subscription_tier) {
-          setPlanType((data.subscription_tier || data.plan_type) as SubscriptionTier);
-        }
-        if (data.role) setUserRole(data.role as UserRole);
-        if (data.free_audit_completed) setFreeAuditCompleted(data.free_audit_completed);
-      }
-    } catch (err) {
-      console.warn("Error loading user profile tier:", err);
+    if (data && !error) {
+      if (data.company_name) setCompanyName(data.company_name);
+      
+      // Explicitly check both database field variants
+      const activeTier = data.subscription_tier || data.plan_type || 'free';
+      setPlanType(activeTier as SubscriptionTier);
+      
+      if (data.role) setUserRole(data.role as UserRole);
     }
-  };
+  } catch (err) {
+    console.warn("Error loading user profile tier:", err);
+  }
+};
 
   // Listen for active Supabase Auth sessions
   useEffect(() => {
