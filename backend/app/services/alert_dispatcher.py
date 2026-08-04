@@ -1,13 +1,26 @@
 import os
-from datetime import datetime, timedelta
-from supabase import create_client
-import requests  # Or import resend
+import sys
+from supabase import create_client, Client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Fallback chain across common variable aliases
+SUPABASE_SERVICE_ROLE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY") or 
+    os.getenv("SUPABASE_SERVICE_KEY") or 
+    os.getenv("SUPABASE_KEY")
+)
+
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+# Explicit credential validation before initializing client
+if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+    print("❌ FATAL: Missing Supabase credentials in alert_dispatcher.py")
+    print(f"SUPABASE_URL present: {bool(SUPABASE_URL)}")
+    print(f"SUPABASE_SERVICE_ROLE_KEY present: {bool(SUPABASE_SERVICE_ROLE_KEY)}")
+    sys.exit(1)
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 def send_email_alert(to_email: str, company_name: str, new_recalls: list):
     """Sends a crisp HTML email digest of newly detected fleet recalls."""
