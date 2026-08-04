@@ -53,7 +53,8 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
-// CONSOLIDATED ACCOUNT DROPDOWN (4 BLOCKS)
+// REUSABLE CONSOLIDATED ACCOUNT DROPDOWN
+// (Import this component into your main App.tsx / Layout.tsx header)
 // ==========================================
 interface AccountMenuProps {
   userEmail: string;
@@ -80,24 +81,24 @@ export function AccountMenu({
 
   return (
     <div className="relative inline-block text-left">
-      {/* ACCOUNT DROPDOWN TRIGGER BUTTON */}
+      {/* CONSOLIDATED ACCOUNT TRIGGER BUTTON */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-md cursor-pointer"
+        className="flex items-center gap-2.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-md cursor-pointer"
       >
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
         <span className="font-bold text-white max-w-[180px] truncate">{userEmail || 'Account'}</span>
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
 
-      {/* DROPDOWN POPOVER MENU */}
+      {/* DROPDOWN POPOVER MENU (4 SPECIFIC BLOCKS) */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
           <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
             
-            {/* 1. IDENTITY & ACTIVE SESSION HEADER */}
+            {/* BLOCK 1: IDENTITY & ACTIVE SESSION HEADER */}
             <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Active Account</p>
               <p className="text-xs font-bold text-white truncate">{userEmail || 'lasvegas_fleet_test@example.com'}</p>
@@ -111,7 +112,7 @@ export function AccountMenu({
               </div>
             </div>
 
-            {/* 2. ADMINISTRATIVE & SECURITY CONTROLS (ROLE GATED) */}
+            {/* BLOCK 2: ADMINISTRATIVE & SECURITY CONTROLS (ROLE GATED) */}
             <div className="space-y-1">
               <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
               {userRole === 'admin' && (
@@ -141,7 +142,7 @@ export function AccountMenu({
               )}
             </div>
 
-            {/* 3. BROKER & RISK TOOLS (QUICK ACTIONS) */}
+            {/* BLOCK 3: BROKER & RISK TOOLS (QUICK ACTIONS) */}
             <div className="space-y-1 border-t border-slate-800/80 pt-2">
               <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Underwriter Quick Tools</p>
               <button
@@ -166,7 +167,7 @@ export function AccountMenu({
               </button>
             </div>
 
-            {/* 4. SESSION CONTROLS */}
+            {/* BLOCK 4: SESSION CONTROL */}
             <div className="border-t border-slate-800 pt-2">
               <button
                 onClick={() => {
@@ -610,11 +611,6 @@ export const TaskBoard: React.FC = () => {
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-  };
-
   // ==========================================
   // ⚡ INSTANT SINGLE-VIN SCAN LOGIC
   // ==========================================
@@ -825,7 +821,7 @@ export const TaskBoard: React.FC = () => {
     } catch (err) {
       console.error('Failed to upload receipt file:', err);
       return null;
-    } finally {
+    } fontally {
       setUploadingReceipt(false);
     }
   };
@@ -1011,33 +1007,7 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* 🌟 INTEGRATED TOP CONTROL BAR (CONTAINING ACCOUNT MENU DROPDOWN) */}
-      <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
-        <div className="flex items-center gap-3">
-          <span className="text-cyan-400 font-bold font-mono text-lg">⚡</span>
-          <div>
-            <h2 className="text-sm font-bold font-mono text-white">RECALLLOGIC WORKSPACE</h2>
-            <p className="text-[10px] font-mono text-slate-400">Active Operational Risk Control</p>
-          </div>
-        </div>
-
-        {/* CONSOLIDATED ACCOUNT BUTTON DROPDOWN */}
-        <AccountMenu
-          userEmail={userEmail}
-          userRole={userRole}
-          subscriptionTier={subscriptionTier}
-          onOpenTeamModal={() => setIsTeamModalOpen(true)}
-          onOpenUpgradeModal={() => triggerUpgradeModal('Manage your subscription tier')}
-          onCopyUnderwriterLink={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Copied secure read-only underwriter link to clipboard!');
-          }}
-          onDownloadRiskCard={handleDownloadPDF}
-          onSignOut={handleSignOut}
-        />
-      </div>
-
-      {/* WORKSPACE VIEW HEADER & TAB NAVIGATION */}
+      {/* WORKSPACE VIEW HEADER & TAB SWITCHER (SINGLE CLEAN CONTAINER) */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
