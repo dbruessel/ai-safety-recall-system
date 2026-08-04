@@ -282,19 +282,19 @@ export default function App() {
 
             {/* ⚙️ CONSOLIDATED ACCOUNT DROPDOWN MENU */}
             <AccountMenu
-              userEmail={session.user.email || userEmail || 'lasvegas_fleet_test@example.com'}
-              orgName={companyName || 'Las Vegas Fleet Test Co.'}
-              userRole={userRole}
-              subscriptionTier={planType}
-              onOpenTeamModal={() => setIsTeamModalOpen(true)}
-              onOpenUpgradeModal={() => setShowUpgradeModal(true)}
-              onCopyUnderwriterLink={() => {
-                navigator.clipboard.writeText(window.location.href);
-                alert('Copied secure read-only underwriter link to clipboard!');
-              }}
-              onDownloadRiskCard={handleDownloadPDF}
-              onSignOut={handleSignOut}
-            />
+      userEmail={session.user.email || userEmail}
+      orgName={companyName || 'Las Vegas Fleet Test Co.'}
+      userRole={userRole}
+      subscriptionTier={planType}
+      onOpenTeamModal={() => setIsTeamModalOpen(true)}
+      onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+      onCopyUnderwriterLink={() => {
+        navigator.clipboard.writeText(window.location.href);
+        alert('Copied secure read-only underwriter link to clipboard!');
+      }}
+      onDownloadRiskCard={handleDownloadPDF}
+      onSignOut={handleSignOut}
+    />
           </div>
         </header>
 
