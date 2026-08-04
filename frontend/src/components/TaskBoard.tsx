@@ -821,7 +821,7 @@ export const TaskBoard: React.FC = () => {
     } catch (err) {
       console.error('Failed to upload receipt file:', err);
       return null;
-    } fontally {
+    } finally {
       setUploadingReceipt(false);
     }
   };

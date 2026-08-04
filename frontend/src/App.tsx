@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
-import { TaskBoard } from './components/TaskBoard';
+import { TaskBoard, AccountMenu, UserRole, SubscriptionTier } from './components/TaskBoard';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -24,7 +24,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
-  const [planType, setPlanType] = useState<'free' | 'standard' | 'professional' | 'enterprise'>('free');
+  const [planType, setPlanType] = useState<SubscriptionTier>('free');
+  const [userRole, setUserRole] = useState<UserRole>('admin');
   const [freeAuditCompleted, setFreeAuditCompleted] = useState<boolean>(false);
   
   const [bulkInput, setBulkInput] = useState('');
@@ -82,18 +83,21 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Helper to pull subscriber tier & profile data from Supabase
+  // Helper to pull subscriber tier, role & profile data from Supabase
   const fetchUserProfile = async (email: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('company_name, email, plan_type, free_audit_completed')
+        .select('company_name, email, plan_type, role, subscription_tier, free_audit_completed')
         .eq('email', email)
         .maybeSingle();
 
       if (data && !error) {
         if (data.company_name) setCompanyName(data.company_name);
-        if (data.plan_type) setPlanType(data.plan_type as any);
+        if (data.plan_type || data.subscription_tier) {
+          setPlanType((data.subscription_tier || data.plan_type) as SubscriptionTier);
+        }
+        if (data.role) setUserRole(data.role as UserRole);
         if (data.free_audit_completed) setFreeAuditCompleted(data.free_audit_completed);
       }
     } catch (err) {
@@ -106,6 +110,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user?.email) {
+        setUserEmail(session.user.email);
         fetchUserProfile(session.user.email);
       }
     });
@@ -113,6 +118,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user?.email) {
+        setUserEmail(session.user.email);
         fetchUserProfile(session.user.email);
       }
     });
@@ -154,6 +160,16 @@ export default function App() {
     setLoginPassword('');
     setLoginError('');
     setShowLoginModal(true);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  const handleDownloadPDF = () => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
   };
 
   // ====================================================================
@@ -250,8 +266,9 @@ export default function App() {
   // ROUTE 2: AUTHENTICATED WORKSPACE (For Active Paid Members)
   if (session) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 antialiased">
-        <header className="border-b border-slate-900 pb-4 mb-6 flex justify-between items-center max-w-7xl mx-auto">
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
+        {/* GLOBAL TOP NAVIGATION BAR */}
+        <header className="border-b border-slate-900 bg-slate-950/90 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
           <div className="flex items-center space-x-3">
             <img src="/recall-logo.png" alt="RecallLogic" className="h-8 w-auto object-contain" />
             <div>
@@ -259,22 +276,27 @@ export default function App() {
               <p className="text-[10px] text-slate-400 font-mono tracking-wider">Active Operational Risk Control.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-3 py-1 rounded-full flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {session.user.email}
-            </span>
-            <button 
-              onClick={() => supabase.auth.signOut()}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-mono rounded-lg border border-slate-800 transition cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </div>
+
+          {/* CONSOLIDATED ACCOUNT DROPDOWN MENU */}
+          <AccountMenu
+            userEmail={session.user.email || userEmail || 'lasvegas_fleet_test@example.com'}
+            userRole={userRole}
+            subscriptionTier={planType}
+            onOpenTeamModal={() => {
+              window.dispatchEvent(new CustomEvent('open-team-modal'));
+            }}
+            onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+            onCopyUnderwriterLink={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert('Copied secure read-only underwriter link to clipboard!');
+            }}
+            onDownloadRiskCard={handleDownloadPDF}
+            onSignOut={handleSignOut}
+          />
         </header>
 
-        <main className="max-w-7xl mx-auto">
-          <TaskBoard session={session} planType={planType} />
+        <main className="max-w-7xl mx-auto p-6">
+          <TaskBoard />
         </main>
       </div>
     );
