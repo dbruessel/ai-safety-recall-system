@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import UpgradeButton from './components/UpgradeButton';
 import CheckoutReturn from './components/CheckoutReturn';
 import { TaskBoard, AccountMenu } from './components/TaskBoard';
+import { TeamManagementModal } from './components/TeamManagementModal';
 
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
 export type UserRole = 'admin' | 'mechanic' | 'viewer';
@@ -26,8 +27,8 @@ interface Recall {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
-  const [companyName, setCompanyName] = useState<string>('');
-  const [planType, setPlanType] = useState<SubscriptionTier>('free');
+  const [companyName, setCompanyName] = useState<string>('Las Vegas Fleet Test Co.');
+  const [planType, setPlanType] = useState<SubscriptionTier>('professional');
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [freeAuditCompleted, setFreeAuditCompleted] = useState<boolean>(false);
   
@@ -39,7 +40,7 @@ export default function App() {
   // Ref for auto-scrolling to pricing upon audit completion
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // LOGIN / SIGN-IN MODAL STATES (For Paid Members Only)
+  // LOGIN / SIGN-IN MODAL STATES
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -49,6 +50,9 @@ export default function App() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [blockedVinCount, setBlockedVinCount] = useState(0);
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
+
+  // TEAM MANAGEMENT MODAL STATE
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   // DYNAMIC SUPABASE GLOBAL METRICS STATE
   const [globalMetrics, setGlobalMetrics] = useState({
@@ -80,44 +84,37 @@ export default function App() {
     fetchGlobalRecallsCount();
   }, []);
 
-  // ====================================================================
+  // Listen for team modal dispatch events
+  useEffect(() => {
+    const handleOpenTeamModal = () => setIsTeamModalOpen(true);
+    window.addEventListener('open-team-modal', handleOpenTeamModal);
+    return () => window.removeEventListener('open-team-modal', handleOpenTeamModal);
+  }, []);
+
   // ROUTE INTERCEPTOR: POST-CHECKOUT STRIPE RETURN DETECTOR
-  // ====================================================================
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
   // Helper to pull subscriber tier, role & profile data from Supabase
- const fetchUserProfile = async (email: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
+  const fetchUserProfile = async (email: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('company_name, role, subscription_tier, organization_id, organizations(name)')
+        .eq('email', email)
+        .maybeSingle();
 
-    if (data && !error) {
-      if (data.company_name) setCompanyName(data.company_name);
-      if (data.role) setUserRole(data.role as UserRole);
+      if (data && !error) {
+        const orgName = (data.organizations as any)?.name || data.company_name || 'Las Vegas Fleet Test Co.';
+        setCompanyName(orgName);
 
-      // Smart Tier Resolution (Prioritizes pro flag or pro plan names over stale fields)
-      let resolvedTier: SubscriptionTier = 'free';
-
-      if (data.subscription_tier && data.subscription_tier !== 'free') {
-        resolvedTier = data.subscription_tier as SubscriptionTier;
-      } else if (data.plan_type && data.plan_type !== 'free') {
-        resolvedTier = data.plan_type as SubscriptionTier;
-      } else if (data.tier && data.tier !== 'free') {
-        resolvedTier = data.tier as SubscriptionTier;
-      } else if (data.is_pro) {
-        resolvedTier = 'professional';
+        if (data.role) setUserRole(data.role as UserRole);
+        if (data.subscription_tier) setPlanType(data.subscription_tier as SubscriptionTier);
       }
-
-      setPlanType(resolvedTier);
+    } catch (err) {
+      console.warn("Error loading user profile & organization:", err);
     }
-  } catch (err) {
-    console.warn("Error loading user profile tier:", err);
-  }
-};
+  };
 
   // Listen for active Supabase Auth sessions
   useEffect(() => {
@@ -160,7 +157,7 @@ export default function App() {
           setCompanyName(refParam.split('@')[0]);
           fetchUserProfile(refParam);
         } else {
-          setCompanyName('Active Workspace');
+          setCompanyName('Las Vegas Fleet Test Co.');
         }
       }
     };
@@ -168,7 +165,6 @@ export default function App() {
     hydrateProspectSession();
   }, []);
 
-  // Clear modal inputs when opened to protect sensitive pre-fills
   const handleOpenLoginModal = () => {
     setUserEmail('');
     setLoginPassword('');
@@ -186,9 +182,6 @@ export default function App() {
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
   };
 
-  // ====================================================================
-  // PROSPECT GHOST AUDIT PROCESSOR (INLINE HOMEPAGE RESULTS)
-  // ====================================================================
   const handleProcessManifest = async (rawText: string) => {
     setLoading(true);
     setError('');
@@ -203,7 +196,6 @@ export default function App() {
         throw new Error("No valid asset rows detected inside your input feed.");
       }
 
-      // Intercept if asset size exceeds free tier audit allowance (10 VINs)
       if (lines.length > 10) {
         setBlockedVinCount(lines.length);
         setShowUpgradeModal(true);
@@ -212,7 +204,6 @@ export default function App() {
       }
 
       setTimeout(async () => {
-        // Process preview audit items
         const fullAuditRecalls = lines.slice(0, 10).map((line, idx) => {
           const parts = line.split(',');
           return {
@@ -229,13 +220,10 @@ export default function App() {
           };
         });
 
-        // Save preview dataset to localStorage
         localStorage.setItem('recalllogic_audit_recalls', JSON.stringify(fullAuditRecalls));
-
         setInjectedRecalls(fullAuditRecalls);
         setLoading(false);
 
-        // Smoothly scroll down to the results and pricing matrix
         setTimeout(() => {
           resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
@@ -248,7 +236,6 @@ export default function App() {
     }
   };
 
-  // SIGN IN HANDLER FOR EXISTING PAID SUBSCRIBERS
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -277,46 +264,56 @@ export default function App() {
     return <CheckoutReturn />;
   }
 
-  // ROUTE 2: AUTHENTICATED WORKSPACE (For Active Paid Members)
+  // ROUTE 2: AUTHENTICATED WORKSPACE
   if (session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
-        {/* GLOBAL TOP NAVIGATION BAR */}
-        <header className="border-b border-slate-900 bg-slate-950/90 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
-          <div className="flex items-center space-x-3">
-            <img src="/recall-logo.png" alt="RecallLogic" className="h-8 w-auto object-contain" />
-            <div>
-              <h1 className="text-base font-black text-white tracking-tight uppercase">RecallLogic Workspace</h1>
-              <p className="text-[10px] text-slate-400 font-mono tracking-wider">Active Operational Risk Control.</p>
+        
+        {/* 🌟 GLOBAL TOP NAVIGATION BAR */}
+        <header className="border-b border-slate-900 bg-slate-950/90 backdrop-blur sticky top-0 z-30 px-6 py-3.5">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <img src="/recall-logo.png" alt="RecallLogic" className="h-8 w-auto object-contain" />
+              <div>
+                <h1 className="text-base font-black text-white tracking-tight uppercase">RecallLogic Workspace</h1>
+                <p className="text-[10px] text-slate-400 font-mono tracking-wider">Active Operational Risk Control.</p>
+              </div>
             </div>
-          </div>
 
-          {/* CONSOLIDATED ACCOUNT DROPDOWN MENU */}
-          <AccountMenu
-            userEmail={session.user.email || userEmail || 'lasvegas_fleet_test@example.com'}
-            userRole={userRole}
-            subscriptionTier={planType}
-            onOpenTeamModal={() => {
-              window.dispatchEvent(new CustomEvent('open-team-modal'));
-            }}
-            onOpenUpgradeModal={() => setShowUpgradeModal(true)}
-            onCopyUnderwriterLink={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Copied secure read-only underwriter link to clipboard!');
-            }}
-            onDownloadRiskCard={handleDownloadPDF}
-            onSignOut={handleSignOut}
-          />
+            {/* ⚙️ CONSOLIDATED ACCOUNT DROPDOWN MENU */}
+            <AccountMenu
+              userEmail={session.user.email || userEmail || 'lasvegas_fleet_test@example.com'}
+              orgName={companyName || 'Las Vegas Fleet Test Co.'}
+              userRole={userRole}
+              subscriptionTier={planType}
+              onOpenTeamModal={() => setIsTeamModalOpen(true)}
+              onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+              onCopyUnderwriterLink={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Copied secure read-only underwriter link to clipboard!');
+              }}
+              onDownloadRiskCard={handleDownloadPDF}
+              onSignOut={handleSignOut}
+            />
+          </div>
         </header>
 
+        {/* MAIN WORKSPACE CONTENT */}
         <main className="max-w-7xl mx-auto p-6">
           <TaskBoard />
         </main>
+
+        {/* TEAM MANAGEMENT MODAL */}
+        <TeamManagementModal
+          isOpen={isTeamModalOpen}
+          onClose={() => setIsTeamModalOpen(false)}
+          currentUserId={session.user.id}
+        />
       </div>
     );
   }
 
-  // ROUTE 3: GUEST MARKETING & FREEMIUM LANDING PAGE
+  // ROUTE 3: GUEST MARKETING LANDING PAGE
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950 antialiased">
       
@@ -359,10 +356,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN LAYOUT */}
+      {/* MAIN LANDING CONTENT */}
       <main className="max-w-6xl mx-auto px-6 py-12 space-y-12">
         
-        {/* HERO INTRO & GHOST AUDIT DROPZONE */}
         <div className="text-center max-w-2xl mx-auto space-y-4">
           <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono text-xs font-semibold">
             Complimentary 10-VIN Ghost Audit
@@ -375,7 +371,6 @@ export default function App() {
           </p>
         </div>
 
-        {/* INPUT DROPZONE CONTAINER */}
         <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between">
             <label className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
@@ -414,7 +409,6 @@ export default function App() {
           )}
         </div>
 
-        {/* INLINE GHOST AUDIT RESULTS FEED */}
         {injectedRecalls && (
           <div ref={resultsRef} className="max-w-3xl mx-auto space-y-6 animate-fadeIn pt-4">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
@@ -442,7 +436,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* CALL TO ACTION BANNER FOR GHOST AUDIT COMPLETED */}
             <div className="bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border border-cyan-500/40 rounded-2xl p-6 text-center space-y-3 shadow-2xl">
               <h4 className="text-base font-bold text-white tracking-tight">Ready to Track & Resolve These Safety Liability Issues?</h4>
               <p className="text-xs text-slate-400 max-w-xl mx-auto">
@@ -458,7 +451,7 @@ export default function App() {
           </div>
         )}
 
-        {/* PRODUCT TIERS & PRICING MATRIX */}
+        {/* PRICING MATRIX */}
         <section id="pricing-matrix-anchor" className="space-y-8 pt-6">
           <div className="text-center max-w-xl mx-auto space-y-3">
             <h3 className="text-2xl font-extrabold text-white tracking-tight">Simple, Value-Based Tiers</h3>
@@ -466,8 +459,6 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* STANDARD TIER */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div>
@@ -488,7 +479,6 @@ export default function App() {
               <UpgradeButton planType="standard" email={userEmail} className="w-full py-3" />
             </div>
 
-            {/* PROFESSIONAL TIER (FEATURED) */}
             <div className="bg-gradient-to-b from-slate-900 to-slate-900/90 border-2 border-cyan-500/50 rounded-2xl p-6 flex flex-col justify-between space-y-6 relative shadow-2xl shadow-cyan-500/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 font-mono text-[10px] uppercase font-black px-3 py-0.5 rounded-full tracking-widest">
                 Most Popular
@@ -513,7 +503,6 @@ export default function App() {
               <UpgradeButton planType="professional" email={userEmail} className="w-full py-3" />
             </div>
 
-            {/* ENTERPRISE TIER */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div>
@@ -546,13 +535,12 @@ export default function App() {
               </div>
               <UpgradeButton planType="enterprise" email={userEmail} className="w-full py-3" />
             </div>
-
           </div>
         </section>
 
       </main>
 
-      {/* SIGN IN MODAL FOR EXISTING ACTIVE SUBSCRIBERS */}
+      {/* SIGN IN MODAL */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-cyan-500/30 max-w-md w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
@@ -620,7 +608,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MULTI-TIER UPGRADE INTERCEPTOR MODAL FOR PROSPECTS */}
+      {/* UPGRADE INTERCEPTOR MODAL */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-6">
           <div className="bg-slate-900 border border-cyan-500/30 max-w-lg w-full rounded-2xl p-6 space-y-6 shadow-2xl relative">
@@ -641,7 +629,6 @@ export default function App() {
               </p>
             </div>
 
-            {/* TIER SELECTION TABS */}
             <div className="grid grid-cols-3 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
               <button
                 type="button"
@@ -683,7 +670,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* DYNAMIC TIER FEATURE SUMMARY */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 font-mono text-xs">
               <div className="flex justify-between items-center pb-2 border-b border-slate-800">
                 <span className="text-slate-400">Selected Plan:</span>
@@ -723,7 +709,6 @@ export default function App() {
               </ul>
             </div>
 
-            {/* CTA BUTTON */}
             <div className="space-y-3">
               <UpgradeButton planType={selectedTier} email={userEmail} className="w-full py-3" />
               <button
