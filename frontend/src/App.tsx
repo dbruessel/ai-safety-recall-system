@@ -96,25 +96,31 @@ export default function App() {
                        window.location.search.includes('session_id');
 
   // Helper to pull subscriber tier, role & profile data from Supabase
-  const fetchUserProfile = async (email: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('company_name, role, subscription_tier, organization_id, organizations(name)')
-        .eq('email', email)
-        .maybeSingle();
+const fetchUserProfile = async (email: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('company_name, role, subscription_tier, organization_id, organizations(name)')
+      .eq('email', email)
+      .maybeSingle();
 
-      if (data && !error) {
-        const orgName = (data.organizations as any)?.name || data.company_name || 'Las Vegas Fleet Test Co.';
-        setCompanyName(orgName);
+    if (data && !error) {
+      // 1. Check joined organization table name first
+      // 2. Fallback to profile company_name
+      // 3. Last fallback to default
+      const resolvedOrgName = 
+        (data.organizations as any)?.name || 
+        data.company_name || 
+        'Las Vegas Fleet Test Co.';
 
-        if (data.role) setUserRole(data.role as UserRole);
-        if (data.subscription_tier) setPlanType(data.subscription_tier as SubscriptionTier);
-      }
-    } catch (err) {
-      console.warn("Error loading user profile & organization:", err);
+      setCompanyName(resolvedOrgName);
+      if (data.role) setUserRole(data.role as UserRole);
+      if (data.subscription_tier) setPlanType(data.subscription_tier as SubscriptionTier);
     }
-  };
+  } catch (err) {
+    console.warn("Error loading profile & organization:", err);
+  }
+};
 
   // Listen for active Supabase Auth sessions
   useEffect(() => {
