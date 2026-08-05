@@ -53,8 +53,7 @@ interface SingleVinScanResult {
 }
 
 // ==========================================
-// REUSABLE CONSOLIDATED ACCOUNT DROPDOWN
-// (Import this component into your main App.tsx / Layout.tsx header)
+// CONSOLIDATED ACCOUNT DROPDOWN MENU
 // ==========================================
 interface AccountMenuProps {
   userEmail: string;
@@ -80,13 +79,11 @@ export function AccountMenu({
   onSignOut,
 }: AccountMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-
-  // Fallback to orgName if provided, otherwise company or formatted string
   const displayTitle = orgName || 'Las Vegas Fleet Test Co.';
 
   return (
     <div className="relative inline-block text-left">
-      {/* 🏢 TRIGGER BUTTON — FORCES ORGANIZATION NAME */}
+      {/* 🏢 TRIGGER BUTTON — FORCES ORGANIZATION NAME FIRST */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-md cursor-pointer"
@@ -98,14 +95,14 @@ export function AccountMenu({
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
 
-      {/* DROPDOWN MENU */}
+      {/* DROPDOWN MENU POPOVER */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
           <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
             
-            {/* BLOCK 1: ORGANIZATION HEADER */}
+            {/* BLOCK 1: ORGANIZATION & OPERATOR IDENTITY */}
             <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
               <div className="flex justify-between items-center">
                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Active Workspace</p>
@@ -197,8 +194,9 @@ export function AccountMenu({
     </div>
   );
 }
+
 // ==========================================
-// UNDERWRITER REPORT VIEW COMPONENT (BROKER READY)
+// UNDERWRITER REPORT VIEW COMPONENT
 // ==========================================
 function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
   const completedTasks = tasks.filter((t) => t.status === 'Cleared');
@@ -213,12 +211,10 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
       return acc + (closed - created) / (1000 * 3600 * 24);
     }, 0) / (completedTasks.length || 1);
 
-  // Estimate potential savings ($200 avg credit per vehicle/yr at 90%+ compliance)
   const estimatedSavings = complianceScore >= 90 ? totalTasks * 200 : 0;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl font-mono">
-      {/* HEADER WITH BROKER SHARE BUTTONS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
         <div>
           <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">
@@ -245,9 +241,7 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* ENHANCED METRICS GRID WITH SAVINGS & CARRIER STATUS BADGES */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Metric 1: Remediation Rate + Status Badge */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
           <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
@@ -268,14 +262,12 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           </div>
         </div>
 
-        {/* Metric 2: Avg Resolution Time */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Avg. Resolution Time</span>
           <div className="text-3xl font-black text-cyan-400">{Math.round(avgDaysToRemediate)} Days</div>
           <span className="text-[10px] text-slate-500 block">Industry Avg: 45 Days</span>
         </div>
 
-        {/* Metric 3: Verified Receipts */}
         <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
           <span className="text-xs text-slate-400">Verified Proof-of-Remedies</span>
           <div className="text-3xl font-black text-purple-400">
@@ -284,7 +276,6 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
           <span className="text-[10px] text-slate-500 block">Dealer Invoices Attached</span>
         </div>
 
-        {/* Metric 4: Estimated ROI Callout */}
         <div className="bg-slate-950 border border-cyan-500/30 p-4 rounded-xl space-y-2">
           <span className="text-xs text-cyan-400 font-bold uppercase">Estimated Annual Credit</span>
           <div className="text-3xl font-black text-white">
@@ -294,7 +285,6 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
         </div>
       </div>
 
-      {/* VERIFIED AUDIT LOG TABLE */}
       <div className="space-y-3">
         <h4 className="text-xs font-mono uppercase font-bold text-slate-300">Verified Remediation Log</h4>
         <div className="border border-slate-800 rounded-xl overflow-hidden text-xs font-mono">
@@ -350,29 +340,27 @@ function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
 // MAIN TASKBOARD COMPONENT
 // ==========================================
 export const TaskBoard: React.FC = () => {
-  // ==========================================
   // STATE MANAGEMENT
-  // ==========================================
   const [recalls, setRecalls] = useState<TaskboardRecallItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-  // 🛡️ RBAC User Role, Account, & Team Modal States
+  // RBAC User Role & Account States
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'workspace' | 'underwriter'>('workspace');
 
-  // 💳 Subscription Tier States
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  // Subscription Tier States
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('professional');
   const [vinChecksUsed, setVinChecksUsed] = useState<number>(0);
   const [isHardStopDismissed, setIsHardStopDismissed] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [gateReason, setGateReason] = useState<string>('');
 
-  // 🔍 Filter & Sort States
+  // Filter & Sort States
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMake, setSelectedMake] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -385,17 +373,17 @@ export const TaskBoard: React.FC = () => {
   const [scheduledDateInput, setScheduledDateInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
 
-  // 📎 Receipt Upload State
+  // Receipt Upload State
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState<boolean>(false);
 
-  // 📥 Bulk CSV Import Modal States
+  // Bulk CSV Import Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [importing, setImporting] = useState<boolean>(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
-  // ⚡ Single-VIN Scan Console States
+  // Single-VIN Scan Console States
   const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
   const [singleVinInput, setSingleVinInput] = useState<string>('');
   const [scanning, setScanning] = useState<boolean>(false);
@@ -403,16 +391,19 @@ export const TaskBoard: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [addingToFleet, setAddingToFleet] = useState<boolean>(false);
 
-  // Define RBAC permissions map based on role
+  // PERMISSIONS MAP FOR FRONTEND LEAKAGE PREVENTION
   const permissions = useMemo(() => {
     const isAdmin = userRole === 'admin';
+    const isMechanic = userRole === 'mechanic';
     const isViewer = userRole === 'viewer';
+
     return {
       canManageBilling: isAdmin,
       canInviteUsers: isAdmin,
+      canIngestAssets: isAdmin, // Only admins run CSV imports or add VINs
       canExportUnderwriterReport: isAdmin || isViewer,
-      canUpdateTaskStatus: isAdmin || userRole === 'mechanic',
-      canUploadReceipts: isAdmin || userRole === 'mechanic',
+      canUpdateTaskStatus: isAdmin || isMechanic, // Mechanics & Admins can change status
+      canUploadReceipts: isAdmin || isMechanic, // Mechanics & Admins can upload PDFs
       isReadOnly: isViewer,
     };
   }, [userRole]);
@@ -440,7 +431,7 @@ export const TaskBoard: React.FC = () => {
     fetchUserProfile();
   }, []);
 
-  // Derive Tier Limit Caps based on defined tiers
+  // Tier Limit Caps
   const vehicleLimit = useMemo(() => {
     switch (subscriptionTier) {
       case 'free': return 10;
@@ -451,7 +442,6 @@ export const TaskBoard: React.FC = () => {
     }
   }, [subscriptionTier]);
 
-  // Modal triggers ONLY when NOT standard/professional/enterprise AND user has checked > 10 VINs
   const showHardGatedModal = useMemo(() => {
     const isPaidPlan = ['standard', 'professional', 'enterprise'].includes(subscriptionTier);
     if (isPaidPlan || isHardStopDismissed || currentUserId) return false;
@@ -459,9 +449,7 @@ export const TaskBoard: React.FC = () => {
     return subscriptionTier === 'free' && (vinChecksUsed > 10 || recalls.length > 10);
   }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed, currentUserId]);
 
-  // ==========================================
-  // DIRECT SUPABASE FETCHING WITH RELATIONAL JOIN
-  // ==========================================
+  // SUPABASE DATA FETCHING
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
@@ -488,10 +476,7 @@ export const TaskBoard: React.FC = () => {
           )
         `);
 
-      if (error) {
-        console.error('Supabase Query Error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       const formattedData: TaskboardRecallItem[] = (data || []).map((item: any) => {
         const vehicle = Array.isArray(item.monitored_vehicles)
@@ -543,9 +528,7 @@ export const TaskBoard: React.FC = () => {
     fetchTaskboardData();
   }, []);
 
-  // ==========================================
-  // DYNAMIC DATA MEMOIZATION
-  // ==========================================
+  // DATA MEMOIZATION
   const uniqueMakes = useMemo(() => {
     const makes = new Set(recalls.map((item) => item.make).filter(Boolean));
     return ['All', ...Array.from(makes).sort()];
@@ -593,15 +576,14 @@ export const TaskBoard: React.FC = () => {
     return { total, open, scheduled, cleared, safeRate };
   }, [recalls]);
 
-  // ==========================================
   // TIER GATE HANDLERS
-  // ==========================================
   const triggerUpgradeModal = (reason: string) => {
     setGateReason(reason);
     setIsUpgradeModalOpen(true);
   };
 
   const handleOpenSingleVinConsole = () => {
+    if (!permissions.canIngestAssets) return;
     if (subscriptionTier === 'free' || subscriptionTier === 'standard') {
       triggerUpgradeModal('Instant Single-VIN Scan Console is exclusive to Professional & Enterprise plans.');
       return;
@@ -621,9 +603,7 @@ export const TaskBoard: React.FC = () => {
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
   };
 
-  // ==========================================
-  // ⚡ INSTANT SINGLE-VIN SCAN LOGIC
-  // ==========================================
+  // SINGLE-VIN SCAN LOGIC
   const handleRunSingleVinScan = async () => {
     const cleanVin = singleVinInput.trim().toUpperCase();
     if (!cleanVin || cleanVin.length < 11) {
@@ -666,7 +646,7 @@ export const TaskBoard: React.FC = () => {
   };
 
   const handleAddScannedVinToFleet = async () => {
-    if (!scanResult) return;
+    if (!scanResult || !permissions.canIngestAssets) return;
 
     if (recalls.length >= vehicleLimit) {
       triggerUpgradeModal(`You have reached your tier capacity of ${vehicleLimit} vehicles.`);
@@ -719,11 +699,9 @@ export const TaskBoard: React.FC = () => {
     }
   };
 
-  // ==========================================
-  // BULK CSV PARSING & IMPORT LOGIC
-  // ==========================================
+  // BULK CSV IMPORT LOGIC
   const handleProcessCsvImport = async () => {
-    if (!csvFile) return;
+    if (!csvFile || !permissions.canIngestAssets) return;
 
     try {
       setImporting(true);
@@ -793,9 +771,7 @@ export const TaskBoard: React.FC = () => {
     }
   };
 
-  // ==========================================
-  // HANDLERS & ACTIONS
-  // ==========================================
+  // DRAWER & STATUS ACTIONS
   const handleOpenDrawer = (item: TaskboardRecallItem) => {
     setSelectedRecall(item);
     setScheduledDateInput(item.scheduled_date || '');
@@ -861,7 +837,7 @@ export const TaskBoard: React.FC = () => {
       };
 
       if (newStatus === 'Cleared') {
-        updatePayload.closed_by_user_email = user?.email || 'System Admin';
+        updatePayload.closed_by_user_email = user?.email || userEmail || 'System Operator';
         updatePayload.closed_at = new Date().toISOString();
       }
 
@@ -936,13 +912,10 @@ export const TaskBoard: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // ==========================================
-  // RENDER UI
-  // ==========================================
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative text-slate-100">
       
-      {/* 🛑 HARD-STOP FREE TEASER OVERLAY MODAL */}
+      {/* HARD-STOP TEASER OVERLAY MODAL */}
       {showHardGatedModal && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative text-gray-900">
@@ -1017,7 +990,7 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* WORKSPACE VIEW HEADER & TAB SWITCHER (SINGLE CLEAN CONTAINER) */}
+      {/* WORKSPACE VIEW HEADER & TAB SWITCHER */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -1031,7 +1004,6 @@ export const TaskBoard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* TAB NAVIGATION SWITCHER */}
           <div className="bg-gray-100 p-1 rounded-xl flex gap-1 text-xs font-mono">
             <button
               onClick={() => setActiveTab('workspace')}
@@ -1053,7 +1025,6 @@ export const TaskBoard: React.FC = () => {
             )}
           </div>
 
-          {/* OPERATIONAL EXPORTS (ONLY VISIBLE ON TASK BOARD TAB) */}
           {activeTab === 'workspace' && (
             <div className="flex items-center gap-2">
               <button
@@ -1073,12 +1044,12 @@ export const TaskBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* RENDER VIEW SWITCH: TASKBOARD WORKSPACE VS UNDERWRITER AUDIT VIEW */}
+      {/* RENDER ACTIVE TAB */}
       {activeTab === 'underwriter' ? (
         <UnderwriterReportView tasks={recalls} />
       ) : (
         <>
-          {/* 1. TOP KPI STATS BAR */}
+          {/* KPI STATS BAR */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-gray-900">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Required</p>
@@ -1105,7 +1076,7 @@ export const TaskBoard: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. TWO-ROW ASSET INGESTION & FILTER CONTROL BAR */}
+          {/* FILTER & ROLE-GATED INGESTION CONTROL BAR */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3 text-gray-900">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:flex-1 max-w-xl">
@@ -1129,23 +1100,31 @@ export const TaskBoard: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                <button
-                  onClick={handleOpenSingleVinConsole}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  title="Instant single vehicle lookup"
-                >
-                  <span>⚡</span> Single-VIN Scan
-                </button>
+              {/* 🛡️ INGESTION CONTROLS GATED TO ADMIN ONLY */}
+              {permissions.canIngestAssets ? (
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                  <button
+                    onClick={handleOpenSingleVinConsole}
+                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>⚡</span> Single-VIN Scan
+                  </button>
 
-                <button
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-                  title="Import VIN list via CSV"
-                >
-                  <span>📥</span> Bulk CSV Import
-                </button>
-              </div>
+                  <button
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>📥</span> Bulk CSV Import
+                  </button>
+                </div>
+              ) : (
+                /* MECHANIC / VIEWER ACCESS INDICATOR */
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg font-bold">
+                    {userRole === 'mechanic' ? '🔧 Mechanic Operational View' : '👁️ Read-Only Auditor View'}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-100 my-1"></div>
@@ -1205,7 +1184,6 @@ export const TaskBoard: React.FC = () => {
                 <button
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
-                  title="Toggle Sort Order"
                 >
                   {sortOrder === 'desc' ? '⬇️' : '⬆️'}
                 </button>
@@ -1213,7 +1191,7 @@ export const TaskBoard: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. ACTIONABLE FLEET RECALL TABLE */}
+          {/* TABLE CONTAINER */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden text-gray-900">
             {loading ? (
               <div className="p-12 text-center">
@@ -1304,7 +1282,7 @@ export const TaskBoard: React.FC = () => {
         </>
       )}
 
-      {/* 4. RECALL MANAGEMENT DRAWER MODAL */}
+      {/* DRAWER MODAL (ROLE GATED INSIDE) */}
       {isDrawerOpen && selectedRecall && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end text-gray-900">
           <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
@@ -1437,8 +1415,8 @@ export const TaskBoard: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <div className="p-3 bg-gray-100 text-gray-600 text-center rounded-lg text-xs font-mono">
-                  🔒 Read-Only Access (Role: {userRole})
+                <div className="p-3 bg-gray-100 text-gray-600 text-center rounded-lg text-xs font-mono font-bold">
+                  🔒 Read-Only Access (Role: {userRole.toUpperCase()})
                 </div>
               )}
               <button
@@ -1452,8 +1430,8 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* 5. ⚡ INSTANT SINGLE-VIN SCAN CONSOLE MODAL */}
-      {isScanModalOpen && (
+      {/* SINGLE-VIN SCAN CONSOLE MODAL */}
+      {isScanModalOpen && permissions.canIngestAssets && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
             <div className="flex justify-between items-center border-b pb-3">
@@ -1544,8 +1522,8 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* 6. BULK FLEET CSV IMPORT MODAL */}
-      {isImportModalOpen && (
+      {/* BULK CSV IMPORT MODAL */}
+      {isImportModalOpen && permissions.canIngestAssets && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
             <div className="flex justify-between items-center border-b pb-3">
@@ -1559,7 +1537,7 @@ export const TaskBoard: React.FC = () => {
             </div>
 
             <p className="text-xs text-gray-500 leading-relaxed">
-              Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column (optional: <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">make</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">model</code>, <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">year</code>).
+              Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column.
             </p>
 
             <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer">
@@ -1605,7 +1583,7 @@ export const TaskBoard: React.FC = () => {
         </div>
       )}
 
-      {/* 💳 PRICING / UPGRADE MODAL */}
+      {/* PRICING MODAL */}
       {isUpgradeModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5">
@@ -1623,7 +1601,6 @@ export const TaskBoard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-              {/* Standard */}
               <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between space-y-3">
                 <div>
                   <span className="text-[10px] font-bold text-gray-500 uppercase">Standard</span>
@@ -1645,7 +1622,6 @@ export const TaskBoard: React.FC = () => {
                 </button>
               </div>
 
-              {/* Professional */}
               <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/20 flex flex-col justify-between space-y-3 relative">
                 <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
                 <div>
@@ -1668,14 +1644,13 @@ export const TaskBoard: React.FC = () => {
                 </button>
               </div>
 
-              {/* Enterprise */}
               <div className="p-4 rounded-xl border border-gray-200 bg-gray-900 text-white flex flex-col justify-between space-y-3">
                 <div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase">Enterprise</span>
                   <p className="text-2xl font-extrabold text-white">Custom</p>
                   <ul className="text-xs text-gray-300 space-y-1.5 mt-2">
                     <li>✓ Unlimited Vehicles</li>
-                    <li>✓ Telematics (Geotab/Samsara)</li>
+                    <li>✓ Telematics Integrations</li>
                     <li>✓ Dedicated Broker QBR</li>
                   </ul>
                 </div>
