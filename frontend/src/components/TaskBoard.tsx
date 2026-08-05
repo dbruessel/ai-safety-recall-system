@@ -449,11 +449,12 @@ export const TaskBoard: React.FC = () => {
     return subscriptionTier === 'free' && (vinChecksUsed > 10 || recalls.length > 10);
   }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed, currentUserId]);
 
-  // SUPABASE DATA FETCHING
+  // SUPABASE DATA FETCHING WITH FALLBACK RELATION RECOVERY
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
 
+      // Primary Query with Explicit Relationship Join
       const { data, error } = await supabase
         .from('recall_tasks')
         .select(`
@@ -469,6 +470,7 @@ export const TaskBoard: React.FC = () => {
           closed_by_user_email,
           closed_at,
           monitored_vehicles (
+            id,
             vin,
             make,
             model,
@@ -476,9 +478,28 @@ export const TaskBoard: React.FC = () => {
           )
         `);
 
-      if (error) throw error;
+      let tasksPayload = data;
 
-      const formattedData: TaskboardRecallItem[] = (data || []).map((item: any) => {
+      // Fallback query if relation key varies across environments
+      if (error || !data || data.length === 0) {
+        const { data: rawTasks } = await supabase
+          .from('recall_tasks')
+          .select('*');
+
+        const { data: rawVehicles } = await supabase
+          .from('monitored_vehicles')
+          .select('*');
+
+        if (rawTasks && rawVehicles) {
+          const vehicleMap = new Map(rawVehicles.map(v => [v.id, v]));
+          tasksPayload = rawTasks.map(task => ({
+            ...task,
+            monitored_vehicles: vehicleMap.get(task.vehicle_id) || null
+          }));
+        }
+      }
+
+      const formattedData: TaskboardRecallItem[] = (tasksPayload || []).map((item: any) => {
         const vehicle = Array.isArray(item.monitored_vehicles)
           ? item.monitored_vehicles[0]
           : item.monitored_vehicles;
