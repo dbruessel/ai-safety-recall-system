@@ -1,18 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+
+// Modular Sub-Component Imports
+import { AccountMenu } from './AccountMenu';
+import { UnderwriterReportView } from './UnderwriterReportView';
+import { TaskDrawerModal } from './TaskDrawerModal';
+import { SingleVinScanModal } from './SingleVinScanModal';
+import { BulkCsvImportModal } from './BulkCsvImportModal';
+import { PricingUpgradeModal } from './PricingUpgradeModal';
 import { TeamManagementModal } from './TeamManagementModal';
 
-// Initialize Supabase directly using Vite environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Default test profile ID matching database records
-const CURRENT_PROFILE_ID = '07136e5d-0b6e-4ccf-b774-c2f3f01154bf';
-
-// ==========================================
-// TYPES & INTERFACES
-// ==========================================
+// Shared Types
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
 export type UserRole = 'admin' | 'mechanic' | 'viewer';
 
@@ -38,329 +36,34 @@ export interface TaskboardRecallItem {
   closed_at?: string;
 }
 
-interface SingleVinScanResult {
-  vin: string;
-  make?: string;
-  model?: string;
-  year?: number;
-  recallsCount: number;
-  recalls: Array<{
-    campaignNumber: string;
-    component: string;
-    summary: string;
-    remedy: string;
-  }>;
-}
+// Supabase Client Initialization
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// ==========================================
-// CONSOLIDATED ACCOUNT DROPDOWN MENU
-// ==========================================
-interface AccountMenuProps {
-  userEmail: string;
-  orgName?: string;
-  userRole: UserRole;
-  subscriptionTier: SubscriptionTier;
-  onOpenTeamModal: () => void;
-  onOpenUpgradeModal: () => void;
-  onCopyUnderwriterLink: () => void;
-  onDownloadRiskCard: () => void;
-  onSignOut: () => void;
-}
-
-export function AccountMenu({
-  userEmail,
-  orgName = 'Las Vegas Fleet Test Co.',
-  userRole,
-  subscriptionTier,
-  onOpenTeamModal,
-  onOpenUpgradeModal,
-  onCopyUnderwriterLink,
-  onDownloadRiskCard,
-  onSignOut,
-}: AccountMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const displayTitle = orgName || 'Las Vegas Fleet Test Co.';
-
-  return (
-    <div className="relative inline-block text-left">
-      {/* 🏢 TRIGGER BUTTON — FORCES ORGANIZATION NAME FIRST */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 transition shadow-md cursor-pointer"
-      >
-        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span className="font-bold text-white max-w-[200px] truncate">
-          🏢 {displayTitle}
-        </span>
-        <span className="text-slate-400 text-[10px]">▼</span>
-      </button>
-
-      {/* DROPDOWN MENU POPOVER */}
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
-
-          <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
-            
-            {/* BLOCK 1: ORGANIZATION & OPERATOR IDENTITY */}
-            <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Active Workspace</p>
-                <span className="bg-slate-800 text-cyan-400 text-[9px] px-2 py-0.5 rounded font-bold uppercase border border-cyan-500/20">
-                  {subscriptionTier} Plan
-                </span>
-              </div>
-              <p className="text-sm font-extrabold text-white truncate flex items-center gap-1.5">
-                <span>🏢</span> {displayTitle}
-              </p>
-              
-              <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400 truncate max-w-[160px]">{userEmail}</span>
-                <span className="bg-cyan-500/10 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-cyan-500/30">
-                  {userRole}
-                </span>
-              </div>
-            </div>
-
-            {/* BLOCK 2: ADMINISTRATION (ADMIN ONLY) */}
-            {userRole === 'admin' && (
-              <div className="space-y-1">
-                <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    onOpenTeamModal();
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
-                >
-                  <span>👥 Team & Permissions</span>
-                  <span className="text-slate-500">→</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    onOpenUpgradeModal();
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-cyan-400 font-bold transition flex items-center justify-between cursor-pointer"
-                >
-                  <span>💳 Plan & Billing Surcharge</span>
-                  <span className="text-slate-500">→</span>
-                </button>
-              </div>
-            )}
-
-            {/* BLOCK 3: BROKER & RISK TOOLS */}
-            <div className="space-y-1 border-t border-slate-800/80 pt-2">
-              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Underwriter Quick Tools</p>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onCopyUnderwriterLink();
-                }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
-              >
-                <span>🔗 Copy Broker Share Link</span>
-                <span className="text-slate-500">📋</span>
-              </button>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onDownloadRiskCard();
-                }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
-              >
-                <span>📄 Download Compliance Card</span>
-                <span className="text-slate-500">⬇️</span>
-              </button>
-            </div>
-
-            {/* BLOCK 4: SESSION CONTROL */}
-            <div className="border-t border-slate-800 pt-2">
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onSignOut();
-                }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-bold transition flex items-center justify-between cursor-pointer"
-              >
-                <span>Sign Out</span>
-                <span>🚪</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ==========================================
-// UNDERWRITER REPORT VIEW COMPONENT
-// ==========================================
-function UnderwriterReportView({ tasks }: { tasks: TaskboardRecallItem[] }) {
-  const completedTasks = tasks.filter((t) => t.status === 'Cleared');
-  const totalTasks = tasks.length;
-
-  const complianceScore = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 100;
-
-  const avgDaysToRemediate =
-    completedTasks.reduce((acc, task) => {
-      const created = new Date(task.created_at).getTime();
-      const closed = new Date(task.closed_at || Date.now()).getTime();
-      return acc + (closed - created) / (1000 * 3600 * 24);
-    }, 0) / (completedTasks.length || 1);
-
-  const estimatedSavings = complianceScore >= 90 ? totalTasks * 200 : 0;
-
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 text-white shadow-xl font-mono">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
-        <div>
-          <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest font-bold">
-            Insurance Underwriter Audit Packet
-          </span>
-          <h3 className="text-xl font-bold text-white font-mono mt-1">Commercial Risk & Compliance Scorecard</h3>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Copied secure read-only underwriter link to clipboard!');
-            }}
-            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-mono text-xs font-bold rounded-xl border border-cyan-500/30 transition flex items-center gap-1.5 cursor-pointer"
-          >
-            🔗 Copy Broker Link
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-extrabold rounded-xl transition shadow-lg cursor-pointer"
-          >
-            Export Audit PDF
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
-          <span className="text-xs text-slate-400">Fleet Remediation Rate</span>
-          <div className="text-3xl font-black text-emerald-400">{complianceScore}%</div>
-          <div>
-            {complianceScore >= 95 ? (
-              <span className="inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold">
-                🟢 Premium Credit Eligible
-              </span>
-            ) : complianceScore >= 80 ? (
-              <span className="inline-block bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold">
-                🟡 Standard Carrier Appetite
-              </span>
-            ) : (
-              <span className="inline-block bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold">
-                🔴 Surcharge / Audit Risk
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
-          <span className="text-xs text-slate-400">Avg. Resolution Time</span>
-          <div className="text-3xl font-black text-cyan-400">{Math.round(avgDaysToRemediate)} Days</div>
-          <span className="text-[10px] text-slate-500 block">Industry Avg: 45 Days</span>
-        </div>
-
-        <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
-          <span className="text-xs text-slate-400">Verified Proof-of-Remedies</span>
-          <div className="text-3xl font-black text-purple-400">
-            {completedTasks.filter((t) => t.receipt_url).length} / {completedTasks.length}
-          </div>
-          <span className="text-[10px] text-slate-500 block">Dealer Invoices Attached</span>
-        </div>
-
-        <div className="bg-slate-950 border border-cyan-500/30 p-4 rounded-xl space-y-2">
-          <span className="text-xs text-cyan-400 font-bold uppercase">Estimated Annual Credit</span>
-          <div className="text-3xl font-black text-white">
-            ${estimatedSavings.toLocaleString()} <span className="text-xs font-normal text-slate-400">/yr</span>
-          </div>
-          <span className="text-[10px] text-slate-400 block">Est. 5% carrier policy savings</span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h4 className="text-xs font-mono uppercase font-bold text-slate-300">Verified Remediation Log</h4>
-        <div className="border border-slate-800 rounded-xl overflow-hidden text-xs font-mono">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
-              <tr>
-                <th className="p-3">Asset Unit</th>
-                <th className="p-3">NHTSA Campaign</th>
-                <th className="p-3">Resolved Date</th>
-                <th className="p-3">Closed By</th>
-                <th className="p-3">Proof Document</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 bg-slate-900/50">
-              {completedTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-4 text-center text-slate-500">
-                    No cleared recalls recorded yet. Upload a dealer receipt to clear open tasks.
-                  </td>
-                </tr>
-              ) : (
-                completedTasks.map((t, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40 transition">
-                    <td className="p-3 text-white font-bold">
-                      {t.make} {t.model} ({t.year})
-                    </td>
-                    <td className="p-3 text-cyan-400">{t.nhtsa_campaign_number}</td>
-                    <td className="p-3 text-slate-300">
-                      {t.closed_at ? new Date(t.closed_at).toLocaleDateString() : 'Recent'}
-                    </td>
-                    <td className="p-3 text-slate-400">{t.closed_by_user_email || 'System Admin'}</td>
-                    <td className="p-3">
-                      {t.receipt_url ? (
-                        <a href={t.receipt_url} target="_blank" rel="noreferrer" className="text-emerald-400 underline flex items-center gap-1">
-                          View Invoice PDF 📄
-                        </a>
-                      ) : (
-                        <span className="text-slate-500">No Receipt</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// MAIN TASKBOARD COMPONENT
-// ==========================================
 export const TaskBoard: React.FC = () => {
-  // STATE MANAGEMENT
+  // WORKSPACE STATES
   const [recalls, setRecalls] = useState<TaskboardRecallItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'workspace' | 'underwriter'>('workspace');
 
-  // RBAC User Role & Account States
+  // USER & PROFILE STATES
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'workspace' | 'underwriter'>('workspace');
-
-  // Subscription Tier States
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('professional');
   const [vinChecksUsed, setVinChecksUsed] = useState<number>(0);
-  const [isHardStopDismissed, setIsHardStopDismissed] = useState<boolean>(false);
+
+  // MODAL CONTROLS
+  const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
   const [gateReason, setGateReason] = useState<string>('');
 
-  // Filter & Sort States
+  // FILTER & SORT STATES
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMake, setSelectedMake] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -368,30 +71,7 @@ export const TaskBoard: React.FC = () => {
   const [sortBy, setSortBy] = useState<'created_at' | 'unit_number' | 'severity'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Status Action Modal/State
-  const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
-  const [scheduledDateInput, setScheduledDateInput] = useState<string>('');
-  const [notesInput, setNotesInput] = useState<string>('');
-
-  // Receipt Upload State
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [uploadingReceipt, setUploadingReceipt] = useState<boolean>(false);
-
-  // Bulk CSV Import Modal States
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState<boolean>(false);
-  const [importFeedback, setImportFeedback] = useState<string | null>(null);
-
-  // Single-VIN Scan Console States
-  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
-  const [singleVinInput, setSingleVinInput] = useState<string>('');
-  const [scanning, setScanning] = useState<boolean>(false);
-  const [scanResult, setScanResult] = useState<SingleVinScanResult | null>(null);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [addingToFleet, setAddingToFleet] = useState<boolean>(false);
-
-  // PERMISSIONS MAP FOR FRONTEND LEAKAGE PREVENTION
+  // PERMISSIONS MAP FOR FRONTEND GATING
   const permissions = useMemo(() => {
     const isAdmin = userRole === 'admin';
     const isMechanic = userRole === 'mechanic';
@@ -400,15 +80,26 @@ export const TaskBoard: React.FC = () => {
     return {
       canManageBilling: isAdmin,
       canInviteUsers: isAdmin,
-      canIngestAssets: isAdmin, // Only admins run CSV imports or add VINs
+      canIngestAssets: isAdmin,
       canExportUnderwriterReport: isAdmin || isViewer,
-      canUpdateTaskStatus: isAdmin || isMechanic, // Mechanics & Admins can change status
-      canUploadReceipts: isAdmin || isMechanic, // Mechanics & Admins can upload PDFs
+      canUpdateTaskStatus: isAdmin || isMechanic,
+      canUploadReceipts: isAdmin || isMechanic,
       isReadOnly: isViewer,
     };
   }, [userRole]);
 
-  // Fetch current user's profile and assigned role
+  // VEHICLE CAPACITY LIMITS
+  const vehicleLimit = useMemo(() => {
+    switch (subscriptionTier) {
+      case 'free': return 10;
+      case 'standard': return 50;
+      case 'professional': return 250;
+      case 'enterprise': return 999999;
+      default: return 10;
+    }
+  }, [subscriptionTier]);
+
+  // FETCH USER PROFILE & ROLE
   useEffect(() => {
     async function fetchUserProfile() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -420,75 +111,29 @@ export const TaskBoard: React.FC = () => {
           .select('role, subscription_tier')
           .eq('id', user.id)
           .single();
-        if (data?.role) {
-          setUserRole(data.role as UserRole);
-        }
-        if (data?.subscription_tier) {
-          setSubscriptionTier(data.subscription_tier as SubscriptionTier);
-        }
+        if (data?.role) setUserRole(data.role as UserRole);
+        if (data?.subscription_tier) setSubscriptionTier(data.subscription_tier as SubscriptionTier);
       }
     }
     fetchUserProfile();
   }, []);
 
-  // Tier Limit Caps
-  const vehicleLimit = useMemo(() => {
-    switch (subscriptionTier) {
-      case 'free': return 10;
-      case 'standard': return 50;
-      case 'professional': return 250;
-      case 'enterprise': return 999999;
-      default: return 10;
-    }
-  }, [subscriptionTier]);
-
-  const showHardGatedModal = useMemo(() => {
-    const isPaidPlan = ['standard', 'professional', 'enterprise'].includes(subscriptionTier);
-    if (isPaidPlan || isHardStopDismissed || currentUserId) return false;
-
-    return subscriptionTier === 'free' && (vinChecksUsed > 10 || recalls.length > 10);
-  }, [subscriptionTier, vinChecksUsed, recalls.length, isHardStopDismissed, currentUserId]);
-
-  // SUPABASE DATA FETCHING WITH FALLBACK RELATION RECOVERY
+  // FETCH RECALL TASKS (WITH RELATIONAL FALLBACK RECOVERY)
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
-
-      // Primary Query with Explicit Relationship Join
       const { data, error } = await supabase
         .from('recall_tasks')
         .select(`
-          id,
-          campaign_number,
-          component,
-          summary,
-          remedy,
-          severity_score,
-          status,
-          created_at,
-          proof_of_remedy_url,
-          closed_by_user_email,
-          closed_at,
-          monitored_vehicles (
-            id,
-            vin,
-            make,
-            model,
-            year
-          )
+          id, campaign_number, component, summary, remedy, severity_score, status, created_at, proof_of_remedy_url, closed_by_user_email, closed_at,
+          monitored_vehicles ( id, vin, make, model, year )
         `);
 
       let tasksPayload = data;
 
-      // Fallback query if relation key varies across environments
       if (error || !data || data.length === 0) {
-        const { data: rawTasks } = await supabase
-          .from('recall_tasks')
-          .select('*');
-
-        const { data: rawVehicles } = await supabase
-          .from('monitored_vehicles')
-          .select('*');
+        const { data: rawTasks } = await supabase.from('recall_tasks').select('*');
+        const { data: rawVehicles } = await supabase.from('monitored_vehicles').select('*');
 
         if (rawTasks && rawVehicles) {
           const vehicleMap = new Map(rawVehicles.map(v => [v.id, v]));
@@ -500,9 +145,7 @@ export const TaskBoard: React.FC = () => {
       }
 
       const formattedData: TaskboardRecallItem[] = (tasksPayload || []).map((item: any) => {
-        const vehicle = Array.isArray(item.monitored_vehicles)
-          ? item.monitored_vehicles[0]
-          : item.monitored_vehicles;
+        const vehicle = Array.isArray(item.monitored_vehicles) ? item.monitored_vehicles[0] : item.monitored_vehicles;
 
         let severityLabel = 'Medium';
         if (item.severity_score >= 8.5) severityLabel = 'Critical';
@@ -513,7 +156,6 @@ export const TaskBoard: React.FC = () => {
         const rawStatus = (item.status || '').toLowerCase();
         if (rawStatus === 'scheduled' || rawStatus === 'in progress') statusLabel = 'Scheduled';
         else if (rawStatus === 'repaired' || rawStatus === 'cleared' || rawStatus === 'completed') statusLabel = 'Cleared';
-        else if (rawStatus === 'pending') statusLabel = 'Open';
 
         return {
           id: item.id,
@@ -539,7 +181,7 @@ export const TaskBoard: React.FC = () => {
 
       setRecalls(formattedData);
     } catch (err) {
-      console.error('Error fetching taskboard data from Supabase:', err);
+      console.error('Error fetching taskboard data:', err);
     } finally {
       setLoading(false);
     }
@@ -549,7 +191,7 @@ export const TaskBoard: React.FC = () => {
     fetchTaskboardData();
   }, []);
 
-  // DATA MEMOIZATION
+  // MEMOIZED FILTERS & METRICS
   const uniqueMakes = useMemo(() => {
     const makes = new Set(recalls.map((item) => item.make).filter(Boolean));
     return ['All', ...Array.from(makes).sort()];
@@ -575,11 +217,9 @@ export const TaskBoard: React.FC = () => {
       })
       .sort((a, b) => {
         let comparison = 0;
-        if (sortBy === 'created_at') {
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        } else if (sortBy === 'unit_number') {
-          comparison = (a.unit_number || '').localeCompare(b.unit_number || '');
-        } else if (sortBy === 'severity') {
+        if (sortBy === 'created_at') comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        else if (sortBy === 'unit_number') comparison = (a.unit_number || '').localeCompare(b.unit_number || '');
+        else if (sortBy === 'severity') {
           const severityOrder: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
           comparison = (severityOrder[a.severity] || 0) - (severityOrder[b.severity] || 0);
         }
@@ -593,11 +233,10 @@ export const TaskBoard: React.FC = () => {
     const scheduled = recalls.filter((r) => r.status === 'Scheduled' || r.status === 'In Progress').length;
     const cleared = recalls.filter((r) => r.status === 'Cleared').length;
     const safeRate = total > 0 ? Math.round((cleared / total) * 100) : 100;
-
     return { total, open, scheduled, cleared, safeRate };
   }, [recalls]);
 
-  // TIER GATE HANDLERS
+  // HANDLERS
   const triggerUpgradeModal = (reason: string) => {
     setGateReason(reason);
     setIsUpgradeModalOpen(true);
@@ -609,9 +248,6 @@ export const TaskBoard: React.FC = () => {
       triggerUpgradeModal('Instant Single-VIN Scan Console is exclusive to Professional & Enterprise plans.');
       return;
     }
-    setSingleVinInput('');
-    setScanResult(null);
-    setScanError(null);
     setIsScanModalOpen(true);
   };
 
@@ -624,305 +260,13 @@ export const TaskBoard: React.FC = () => {
     window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
   };
 
-  // SINGLE-VIN SCAN LOGIC
-  const handleRunSingleVinScan = async () => {
-    const cleanVin = singleVinInput.trim().toUpperCase();
-    if (!cleanVin || cleanVin.length < 11) {
-      setScanError('Please enter a valid 17-digit vehicle VIN.');
-      return;
-    }
-
-    try {
-      setScanning(true);
-      setScanError(null);
-      setScanResult(null);
-
-      const response = await fetch(`https://api.nhtsa.gov/recalls/recallsByVin?vin=${cleanVin}&format=json`);
-      const data = await response.json();
-      const rawResults = data.results || [];
-
-      const mappedRecalls = rawResults.map((r: any) => ({
-        campaignNumber: r.NHTSACampaignNumber || 'N/A',
-        component: r.Component || 'Safety System',
-        summary: r.Summary || 'No defect summary available.',
-        remedy: r.Remedy || 'Contact dealer for remedy details.',
-      }));
-
-      setVinChecksUsed((prev) => prev + 1);
-
-      setScanResult({
-        vin: cleanVin,
-        make: rawResults[0]?.Make || 'Scanned',
-        model: rawResults[0]?.Model || 'Vehicle',
-        year: rawResults[0]?.ModelYear ? parseInt(rawResults[0].ModelYear, 10) : 2022,
-        recallsCount: mappedRecalls.length,
-        recalls: mappedRecalls,
-      });
-    } catch (err) {
-      console.error('NHTSA Scan Error:', err);
-      setScanError('Failed to query NHTSA database. Check the VIN and try again.');
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const handleAddScannedVinToFleet = async () => {
-    if (!scanResult || !permissions.canIngestAssets) return;
-
-    if (recalls.length >= vehicleLimit) {
-      triggerUpgradeModal(`You have reached your tier capacity of ${vehicleLimit} vehicles.`);
-      return;
-    }
-
-    try {
-      setAddingToFleet(true);
-
-      const { data: vehicleData, error: vehicleErr } = await supabase
-        .from('monitored_vehicles')
-        .upsert(
-          {
-            profile_id: CURRENT_PROFILE_ID,
-            vin: scanResult.vin,
-            make: scanResult.make,
-            model: scanResult.model,
-            year: scanResult.year,
-          },
-          { onConflict: 'profile_id,vin' }
-        )
-        .select('id')
-        .single();
-
-      if (vehicleErr) throw vehicleErr;
-
-      if (scanResult.recalls.length > 0 && vehicleData?.id) {
-        const tasksToInsert = scanResult.recalls.map((r) => ({
-          vehicle_id: vehicleData.id,
-          campaign_number: r.campaignNumber,
-          component: r.component,
-          summary: r.summary,
-          remedy: r.remedy,
-          severity_score: 7.5,
-          status: 'pending',
-        }));
-
-        await supabase.from('recall_tasks').insert(tasksToInsert);
-      }
-
-      setIsScanModalOpen(false);
-      setSingleVinInput('');
-      setScanResult(null);
-      fetchTaskboardData();
-    } catch (err: any) {
-      console.error('Add to Fleet Error:', err);
-      setScanError(`Failed to save asset: ${err.message || 'Database error'}`);
-    } finally {
-      setAddingToFleet(false);
-    }
-  };
-
-  // BULK CSV IMPORT LOGIC
-  const handleProcessCsvImport = async () => {
-    if (!csvFile || !permissions.canIngestAssets) return;
-
-    try {
-      setImporting(true);
-      setImportFeedback('Reading CSV payload...');
-
-      const text = await csvFile.text();
-      const lines = text.split(/\r\n|\n/).filter((line) => line.trim().length > 0);
-
-      if (lines.length < 2) {
-        setImportFeedback('Error: CSV file is empty or missing headers.');
-        return;
-      }
-
-      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/["']/g, ''));
-      const vinIndex = headers.findIndex((h) => h.includes('vin'));
-      const makeIndex = headers.findIndex((h) => h.includes('make'));
-      const modelIndex = headers.findIndex((h) => h.includes('model'));
-      const yearIndex = headers.findIndex((h) => h.includes('year'));
-
-      if (vinIndex === -1) {
-        setImportFeedback('Error: CSV must contain a "VIN" column.');
-        return;
-      }
-
-      const vehiclesToInsert: any[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(',').map((cell) => cell.trim().replace(/["']/g, ''));
-        const vin = row[vinIndex];
-
-        if (vin && vin.length >= 11) {
-          vehiclesToInsert.push({
-            profile_id: CURRENT_PROFILE_ID,
-            vin: vin.toUpperCase(),
-            make: makeIndex !== -1 ? row[makeIndex] || 'Unknown' : 'Unknown',
-            model: modelIndex !== -1 ? row[modelIndex] || 'Asset' : 'Asset',
-            year: yearIndex !== -1 ? parseInt(row[yearIndex], 10) || 2022 : 2022,
-          });
-        }
-      }
-
-      if (recalls.length + vehiclesToInsert.length > vehicleLimit) {
-        setImportFeedback(`Error: Importing ${vehiclesToInsert.length} vehicles exceeds your ${subscriptionTier.toUpperCase()} limit of ${vehicleLimit} vehicles.`);
-        return;
-      }
-
-      setImportFeedback(`Uploading ${vehiclesToInsert.length} vehicle(s) to Supabase...`);
-
-      const { error } = await supabase
-        .from('monitored_vehicles')
-        .upsert(vehiclesToInsert, { onConflict: 'profile_id,vin' });
-
-      if (error) throw error;
-
-      setImportFeedback(`Success! ${vehiclesToInsert.length} vehicles added/updated.`);
-      setTimeout(() => {
-        setIsImportModalOpen(false);
-        setCsvFile(null);
-        setImportFeedback(null);
-        fetchTaskboardData();
-      }, 1200);
-    } catch (err: any) {
-      console.error('CSV Import Error:', err);
-      setImportFeedback(`Import Failed: ${err.message || 'Unknown database error'}`);
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // DRAWER & STATUS ACTIONS
-  const handleOpenDrawer = (item: TaskboardRecallItem) => {
-    setSelectedRecall(item);
-    setScheduledDateInput(item.scheduled_date || '');
-    setNotesInput(item.repair_notes || '');
-    setReceiptFile(null);
-    setIsDrawerOpen(true);
-  };
-
-  const handleCloseDrawer = () => {
-    setIsDrawerOpen(false);
-    setSelectedRecall(null);
-    setReceiptFile(null);
-  };
-
-  const uploadReceiptToStorage = async (file: File, taskId: string): Promise<string | null> => {
-    try {
-      setUploadingReceipt(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${taskId}_${Date.now()}.${fileExt}`;
-      const filePath = `receipts/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('repair-receipts')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) return null;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('repair-receipts')
-        .getPublicUrl(filePath);
-
-      return publicUrlData.publicUrl || null;
-    } catch (err) {
-      console.error('Failed to upload receipt file:', err);
-      return null;
-    } finally {
-      setUploadingReceipt(false);
-    }
-  };
-
-  const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedRecall || !permissions.canUpdateTaskStatus) return;
-    try {
-      setUpdatingStatus(true);
-      let uploadedUrl = selectedRecall.receipt_url || '';
-
-      if (receiptFile) {
-        const publicUrl = await uploadReceiptToStorage(receiptFile, selectedRecall.id);
-        if (publicUrl) uploadedUrl = publicUrl;
-      }
-
-      let dbStatus = 'pending';
-      if (newStatus === 'Scheduled' || newStatus === 'In Progress') dbStatus = 'scheduled';
-      if (newStatus === 'Cleared') dbStatus = 'completed';
-
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const updatePayload: any = {
-        status: dbStatus,
-        scheduled_repair_date: scheduledDateInput || null,
-        repair_notes: notesInput || null,
-        proof_of_remedy_url: uploadedUrl || null,
-      };
-
-      if (newStatus === 'Cleared') {
-        updatePayload.closed_by_user_email = user?.email || userEmail || 'System Operator';
-        updatePayload.closed_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('recall_tasks')
-        .update(updatePayload)
-        .eq('id', selectedRecall.id);
-
-      if (error) throw error;
-
-      setRecalls((prev) =>
-        prev.map((r) =>
-          r.id === selectedRecall.id
-            ? {
-                ...r,
-                status: newStatus,
-                scheduled_date: scheduledDateInput,
-                repair_notes: notesInput,
-                receipt_url: uploadedUrl,
-                closed_by_user_email: updatePayload.closed_by_user_email || r.closed_by_user_email,
-                closed_at: updatePayload.closed_at || r.closed_at,
-              }
-            : r
-        )
-      );
-
-      setSelectedRecall((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: newStatus,
-              scheduled_date: scheduledDateInput,
-              repair_notes: notesInput,
-              receipt_url: uploadedUrl,
-              closed_by_user_email: updatePayload.closed_by_user_email || prev.closed_by_user_email,
-              closed_at: updatePayload.closed_at || prev.closed_at,
-            }
-          : null
-      );
-
-      setReceiptFile(null);
-    } catch (err) {
-      console.error('Failed to update status in Supabase:', err);
-    } finally {
-      setUpdatingStatus(false);
-    }
-  };
-
   const handleExportCSV = () => {
     if (filteredRecalls.length === 0) return;
     const headers = ['Unit Number', 'VIN', 'Year', 'Make', 'Model', 'Component', 'NHTSA Campaign', 'Severity', 'Status', 'Receipt URL'];
     const rows = filteredRecalls.map((r) => [
-      `"${r.unit_number || ''}"`,
-      `"${r.vin || ''}"`,
-      r.year,
-      `"${r.make || ''}"`,
-      `"${r.model || ''}"`,
-      `"${r.component || ''}"`,
-      `"${r.nhtsa_campaign_number || ''}"`,
-      `"${r.severity || ''}"`,
-      `"${r.status || ''}"`,
-      `"${r.receipt_url || ''}"`,
+      `"${r.unit_number || ''}"`, `"${r.vin || ''}"`, r.year, `"${r.make || ''}"`, `"${r.model || ''}"`,
+      `"${r.component || ''}"`, `"${r.nhtsa_campaign_number || ''}"`, `"${r.severity || ''}"`, `"${r.status || ''}"`, `"${r.receipt_url || ''}"`,
     ]);
-
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -936,82 +280,7 @@ export const TaskBoard: React.FC = () => {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative text-slate-100">
       
-      {/* HARD-STOP TEASER OVERLAY MODAL */}
-      {showHardGatedModal && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-8 text-center space-y-6 border border-blue-100 relative text-gray-900">
-            <button
-              onClick={() => setIsHardStopDismissed(true)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-              title="Close Preview"
-            >
-              ✕
-            </button>
-
-            <div className="inline-flex p-4 bg-amber-100 text-amber-600 rounded-full text-3xl">
-              🔒
-            </div>
-            <div>
-              <h2 className="text-2xl font-extrabold text-gray-900">10 Free VIN Teaser Limit Reached</h2>
-              <p className="text-sm text-gray-600 mt-2">
-                You have checked more than 10 VINs on your Free Account. Upgrade to a paid plan to unlock continuous monitoring across your fleet.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-left pt-2">
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
-                <span className="text-xs font-bold text-gray-500 uppercase">Standard</span>
-                <p className="text-xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>✓ Up to 50 Vehicles Monitored</li>
-                  <li>✓ Continuous Active Scanning</li>
-                  <li>✓ CSV Audit Exports</li>
-                </ul>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('standard');
-                    setIsHardStopDismissed(true);
-                  }}
-                  className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
-                >
-                  Upgrade to Standard
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/30 space-y-2 relative">
-                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Popular</span>
-                <span className="text-xs font-bold text-indigo-600 uppercase">Professional</span>
-                <p className="text-xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>✓ Up to 250 Vehicles Monitored</li>
-                  <li>✓ Instant Single-VIN Scan Console</li>
-                  <li>✓ Underwriter PDF Risk Certificate</li>
-                </ul>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('professional');
-                    setIsHardStopDismissed(true);
-                  }}
-                  className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow-sm cursor-pointer"
-                >
-                  Upgrade to Professional
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() => setIsHardStopDismissed(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-gray-600 underline cursor-pointer"
-              >
-                Dismiss and continue viewing current workspace
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WORKSPACE VIEW HEADER & TAB SWITCHER */}
+      {/* WORKSPACE HEADER & TAB SWITCHER */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -1027,6 +296,7 @@ export const TaskBoard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <div className="bg-gray-100 p-1 rounded-xl flex gap-1 text-xs font-mono">
             <button
+              type="button"
               onClick={() => setActiveTab('workspace')}
               className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                 activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -1036,6 +306,7 @@ export const TaskBoard: React.FC = () => {
             </button>
             {permissions.canExportUnderwriterReport && (
               <button
+                type="button"
                 onClick={() => setActiveTab('underwriter')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                   activeTab === 'underwriter' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -1049,12 +320,14 @@ export const TaskBoard: React.FC = () => {
           {activeTab === 'workspace' && (
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleDownloadPDF}
                 className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📄</span> Risk Certificate
               </button>
               <button
+                type="button"
                 onClick={handleExportCSV}
                 className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
@@ -1065,7 +338,7 @@ export const TaskBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* RENDER ACTIVE TAB */}
+      {/* RENDER ACTIVE VIEW */}
       {activeTab === 'underwriter' ? (
         <UnderwriterReportView tasks={recalls} />
       ) : (
@@ -1097,54 +370,41 @@ export const TaskBoard: React.FC = () => {
             </div>
           </div>
 
-          {/* FILTER & ROLE-GATED INGESTION CONTROL BAR */}
+          {/* FILTER & CONTROL BAR */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3 text-gray-900">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:flex-1 max-w-xl">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                  🔍
-                </span>
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
                 <input
                   type="text"
                   placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition"
+                  className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm transition"
                 />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
 
-              {/* 🛡️ INGESTION CONTROLS GATED TO ADMIN ONLY */}
               {permissions.canIngestAssets ? (
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                   <button
+                    type="button"
                     onClick={handleOpenSingleVinConsole}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap cursor-pointer"
                   >
-                    <span>⚡</span> Single-VIN Scan
+                    ⚡ Single-VIN Scan
                   </button>
-
                   <button
+                    type="button"
                     onClick={() => setIsImportModalOpen(true)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap cursor-pointer"
                   >
-                    <span>📥</span> Bulk CSV Import
+                    📥 Bulk CSV Import
                   </button>
                 </div>
               ) : (
-                /* MECHANIC / VIEWER ACCESS INDICATOR */
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg font-bold">
-                    {userRole === 'mechanic' ? '🔧 Mechanic Operational View' : '👁️ Read-Only Auditor View'}
-                  </span>
-                </div>
+                <span className="text-xs font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg font-bold">
+                  {userRole === 'mechanic' ? '🔧 Mechanic Operational View' : '👁️ Read-Only Auditor View'}
+                </span>
               )}
             </div>
 
@@ -1153,11 +413,10 @@ export const TaskBoard: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter By:</span>
-
                 <select
                   value={selectedMake}
                   onChange={(e) => setSelectedMake(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
                 >
                   <option value="All">All Makes</option>
                   {uniqueMakes.filter((m) => m !== 'All').map((make) => (
@@ -1168,7 +427,7 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={selectedSeverity}
                   onChange={(e) => setSelectedSeverity(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
                 >
                   <option value="All">All Severities</option>
                   <option value="Critical">Critical</option>
@@ -1180,12 +439,11 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
                 >
                   <option value="All">All Statuses</option>
                   <option value="Open">Open</option>
                   <option value="Scheduled">Scheduled</option>
-                  <option value="In Progress">In Progress</option>
                   <option value="Cleared">Cleared</option>
                 </select>
               </div>
@@ -1195,14 +453,14 @@ export const TaskBoard: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold cursor-pointer"
                 >
                   <option value="created_at">Sort by Date</option>
                   <option value="severity">Sort by Severity</option>
                   <option value="unit_number">Sort by Unit #</option>
                 </select>
-
                 <button
+                  type="button"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                   className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
                 >
@@ -1212,7 +470,7 @@ export const TaskBoard: React.FC = () => {
             </div>
           </div>
 
-          {/* TABLE CONTAINER */}
+          {/* TASK TABLE */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden text-gray-900">
             {loading ? (
               <div className="p-12 text-center">
@@ -1241,9 +499,7 @@ export const TaskBoard: React.FC = () => {
                   <tbody className="divide-y divide-gray-100">
                     {filteredRecalls.map((item) => (
                       <tr key={item.id} className="hover:bg-blue-50/40 transition">
-                        <td className="p-4 font-bold text-gray-900">
-                          Unit #{item.unit_number || 'Unassigned'}
-                        </td>
+                        <td className="p-4 font-bold text-gray-900">Unit #{item.unit_number || 'Unassigned'}</td>
                         <td className="p-4">
                           <div className="font-semibold text-gray-800">{item.year} {item.make} {item.model}</div>
                           <div className="text-xs text-gray-400 font-mono mt-0.5">VIN: {item.vin}</div>
@@ -1255,31 +511,23 @@ export const TaskBoard: React.FC = () => {
                         <td className="p-4">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
                             item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                            item.severity === 'High' ? 'bg-orange-100 text-orange-700' :
-                            item.severity === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-700'
+                            item.severity === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {item.severity || 'Medium'}
+                            {item.severity}
                           </span>
                         </td>
                         <td className="p-4">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
                             item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
-                            item.status === 'Scheduled' || item.status === 'In Progress' ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-50 text-red-600'
+                            item.status === 'Scheduled' ? 'bg-amber-100 text-amber-700' : 'bg-red-50 text-red-600'
                           }`}>
-                            {item.status || 'Open'}
+                            {item.status}
                           </span>
                         </td>
                         <td className="p-4">
                           {item.receipt_url ? (
-                            <a
-                              href={item.receipt_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold hover:underline"
-                            >
-                              <span>🧾</span> Verified Invoice
+                            <a href={item.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-emerald-600 font-semibold hover:underline">
+                              🧾 Verified Invoice
                             </a>
                           ) : (
                             <span className="text-xs text-gray-400">No document</span>
@@ -1287,7 +535,11 @@ export const TaskBoard: React.FC = () => {
                         </td>
                         <td className="p-4 text-right">
                           <button
-                            onClick={() => handleOpenDrawer(item)}
+                            type="button"
+                            onClick={() => {
+                              setSelectedRecall(item);
+                              setIsDrawerOpen(true);
+                            }}
                             className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition cursor-pointer"
                           >
                             Manage
@@ -1303,394 +555,46 @@ export const TaskBoard: React.FC = () => {
         </>
       )}
 
-      {/* DRAWER MODAL (ROLE GATED INSIDE) */}
-      {isDrawerOpen && selectedRecall && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/40 backdrop-blur-sm flex justify-end text-gray-900">
-          <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center border-b pb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Manage Unit #{selectedRecall.unit_number}</h2>
-                  <p className="text-xs text-gray-500">{selectedRecall.year} {selectedRecall.make} {selectedRecall.model} (VIN: {selectedRecall.vin})</p>
-                </div>
-                <button
-                  onClick={handleCloseDrawer}
-                  className="p-2 text-gray-400 hover:text-gray-600 text-lg font-bold rounded-lg hover:bg-gray-100 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
+      {/* ALL MODAL OVERLAYS */}
+      <TaskDrawerModal
+        isOpen={isDrawerOpen}
+        selectedRecall={selectedRecall}
+        userRole={userRole}
+        userEmail={userEmail}
+        permissions={permissions}
+        onClose={() => setIsDrawerOpen(false)}
+        onTaskUpdated={(updated) => {
+          setRecalls((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          setSelectedRecall(updated);
+        }}
+      />
 
-              <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-blue-600 font-mono">NHTSA #{selectedRecall.nhtsa_campaign_number}</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-red-100 text-red-700">{selectedRecall.severity} Severity</span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold uppercase text-gray-500">Defective Component</h4>
-                  <p className="text-sm font-medium text-gray-800">{selectedRecall.component}</p>
-                </div>
-                {selectedRecall.summary && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase text-gray-500">Defect Summary</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.summary}</p>
-                  </div>
-                )}
-                {selectedRecall.remedy && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase text-gray-500">Manufacturer Remedy</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">{selectedRecall.remedy}</p>
-                  </div>
-                )}
-              </div>
+      <SingleVinScanModal
+        isOpen={isScanModalOpen}
+        currentFleetCount={recalls.length}
+        vehicleLimit={vehicleLimit}
+        onClose={() => setIsScanModalOpen(false)}
+        onSuccess={fetchTaskboardData}
+        onTriggerUpgrade={triggerUpgradeModal}
+        onIncrementVinChecks={() => setVinChecksUsed((prev) => prev + 1)}
+      />
 
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900">Update Remedy Status</h3>
+      <BulkCsvImportModal
+        isOpen={isImportModalOpen}
+        currentFleetCount={recalls.length}
+        vehicleLimit={vehicleLimit}
+        subscriptionTier={subscriptionTier}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchTaskboardData}
+      />
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Appointment / Repair Date</label>
-                  <input
-                    type="date"
-                    disabled={!permissions.canUpdateTaskStatus}
-                    value={scheduledDateInput}
-                    onChange={(e) => setScheduledDateInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
-                </div>
+      <PricingUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        gateReason={gateReason}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onSelectTier={setSubscriptionTier}
+      />
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Fleet Notes / Repair Invoice #</label>
-                  <textarea
-                    rows={3}
-                    disabled={!permissions.canUpdateTaskStatus}
-                    placeholder="Add dealership invoice numbers, technician notes, or service location details..."
-                    value={notesInput}
-                    onChange={(e) => setNotesInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
-                  <label className="block text-xs font-bold text-gray-800">
-                    Proof of Remedy / Repair Invoice (PDF or Image)
-                  </label>
-
-                  {selectedRecall.receipt_url ? (
-                    <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                        <span>✅</span> Attached Repair Proof
-                      </div>
-                      <a
-                        href={selectedRecall.receipt_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded border border-emerald-200 transition"
-                      >
-                        View Document ↗
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      Upload the dealership repair order or receipt to establish an unshakeable audit trail before clearing this recall.
-                    </p>
-                  )}
-
-                  {permissions.canUploadReceipts && (
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => setReceiptFile(e.target.files ? e.target.files[0] : null)}
-                      className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
-                    />
-                  )}
-                  {receiptFile && (
-                    <p className="text-xs text-blue-600 font-medium">Selected: {receiptFile.name}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-2">
-              {permissions.canUpdateTaskStatus ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => handleUpdateStatus('Scheduled')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
-                  >
-                    Mark Scheduled
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('In Progress')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
-                  >
-                    In Progress
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('Cleared')}
-                    disabled={updatingStatus || uploadingReceipt}
-                    className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {uploadingReceipt ? 'Uploading...' : 'Mark Cleared'}
-                  </button>
-                </div>
-              ) : (
-                <div className="p-3 bg-gray-100 text-gray-600 text-center rounded-lg text-xs font-mono font-bold">
-                  🔒 Read-Only Access (Role: {userRole.toUpperCase()})
-                </div>
-              )}
-              <button
-                onClick={handleCloseDrawer}
-                className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
-              >
-                Close Drawer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SINGLE-VIN SCAN CONSOLE MODAL */}
-      {isScanModalOpen && permissions.canIngestAssets && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <span>⚡</span> Instant Single-VIN Scan Console
-                </h3>
-                <p className="text-xs text-gray-500">Query live NHTSA safety defect databases on demand.</p>
-              </div>
-              <button
-                onClick={() => setIsScanModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-                Enter 17-Digit Vehicle Identification Number (VIN)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  maxLength={17}
-                  placeholder="e.g. 1FTFW1ED4MFC12345"
-                  value={singleVinInput}
-                  onChange={(e) => setSingleVinInput(e.target.value.toUpperCase())}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 uppercase"
-                />
-                <button
-                  onClick={handleRunSingleVinScan}
-                  disabled={scanning || !singleVinInput}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
-                >
-                  {scanning ? 'Scanning...' : 'Scan VIN'}
-                </button>
-              </div>
-              {scanError && (
-                <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
-                  {scanError}
-                </p>
-              )}
-            </div>
-
-            {scanResult && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border">
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">{scanResult.year} {scanResult.make} {scanResult.model}</p>
-                    <p className="text-xs font-mono text-gray-500">VIN: {scanResult.vin}</p>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    scanResult.recallsCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {scanResult.recallsCount} Open Recalls Found
-                  </span>
-                </div>
-
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                  {scanResult.recalls.length === 0 ? (
-                    <p className="text-xs text-emerald-600 font-semibold text-center py-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                      ✅ No safety recalls currently registered with NHTSA for this VIN.
-                    </p>
-                  ) : (
-                    scanResult.recalls.map((r, i) => (
-                      <div key={i} className="p-3 bg-red-50/60 border border-red-100 rounded-lg text-xs space-y-1">
-                        <div className="flex justify-between font-bold text-red-800">
-                          <span>{r.component}</span>
-                          <span className="font-mono text-red-600">#{r.campaignNumber}</span>
-                        </div>
-                        <p className="text-gray-700">{r.summary}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <button
-                  onClick={handleAddScannedVinToFleet}
-                  disabled={addingToFleet}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer"
-                >
-                  {addingToFleet ? 'Saving Asset...' : '➕ Add Vehicle to Monitored Fleet'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* BULK CSV IMPORT MODAL */}
-      {isImportModalOpen && permissions.canIngestAssets && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-lg font-bold text-gray-900">Bulk Import Fleet VINs</h3>
-              <button
-                onClick={() => setIsImportModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Upload a CSV file containing your fleet assets. Make sure your file includes a <code className="bg-gray-100 px-1 rounded font-bold text-gray-800">vin</code> column.
-            </p>
-
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
-              />
-              {csvFile && (
-                <p className="text-xs text-emerald-600 font-bold mt-2">Ready: {csvFile.name}</p>
-              )}
-            </div>
-
-            {importFeedback && (
-              <p className={`text-xs font-semibold p-3 rounded-lg ${
-                importFeedback.startsWith('Error')
-                  ? 'bg-red-50 text-red-600'
-                  : importFeedback.startsWith('Success')
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-blue-50 text-blue-600'
-              }`}>
-                {importFeedback}
-              </p>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleProcessCsvImport}
-                disabled={!csvFile || importing}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
-              >
-                {importing ? 'Processing...' : 'Upload & Sync Fleet'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PRICING MODAL */}
-      {isUpgradeModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 text-gray-900">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Upgrade Subscription Plan</h3>
-                {gateReason && <p className="text-xs text-blue-600 font-semibold mt-0.5">{gateReason}</p>}
-              </div>
-              <button
-                onClick={() => setIsUpgradeModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase">Standard</span>
-                  <p className="text-2xl font-extrabold text-gray-900">$99<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
-                    <li>✓ Up to 50 Vehicles</li>
-                    <li>✓ Continuous Monitoring</li>
-                    <li>✓ Full Workspace Access</li>
-                  </ul>
-                </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('standard');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Standard
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/20 flex flex-col justify-between space-y-3 relative">
-                <span className="absolute -top-3 right-3 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recommended</span>
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase">Professional</span>
-                  <p className="text-2xl font-extrabold text-gray-900">$249<span className="text-xs font-normal text-gray-500">/mo</span></p>
-                  <ul className="text-xs text-gray-600 space-y-1.5 mt-2">
-                    <li>✓ Up to 250 Vehicles</li>
-                    <li>✓ Single-VIN Scan Console</li>
-                    <li>✓ Signed PDF Compliance Card</li>
-                  </ul>
-                </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('professional');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Professional
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl border border-gray-200 bg-gray-900 text-white flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Enterprise</span>
-                  <p className="text-2xl font-extrabold text-white">Custom</p>
-                  <ul className="text-xs text-gray-300 space-y-1.5 mt-2">
-                    <li>✓ Unlimited Vehicles</li>
-                    <li>✓ Telematics Integrations</li>
-                    <li>✓ Dedicated Broker QBR</li>
-                  </ul>
-                </div>
-                <button
-                  onClick={() => {
-                    setSubscriptionTier('enterprise');
-                    setIsUpgradeModalOpen(false);
-                  }}
-                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 font-bold text-xs rounded-lg transition cursor-pointer"
-                >
-                  Select Enterprise
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TEAM ACCESS CONTROL MODAL */}
       <TeamManagementModal
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}
