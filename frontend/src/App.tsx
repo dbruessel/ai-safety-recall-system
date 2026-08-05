@@ -95,32 +95,35 @@ export default function App() {
   const isReturnPage = window.location.pathname.includes('/return') || 
                        window.location.search.includes('session_id');
 
-  // Helper to pull subscriber tier, role & profile data from Supabase
-const fetchUserProfile = async (email: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('company_name, role, subscription_tier, organization_id, organizations(name)')
-      .eq('email', email)
-      .maybeSingle();
+  // ====================================================================
+  // FIXED ORGANIZATIONAL PROFILE FETCHING LOGIC
+  // ====================================================================
+  const fetchUserProfile = async (email: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('company_name, role, subscription_tier, organization_id, organizations(name)')
+        .eq('email', email)
+        .maybeSingle();
 
-    if (data && !error) {
-      // 1. Check joined organization table name first
-      // 2. Fallback to profile company_name
-      // 3. Last fallback to default
-      const resolvedOrgName = 
-        (data.organizations as any)?.name || 
-        data.company_name || 
-        'Las Vegas Fleet Test Co.';
+      if (data && !error) {
+        // Priority 1: Joined Organizations Table Name
+        // Priority 2: Profiles Table company_name column
+        // Priority 3: Standard Default Name
+        const resolvedOrgName = 
+          (data.organizations as any)?.name || 
+          data.company_name || 
+          'Las Vegas Fleet Test Co.';
 
-      setCompanyName(resolvedOrgName);
-      if (data.role) setUserRole(data.role as UserRole);
-      if (data.subscription_tier) setPlanType(data.subscription_tier as SubscriptionTier);
+        setCompanyName(resolvedOrgName);
+
+        if (data.role) setUserRole(data.role as UserRole);
+        if (data.subscription_tier) setPlanType(data.subscription_tier as SubscriptionTier);
+      }
+    } catch (err) {
+      console.warn("Error loading user profile & organization:", err);
     }
-  } catch (err) {
-    console.warn("Error loading profile & organization:", err);
-  }
-};
+  };
 
   // Listen for active Supabase Auth sessions
   useEffect(() => {
@@ -143,7 +146,7 @@ const fetchUserProfile = async (email: string) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Hydrate user info from URL parameters or local storage
+  // Hydrate user info without overwriting companyName with email prefix
   useEffect(() => {
     const hydrateProspectSession = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -160,10 +163,7 @@ const fetchUserProfile = async (email: string) => {
 
         if (isEmail) {
           setUserEmail(refParam);
-          setCompanyName(refParam.split('@')[0]);
           fetchUserProfile(refParam);
-        } else {
-          setCompanyName('Las Vegas Fleet Test Co.');
         }
       }
     };
@@ -275,7 +275,7 @@ const fetchUserProfile = async (email: string) => {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
         
-        {/* 🌟 GLOBAL TOP NAVIGATION BAR */}
+        {/* GLOBAL TOP NAVIGATION BAR */}
         <header className="border-b border-slate-900 bg-slate-950/90 backdrop-blur sticky top-0 z-30 px-6 py-3.5">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div className="flex items-center space-x-3">
@@ -286,21 +286,21 @@ const fetchUserProfile = async (email: string) => {
               </div>
             </div>
 
-            {/* ⚙️ CONSOLIDATED ACCOUNT DROPDOWN MENU */}
+            {/* CONSOLIDATED ACCOUNT DROPDOWN MENU */}
             <AccountMenu
-      userEmail={session.user.email || userEmail}
-      orgName={companyName || 'Las Vegas Fleet Test Co.'}
-      userRole={userRole}
-      subscriptionTier={planType}
-      onOpenTeamModal={() => setIsTeamModalOpen(true)}
-      onOpenUpgradeModal={() => setShowUpgradeModal(true)}
-      onCopyUnderwriterLink={() => {
-        navigator.clipboard.writeText(window.location.href);
-        alert('Copied secure read-only underwriter link to clipboard!');
-      }}
-      onDownloadRiskCard={handleDownloadPDF}
-      onSignOut={handleSignOut}
-    />
+              userEmail={session.user.email || userEmail || 'lasvegas_fleet_test@example.com'}
+              orgName={companyName}
+              userRole={userRole}
+              subscriptionTier={planType}
+              onOpenTeamModal={() => setIsTeamModalOpen(true)}
+              onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+              onCopyUnderwriterLink={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Copied secure read-only underwriter link to clipboard!');
+              }}
+              onDownloadRiskCard={handleDownloadPDF}
+              onSignOut={handleSignOut}
+            />
           </div>
         </header>
 
