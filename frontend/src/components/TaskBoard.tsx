@@ -182,7 +182,7 @@ export const TaskBoard: React.FC = () => {
       setRecalls(formattedData);
     } catch (err) {
       console.error('Error fetching taskboard data:', err);
-    } font-sans finally {
+    } finally {
       setLoading(false);
     }
   };
