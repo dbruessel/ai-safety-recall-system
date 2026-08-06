@@ -9,6 +9,7 @@ import { SingleVinScanModal } from './SingleVinScanModal';
 import { BulkCsvImportModal } from './BulkCsvImportModal';
 import { PricingUpgradeModal } from './PricingUpgradeModal';
 import { TeamManagementModal } from './TeamManagementModal';
+import { BillingManagementModal } from './BillingManagementModal';
 
 // Shared Types
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
@@ -588,9 +589,11 @@ export const TaskBoard: React.FC = () => {
         onSuccess={fetchTaskboardData}
       />
 
-      <PricingUpgradeModal
+      <BillingManagementModal
         isOpen={isUpgradeModalOpen}
-        gateReason={gateReason}
+        subscriptionTier={subscriptionTier}
+        currentFleetCount={recalls.length}
+        userEmail={userEmail}
         onClose={() => setIsUpgradeModalOpen(false)}
         onSelectTier={setSubscriptionTier}
       />

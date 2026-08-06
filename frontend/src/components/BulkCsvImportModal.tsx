@@ -98,7 +98,7 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
     } catch (err: any) {
       console.error('CSV Import Error:', err);
       setImportFeedback(`Import Failed: ${err.message || 'Unknown database error'}`);
-    } font-sans finally {
+    } finally {
       setImporting(false);
     }
   };
