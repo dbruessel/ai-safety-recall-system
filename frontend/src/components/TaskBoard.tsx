@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 // Sub-Component Imports
-import { AccountMenu } from './AccountMenu';
 import { UnderwriterReportView } from './UnderwriterReportView';
 import { TaskDrawerModal } from './TaskDrawerModal';
 import { SingleVinScanModal } from './SingleVinScanModal';
@@ -280,7 +279,7 @@ export const TaskBoard: React.FC = () => {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative text-slate-100">
       
-      {/* WORKSPACE HEADER & ACCOUNT DROPDOWN */}
+      {/* WORKSPACE HEADER & TAB SWITCHER */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -294,24 +293,6 @@ export const TaskBoard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* 🏢 ACCOUNT MENU DROPDOWN */}
-          <AccountMenu
-            userEmail={userEmail}
-            userRole={userRole}
-            subscriptionTier={subscriptionTier}
-            onOpenTeamModal={() => setIsTeamModalOpen(true)}
-            onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)}
-            onCopyUnderwriterLink={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Copied broker share link to clipboard!');
-            }}
-            onDownloadRiskCard={handleDownloadPDF}
-            onSignOut={async () => {
-              await supabase.auth.signOut();
-              window.location.reload();
-            }}
-          />
-
           <div className="bg-gray-100 p-1 rounded-xl flex gap-1 text-xs font-mono">
             <button
               type="button"
