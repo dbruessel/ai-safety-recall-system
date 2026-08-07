@@ -1,9 +1,4 @@
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
 
@@ -25,6 +20,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   onSelectTier,
 }) => {
   const [loadingPortal, setLoadingPortal] = useState<boolean>(false);
+  const [loadingTier, setLoadingTier] = useState<SubscriptionTier | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -40,7 +36,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   const currentLimit = capacityLimits[subscriptionTier] || 10;
   const usagePercentage = Math.min(Math.round((currentFleetCount / currentLimit) * 100), 100);
 
-  // STRIPE CUSTOMER PORTAL REDIRECT
+  // 1. STRIPE CUSTOMER PORTAL REDIRECT (For existing subscribers managing payment methods)
   const handleOpenStripePortal = async () => {
     try {
       setLoadingPortal(true);
@@ -54,7 +50,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create billing session.');
+        throw new Error('Failed to create billing portal session.');
       }
 
       const data = await response.json();
@@ -71,20 +67,43 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
     }
   };
 
-  const handleSwitchTier = async (newTier: SubscriptionTier) => {
+  // 2. STRIPE CHECKOUT REDIRECT (For switching/purchasing new plans)
+  const handleInitiateStripeCheckout = async (targetTier: SubscriptionTier) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ subscription_tier: newTier })
-          .eq('id', user.id);
+      setLoadingTier(targetTier);
+      setFeedbackMsg(null);
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${baseUrl}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          tier: targetTier,
+          success_url: `${window.location.origin}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: window.location.href,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Checkout session creation failed.');
       }
-      onSelectTier(newTier);
-      setFeedbackMsg(`Successfully switched workspace to ${newTier.toUpperCase()} Plan.`);
-    } catch (err) {
-      console.error('Error updating plan:', err);
-      onSelectTier(newTier);
+
+      const data = await response.json();
+      if (data.url) {
+        // Redirect directly to hosted Stripe Checkout Page
+        window.location.href = data.url;
+      } else {
+        throw new Error('No Checkout URL returned.');
+      }
+    } catch (err: any) {
+      console.error('Stripe Checkout Error:', err);
+      setFeedbackMsg('Stripe Checkout is running in demo mode or offline. Updating tier locally.');
+      // Local fallback for dev/testing when Stripe backend isn't live
+      setTimeout(() => {
+        onSelectTier(targetTier);
+        setLoadingTier(null);
+      }, 1000);
     }
   };
 
@@ -182,11 +201,15 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => handleSwitchTier('standard')}
-                disabled={subscriptionTier === 'standard'}
+                onClick={() => handleInitiateStripeCheckout('standard')}
+                disabled={subscriptionTier === 'standard' || loadingTier === 'standard'}
                 className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold rounded-lg transition cursor-pointer"
               >
-                {subscriptionTier === 'standard' ? 'Active Plan' : 'Switch to Standard'}
+                {subscriptionTier === 'standard'
+                  ? 'Active Plan'
+                  : loadingTier === 'standard'
+                  ? 'Redirecting...'
+                  : 'Switch to Standard'}
               </button>
             </div>
 
@@ -204,11 +227,15 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => handleSwitchTier('professional')}
-                disabled={subscriptionTier === 'professional'}
+                onClick={() => handleInitiateStripeCheckout('professional')}
+                disabled={subscriptionTier === 'professional' || loadingTier === 'professional'}
                 className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold rounded-lg transition cursor-pointer"
               >
-                {subscriptionTier === 'professional' ? 'Active Plan' : 'Switch to Pro'}
+                {subscriptionTier === 'professional'
+                  ? 'Active Plan'
+                  : loadingTier === 'professional'
+                  ? 'Redirecting...'
+                  : 'Switch to Pro'}
               </button>
             </div>
 
@@ -226,11 +253,15 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => handleSwitchTier('enterprise')}
-                disabled={subscriptionTier === 'enterprise'}
+                onClick={() => handleInitiateStripeCheckout('enterprise')}
+                disabled={subscriptionTier === 'enterprise' || loadingTier === 'enterprise'}
                 className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold rounded-lg transition cursor-pointer"
               >
-                {subscriptionTier === 'enterprise' ? 'Active Plan' : 'Switch to Enterprise'}
+                {subscriptionTier === 'enterprise'
+                  ? 'Active Plan'
+                  : loadingTier === 'enterprise'
+                  ? 'Redirecting...'
+                  : 'Switch to Enterprise'}
               </button>
             </div>
           </div>
