@@ -93,13 +93,8 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-6 relative font-mono text-xs">
         
         {/* HEADER */}
-        <div className="flex justify-between items-start border-b border-slate-800 pb-4">
-          <div>
-            <span className="text-[10px] text-cyan-400 uppercase font-bold tracking-widest bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-              Commercial Account Operations
-            </span>
-            <h2 className="text-xl font-bold text-white font-sans mt-1">Plan & Billing Management</h2>
-          </div>
+        <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+          <h2 className="text-xl font-bold text-white font-sans">Plan & Billing Management</h2>
           <button
             type="button"
             onClick={onClose}
