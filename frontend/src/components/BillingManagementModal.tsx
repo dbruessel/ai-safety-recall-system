@@ -221,7 +221,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                   <span className="font-bold text-emerald-400">Enterprise</span>
                   {subscriptionTier === 'enterprise' && <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">CURRENT</span>}
                 </div>
-                <p className="text-lg font-extrabold text-white mt-1">Custom</p>
+                <p className="text-lg font-extrabold text-white mt-1">$499<span className="text-[10px] text-slate-400 font-normal">/mo</span></p>
                 <p className="text-[10px] text-slate-400 mt-1">Unlimited vehicles, dedicated carrier integrations, and QBR support.</p>
               </div>
               <button
@@ -230,7 +230,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 disabled={subscriptionTier === 'enterprise'}
                 className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold rounded-lg transition cursor-pointer"
               >
-                {subscriptionTier === 'enterprise' ? 'Active Plan' : 'Contact Sales'}
+                {subscriptionTier === 'enterprise' ? 'Active Plan' : 'Switch to Enterprise'}
               </button>
             </div>
           </div>
