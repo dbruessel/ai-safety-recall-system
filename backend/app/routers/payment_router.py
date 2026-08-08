@@ -1,126 +1,160 @@
-import logging
 import os
-from typing import Optional
 import stripe
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
-from app.config import get_settings
+from fastapi import APIRouter, HTTPException, Request, Header
+from pydantic import BaseModel
+from typing import Optional
 
-# Initialize Logger
-logger = logging.getLogger("payment-router")
+# Router prefix aligned with frontend API calls
+router = APIRouter(prefix="/api/stripe", tags=["Stripe Billing"])
 
-# Retrieve Global SaaS Configurations
-try:
-    settings = get_settings()
-except Exception:
-    from app.config import settings
+# Fetch Stripe API Key from environment
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# Initialize Stripe API Client
-stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# Register payments route group
-router = APIRouter(prefix="/payments", tags=["payments"])
+class PortalRequest(BaseModel):
+    email: str
 
-# Stripe Price Tier IDs
-PRICE_TIER_MAPPING = {
-    "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",     # $99/mo Standard
-    "professional": "price_1TsR6jDXs4xycz0ohAfewQgk",   # $249/mo Professional
-    "enterprise": "price_1TrlFxDXs4xycz0ofyuV70Rf"      # $499/mo Enterprise
-}
 
 class CheckoutRequest(BaseModel):
-    plan_type: str
-    user_id: Optional[str] = None
-    email: Optional[str] = None
+    email: str
+    tier: str
+    success_url: str
+    cancel_url: str
+
+
+def get_stripe_price_id(tier: str) -> str:
+    """Helper to resolve Stripe Price IDs from environment variables."""
+    price_map = {
+        "standard": os.getenv("STRIPE_PRICE_STANDARD", ""),
+        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL", ""),
+        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", ""),
+    }
+    return price_map.get(tier.lower(), "")
+
+
+@router.post("/create-portal-session")
+async def create_portal_session(req: PortalRequest):
+    """
+    Creates a hosted Stripe Customer Portal session for managing 
+    invoices, payment methods, and receipts.
+    """
+    try:
+        if not stripe.api_key:
+            raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+
+        # 1. Search for existing customer in Stripe Sandbox/Live by email
+        customers = stripe.Customer.list(email=req.email, limit=1)
+
+        if customers.data:
+            customer_id = customers.data[0].id
+        else:
+            # 2. Automatically provision customer if they don't exist yet
+            new_customer = stripe.Customer.create(
+                email=req.email,
+                description=f"Fleet Operator ({req.email})"
+            )
+            customer_id = new_customer.id
+
+        # 3. Create Customer Portal Session
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url="http://localhost:5173",
+        )
+        return {"url": session.url}
+
+    except stripe.error.StripeError as e:
+        print(f"[Stripe Portal Error]: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"[Unexpected Server Error]: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create portal session.")
+
 
 @router.post("/create-checkout-session")
-async def create_checkout_session(request: CheckoutRequest):
+async def create_checkout_session(req: CheckoutRequest):
     """
-    Spins up a secure Stripe Checkout Session in Hosted Redirection mode.
+    Creates a Stripe Checkout Session for upgrading or switching subscription tiers.
     """
-    plan = request.plan_type.lower()
-    
-    if plan not in PRICE_TIER_MAPPING:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid plan type '{request.plan_type}'. Must be standard, professional, or enterprise."
-        )
-
-    price_id = PRICE_TIER_MAPPING[plan]
-    customer_email = request.email or (request.user_id if request.user_id and "@" in request.user_id else None)
-    reference_id = request.user_id or request.email or "guest"
-
     try:
-        session_kwargs = {
+        if not stripe.api_key:
+            raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+
+        price_id = get_stripe_price_id(req.tier)
+        if not price_id:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No Stripe Price ID configured for tier '{req.tier}'. Check backend environment variables."
+            )
+
+        # Look up existing customer or let Checkout create one
+        customers = stripe.Customer.list(email=req.email, limit=1)
+        customer_id = customers.data[0].id if customers.data else None
+
+        checkout_kwargs = {
             "payment_method_types": ["card"],
-            "line_items": [
-                {
-                    "price": price_id,
-                    "quantity": 1,
-                },
-            ],
+            "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription",
-            "client_reference_id": reference_id,
-            "metadata": {
-                "email": customer_email or "",
-                "plan_type": plan,
-                "user_id": reference_id
-            },
-            "success_url": f"{settings.FRONTEND_URL}/return?session_id={{CHECKOUT_SESSION_ID}}",
-            "cancel_url": f"{settings.FRONTEND_URL}/?checkout=cancel",
+            "success_url": req.success_url,
+            "cancel_url": req.cancel_url,
+            "metadata": {"tier": req.tier.lower(), "email": req.email},
         }
 
-        # Attach customer_email if present
-        if customer_email:
-            session_kwargs["customer_email"] = customer_email
+        if customer_id:
+            checkout_kwargs["customer"] = customer_id
+        else:
+            checkout_kwargs["customer_email"] = req.email
 
-        checkout_session = stripe.checkout.Session.create(**session_kwargs)
+        session = stripe.checkout.Session.create(**checkout_kwargs)
+        return {"url": session.url}
 
-        # Return both keys to guarantee compatibility across frontends
-        return {
-            "checkout_url": checkout_session.url,
-            "url": checkout_session.url
-        }
-        
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe API error during checkout creation: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        print(f"[Stripe Checkout Error]: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error creating checkout session: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred."
-        )
+        print(f"[Unexpected Server Error]: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session.")
 
-# ====================================================================
-# STEP 5: SESSION STATUS VERIFICATION ENDPOINT
-# ====================================================================
-@router.get("/session-status")
-async def get_session_status(session_id: str):
-    """
-    Retrieves status and customer details for a completed Stripe Checkout Session.
-    """
-    try:
-        session = stripe.checkout.Session.retrieve(session_id)
-        
-        customer_email = (
-            session.get("customer_details", {}).get("email") or 
-            session.get("customer_email") or 
-            session.get("metadata", {}).get("email")
-        )
 
-        return {
-            "status": session.status,          # e.g., 'complete'
-            "payment_status": session.payment_status, # e.g., 'paid'
-            "customer_email": customer_email,
-            "plan_type": session.get("metadata", {}).get("plan_type", "professional")
-        }
-    except stripe.error.StripeError as e:
-        logger.error(f"Error fetching Stripe session status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired Stripe session ID."
-        )
+@router.post("/webhook")
+async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Header(None)):
+    """
+    Receives incoming webhook events from Stripe (CLI or Production)
+    to process subscription changes automatically.
+    """
+    payload = await request.body()
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    event = None
+
+    # Verify signature if secret is provided
+    if webhook_secret and stripe_signature:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload=payload, sig_header=stripe_signature, secret=webhook_secret
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError as e:
+            raise HTTPException(status_code=400, detail="Invalid signature")
+    else:
+        # Fallback for raw JSON testing if secret isn't provided
+        import json
+        event = json.loads(payload)
+
+    event_type = event.get("type")
+    data_object = event.get("data", {}).get("object", {})
+
+    print(f"🔔 Received Stripe Webhook Event: {event_type}")
+
+    # Handle successful checkout completion
+    if event_type == "checkout.session.completed":
+        customer_email = data_object.get("customer_email") or data_object.get("customer_details", {}).get("email")
+        tier = data_object.get("metadata", {}).get("tier")
+        print(f"✅ Subscription activated! User: {customer_email} | Tier: {tier}")
+        # Insert Supabase database tier update logic here if needed
+
+    elif event_type == "customer.subscription.deleted":
+        customer_id = data_object.get("customer")
+        print(f"⚠️ Subscription canceled for customer: {customer_id}")
+
+    return {"status": "success"}
