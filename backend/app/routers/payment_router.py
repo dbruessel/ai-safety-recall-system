@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 # Router prefix aligned with frontend API calls
-router = APIRouter(prefix="/api/stripe", tags=["Stripe Billing"])
+router = APIRouter(prefix="/stripe", tags=["Stripe Billing"])
 
 # Fetch Stripe API Key from environment
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
