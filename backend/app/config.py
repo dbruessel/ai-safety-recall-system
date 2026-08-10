@@ -1,47 +1,48 @@
 ﻿import os
-from functools import lru_cache
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Determine the target environment file dynamically
-ENV_FILE = os.getenv("ENV_FILE_PATH", ".env")
 
 class Settings(BaseSettings):
-    # =====================================================================
-    # EXISTING CORE PLATFORM FIELDS
-    # =====================================================================
-    project_id: str
-    frontend_origin: str
-    supabase_url: str
-    supabase_key: str
-    supabase_service_key: str
-    database_url: str
+    # System & App Settings
+    PROJECT_ID: str = "ai-safety-recall-system"
+    ENVIRONMENT: str = "sandbox"
+    FRONTEND_ORIGIN: str = "http://localhost:5173"
 
-    # =====================================================================
-    # STRIPE SAAS MVP FIELDS
-    # =====================================================================
-    STRIPE_SECRET_KEY: str
-    STRIPE_WEBHOOK_SECRET: str
+    # Supabase Configuration
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
+    DATABASE_URL: Optional[str] = None
+
+    # Stripe Integration Settings
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
     
-    # Defaults to frontend_origin if FRONTEND_URL is not explicitly set in your .env
-    FRONTEND_URL: str = "http://localhost:5173"
+    # Stripe Price IDs (Optional fallback mappings)
+    STRIPE_PRICE_STANDARD: Optional[str] = None
+    STRIPE_PRICE_PRO: Optional[str] = None
+    STRIPE_PRICE_ENTERPRISE: Optional[str] = None
 
-    # Read the environment parameter safely out of your .env file
-    environment: str = "development"
+    # Enable reading from .env file directly
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",         # Prevents errors if there are extra variables in .env
+        case_sensitive=False    # Allows STRIPE_SECRET_KEY to map to stripe_secret_key smoothly
+    )
 
-    # Dynamic path binding to prevent directory resolution failures during testing runs
-    model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 
-
-@lru_cache
 def get_settings() -> Settings:
-    """Cached function to prevent repeated file system I/O reads on config parameters"""
+    """
+    Returns a cached or newly instantiated Settings instance.
+    """
     return Settings()
 
 
-# Instantiate a module-level instance of settings for older modules
-settings = get_settings()
-
-
-def init_vertex():
-    """Placeholder for your Vertex AI init if still needed."""
+def init_vertex() -> None:
+    """
+    Initializes Vertex AI settings or credentials if required.
+    """
+    # Vertex AI initialization logic can be executed here if needed
     pass
