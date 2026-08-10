@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     
-    # Stripe Price IDs (Optional fallback mappings)
+    # Stripe Price IDs
     STRIPE_PRICE_STANDARD: Optional[str] = None
     STRIPE_PRICE_PRO: Optional[str] = None
     STRIPE_PRICE_ENTERPRISE: Optional[str] = None
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",         # Prevents errors if there are extra variables in .env
-        case_sensitive=False    # Allows STRIPE_SECRET_KEY to map to stripe_secret_key smoothly
+        case_sensitive=False    # Allows STRIPE_SECRET_KEY to map smoothly
     )
 
 
@@ -40,9 +40,12 @@ def get_settings() -> Settings:
     return Settings()
 
 
+# Global settings instance so `from app.config import settings` succeeds across all services
+settings = get_settings()
+
+
 def init_vertex() -> None:
     """
     Initializes Vertex AI settings or credentials if required.
     """
-    # Vertex AI initialization logic can be executed here if needed
     pass
