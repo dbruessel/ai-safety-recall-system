@@ -1,4 +1,9 @@
-﻿from fastapi import FastAPI
+﻿from dotenv import load_dotenv
+
+# Load environment variables from .env immediately before app configs are initialized
+load_dotenv()
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import init_vertex, get_settings
 from app.services.pdf_report import router as pdf_router
