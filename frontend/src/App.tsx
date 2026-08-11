@@ -5,6 +5,7 @@ import TaskBoard from './components/TaskBoard';
 import AccountMenu from './components/AccountMenu';
 import BillingManagementModal from './components/BillingManagementModal';
 import TeamManagementModal from './components/TeamManagementModal';
+import { LandingPage } from './components/LandingPage';
 
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
 export type UserRole = 'admin' | 'mechanic' | 'viewer';
@@ -48,7 +49,7 @@ export function App() {
           if (profile?.subscription_tier) setSubscriptionTier(profile.subscription_tier as SubscriptionTier);
         }
       } catch (err) {
-        console.warn('Supabase auth session check skipped or failed:', err);
+        console.warn('Supabase auth check:', err);
       } finally {
         setLoading(false);
       }
@@ -56,7 +57,7 @@ export function App() {
 
     initAuth();
 
-    // Listen for auth state changes
+    // Listen for auth state changes (e.g. Sign Out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         setIsAuthenticated(false);
@@ -87,46 +88,26 @@ export function App() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm">
         <div className="flex items-center gap-3">
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
-          <span>Loading RecallLogic Workspace...</span>
+          <span>Loading RecallLogic...</span>
         </div>
       </div>
     );
   }
 
-  // SIGNED OUT VIEW
+  // PUBLIC MARKETING HOMEPAGE (Shown when signed out or non-paying)
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans text-slate-100">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl space-y-6">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl mx-auto flex items-center justify-center font-bold text-white font-mono text-xl shadow-lg">
-            RL
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white font-mono">RECALLLOGIC</h1>
-            <p className="text-xs text-slate-400 font-mono mt-1">Active Fleet Recall Risk Management</p>
-          </div>
-
-          <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-            <p className="text-sm font-medium text-slate-200">You have been signed out.</p>
-            <p className="text-xs text-slate-400 mt-1">Your active session and security credentials were cleared.</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setIsAuthenticated(true);
-              setLoading(false);
-            }}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition cursor-pointer shadow-md"
-          >
-            Return to Workspace Console
-          </button>
-        </div>
-      </div>
+      <LandingPage 
+        onSignIn={() => {
+          // If you have a Supabase Auth UI / Login Modal, trigger it here.
+          // For local dev, toggles back to active workspace:
+          setIsAuthenticated(true);
+        }} 
+      />
     );
   }
 
-  // WORKSPACE VIEW
+  // ACTIVE WORKSPACE CONSOLE (Shown when authenticated)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       <header className="border-b border-slate-800 bg-slate-950 px-6 py-4 flex items-center justify-between">
