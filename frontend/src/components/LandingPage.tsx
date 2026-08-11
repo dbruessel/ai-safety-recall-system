@@ -10,11 +10,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-600 selection:text-white">
       {/* PUBLIC NAVBAR */}
-      <nav className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto">
+      <nav className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-white font-mono text-base shadow-lg shadow-blue-500/20">
-            RL
-          </div>
+          {/* BRAND LOGO FROM PUBLIC DIR */}
+          <img 
+            src="/recall-logo.png" 
+            alt="RecallLogic Logo" 
+            className="h-10 w-auto object-contain"
+          />
           <div>
             <span className="font-bold text-white text-base tracking-wide font-mono">RECALLLOGIC</span>
             <p className="text-[10px] text-slate-400 font-mono hidden sm:block">Active Fleet Recall Risk Management</p>
@@ -44,14 +47,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignIn }) => {
       </nav>
 
       {/* HERO SECTION */}
-      <section className="px-6 pt-20 pb-16 max-w-5xl mx-auto text-center space-y-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono">
+      <section className="px-6 pt-16 pb-16 max-w-5xl mx-auto text-center space-y-6">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono">
           <span>⚡ Real-Time NHTSA Safety Sync</span>
         </div>
+
         <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-tight">
           Automated Safety Recall Control for Commercial Fleets
         </h1>
-        <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto font-normal">
+
+        <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto font-normal leading-relaxed">
           Eliminate liability risks, track open NHTSA campaigns, and generate audit-grade compliance reports directly for insurance underwriters.
         </p>
 
