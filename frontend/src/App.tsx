@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createClient, Session } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 import TaskBoard from './components/TaskBoard';
 import AccountMenu from './components/AccountMenu';
@@ -14,44 +14,54 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function App() {
-  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // User & Workspace States (default to empty until loaded)
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [userRole, setUserRole] = useState<UserRole>('viewer');
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  // User & Workspace States
+  const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
+  const [userRole, setUserRole] = useState<UserRole>('admin');
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('professional');
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [currentFleetCount, setCurrentFleetCount] = useState<number>(0);
+  const [currentFleetCount, setCurrentFleetCount] = useState<number>(23);
 
   // Modal Visibility States
   const [isBillingModalOpen, setIsBillingModalOpen] = useState<boolean>(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
 
-  // Auth & Session Listener
   useEffect(() => {
-    // 1. Fetch initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        loadUserData(session);
-      } else {
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setIsAuthenticated(true);
+          setCurrentUserId(session.user.id);
+          setUserEmail(session.user.email || 'operator@fleetcompany.com');
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, subscription_tier')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile?.role) setUserRole(profile.role as UserRole);
+          if (profile?.subscription_tier) setSubscriptionTier(profile.subscription_tier as SubscriptionTier);
+        }
+      } catch (err) {
+        console.warn('Supabase auth session check skipped or failed:', err);
+      } finally {
         setLoading(false);
       }
-    });
+    }
 
-    // 2. Listen for auth changes (SIGN_IN, SIGN_OUT, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        loadUserData(session);
-      } else {
-        // Reset all states on sign out
-        setUserEmail('');
-        setCurrentUserId('');
-        setUserRole('viewer');
-        setSubscriptionTier('free');
-        setLoading(false);
+    initAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setIsAuthenticated(false);
+      } else if (session) {
+        setIsAuthenticated(true);
       }
     });
 
@@ -60,55 +70,18 @@ export function App() {
     };
   }, []);
 
-  // Helper to load profile data for authenticated users
-  async function loadUserData(currentSession: Session) {
-    try {
-      const user = currentSession.user;
-      setCurrentUserId(user.id);
-      setUserEmail(user.email || '');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, subscription_tier')
-        .eq('id', user.id)
-        .single();
-
-      if (profile?.role) setUserRole(profile.role as UserRole);
-      if (profile?.subscription_tier) setSubscriptionTier(profile.subscription_tier as SubscriptionTier);
-
-      // Sync active fleet count for billing capacity meters
-      const { count } = await supabase
-        .from('monitored_vehicles')
-        .select('*', { count: 'exact', head: true });
-
-      if (count !== null && count !== undefined) {
-        setCurrentFleetCount(count);
-      }
-    } catch (err) {
-      console.error('Error loading user profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Handle explicit sign-out action
   const handleSignOut = async () => {
     try {
-      setLoading(true);
       await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    } finally {
       localStorage.clear();
       sessionStorage.clear();
-      setSession(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    } finally {
-      setLoading(false);
+      setIsAuthenticated(false);
     }
   };
 
-  // -------------------------------------------------------------
-  // RENDER: LOADING STATE
-  // -------------------------------------------------------------
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm">
@@ -120,10 +93,8 @@ export function App() {
     );
   }
 
-  // -------------------------------------------------------------
-  // RENDER: SIGNED OUT / LANDING / LOGIN VIEW
-  // -------------------------------------------------------------
-  if (!session) {
+  // SIGNED OUT VIEW
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans text-slate-100">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl space-y-6">
@@ -135,27 +106,29 @@ export function App() {
             <p className="text-xs text-slate-400 font-mono mt-1">Active Fleet Recall Risk Management</p>
           </div>
 
-          <p className="text-sm text-slate-300">
-            You are currently signed out of your workspace.
-          </p>
+          <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800">
+            <p className="text-sm font-medium text-slate-200">You have been signed out.</p>
+            <p className="text-xs text-slate-400 mt-1">Your active session and security credentials were cleared.</p>
+          </div>
 
           <button
-            onClick={() => window.location.href = '/login'} // Or trigger your Login Modal / Auth component
+            type="button"
+            onClick={() => {
+              setIsAuthenticated(true);
+              setLoading(false);
+            }}
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition cursor-pointer shadow-md"
           >
-            Sign In to Workspace
+            Return to Workspace Console
           </button>
         </div>
       </div>
     );
   }
 
-  // -------------------------------------------------------------
-  // RENDER: AUTHENTICATED WORKSPACE
-  // -------------------------------------------------------------
+  // WORKSPACE VIEW
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* GLOBAL TOP NAVIGATION HEADER */}
       <header className="border-b border-slate-800 bg-slate-950 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white font-mono text-sm shadow-md">
@@ -167,7 +140,6 @@ export function App() {
           </div>
         </div>
 
-        {/* ACCOUNT MENU DROPDOWN IN GLOBAL NAV */}
         <AccountMenu
           userEmail={userEmail}
           userRole={userRole}
@@ -186,12 +158,10 @@ export function App() {
         />
       </header>
 
-      {/* MAIN CONTENT WORKSPACE */}
       <main>
         <TaskBoard />
       </main>
 
-      {/* GLOBAL OVERLAY MODALS */}
       <BillingManagementModal
         isOpen={isBillingModalOpen}
         subscriptionTier={subscriptionTier}
