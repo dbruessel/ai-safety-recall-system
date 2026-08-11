@@ -8,6 +8,7 @@ import { SingleVinScanModal } from './SingleVinScanModal';
 import { BulkCsvImportModal } from './BulkCsvImportModal';
 import { BillingManagementModal } from './BillingManagementModal';
 import { TeamManagementModal } from './TeamManagementModal';
+import { BrokerShareModal } from './BrokerShareModal';
 
 // Shared Types
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
@@ -60,6 +61,7 @@ export const TaskBoard: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [gateReason, setGateReason] = useState<string>('');
 
   // FILTER & SORT STATES
@@ -97,6 +99,12 @@ export const TaskBoard: React.FC = () => {
       default: return 10;
     }
   }, [subscriptionTier]);
+
+  // UNDERWRITER SHARE URL GENERATOR
+  const shareUrl = useMemo(() => {
+    const origin = window.location.origin;
+    return `${origin}/audit/share/FLT-${currentUserId || '1001'}`;
+  }, [currentUserId]);
 
   // FETCH USER PROFILE & ROLE
   useEffect(() => {
@@ -318,6 +326,13 @@ export const TaskBoard: React.FC = () => {
 
           {activeTab === 'workspace' && (
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
+              >
+                <span>🔗</span> Share Audit Link
+              </button>
               <button
                 type="button"
                 onClick={handleDownloadPDF}
@@ -600,6 +615,17 @@ export const TaskBoard: React.FC = () => {
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}
         currentUserId={currentUserId}
+      />
+
+      <BrokerShareModal
+        isOpen={isShareModalOpen}
+        userTier={subscriptionTier === 'free' ? 'standard' : subscriptionTier}
+        shareUrl={shareUrl}
+        onClose={() => setIsShareModalOpen(false)}
+        onUpgrade={() => {
+          setIsShareModalOpen(false);
+          setIsUpgradeModalOpen(true);
+        }}
       />
     </div>
   );
