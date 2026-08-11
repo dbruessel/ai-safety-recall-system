@@ -53,7 +53,37 @@ export function App() {
     }
 
     fetchUserProfile();
+
+    // Listen for global auth changes (like signing out)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/';
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const handleSignOut = async () => {
+    try {
+      // 1. Sign out from Supabase Auth
+      await supabase.auth.signOut();
+
+      // 2. Wipe cached browser storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // 3. Force hard redirect to the home screen / landing page
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error signing out:', error);
+      window.location.href = '/';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -76,18 +106,15 @@ export function App() {
           subscriptionTier={subscriptionTier}
           onOpenTeamModal={() => setIsTeamModalOpen(true)}
           onOpenUpgradeModal={() => setIsBillingModalOpen(true)}
-          onCopyUnderwriterLink={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Copied broker share link to clipboard!');
+          onCopyUnderwriterLink={async () => {
+            const shareUrl = `${window.location.origin}/audit/share/FLT-${currentUserId || '1001'}`;
+            await navigator.clipboard.writeText(shareUrl);
           }}
           onDownloadRiskCard={() => {
             const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
             window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
           }}
-          onSignOut={async () => {
-            await supabase.auth.signOut();
-            window.location.reload();
-          }}
+          onSignOut={handleSignOut}
         />
       </header>
 
