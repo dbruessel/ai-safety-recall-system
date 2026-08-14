@@ -97,12 +97,25 @@ export function App(): React.ReactElement {
     );
   }
 
-  // PUBLIC MARKETING HOMEPAGE (Delegates directly to src/components/LandingPage.tsx)
+ // PUBLIC MARKETING HOMEPAGE
   if (!isAuthenticated) {
     return (
       <LandingPage
         onSignIn={() => {
+          // Dedicated to signing in existing users
           setIsAuthenticated(true);
+        }}
+        onSelectTier={(tierId) => {
+          // Dedicated to Stripe Checkout for new customers
+          const stripeUrls: Record<string, string> = {
+            standard: 'https://buy.stripe.com/your_standard_link',
+            professional: 'https://buy.stripe.com/your_pro_link',
+            enterprise: 'https://buy.stripe.com/your_enterprise_link',
+          };
+
+          if (stripeUrls[tierId]) {
+            window.location.href = stripeUrls[tierId];
+          }
         }}
       />
     );

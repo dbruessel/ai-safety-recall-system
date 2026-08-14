@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import BulkCsvImportModal from './BulkCsvImportModal';
 
-interface LandingPageProps {
+// Blueprint interface for LandingPage component props
+export interface LandingPageProps {
   onSignIn: () => void;
+  onSelectTier?: (tierId: 'standard' | 'professional' | 'enterprise') => void;
   totalGlobalRecalls?: number;
 }
 
@@ -24,17 +26,24 @@ const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Fallback Stripe Payment Links (overridden if passed via App.tsx onSelectTier)
+const STRIPE_CHECKOUT_URLS: Record<string, string> = {
+  standard: import.meta.env.VITE_STRIPE_STANDARD_URL || 'https://buy.stripe.com/test_standard',
+  professional: import.meta.env.VITE_STRIPE_PROFESSIONAL_URL || 'https://buy.stripe.com/test_professional',
+  enterprise: import.meta.env.VITE_STRIPE_ENTERPRISE_URL || 'https://buy.stripe.com/test_enterprise',
+};
+
 export const LandingPage: React.FC<LandingPageProps> = ({ 
   onSignIn, 
+  onSelectTier,
   totalGlobalRecalls 
 }) => {
-  // Supabase count for recall_definitions table
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [freeLookupsLeft, setFreeLookupsLeft] = useState<number>(10);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
 
-  // Fetch exact count from Supabase recall_definitions table
+  // Fetch count directly from Supabase recall_definitions table
   useEffect(() => {
     async function fetchRecallCount() {
       try {
@@ -46,7 +55,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           setRealRecallCount(count);
         }
       } catch (err) {
-        console.warn('Could not fetch recall count from Supabase, using default count:', err);
+        console.warn('Could not fetch recall count from Supabase:', err);
       }
     }
 
@@ -80,6 +89,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  // Route customer to Stripe Checkout for the chosen tier
+  const handleTierCheckout = (tierId: 'standard' | 'professional' | 'enterprise') => {
+    if (onSelectTier) {
+      onSelectTier(tierId);
+    } else {
+      const checkoutUrl = STRIPE_CHECKOUT_URLS[tierId];
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      }
+    }
+  };
+
   const pricingTiers: PricingTier[] = [
     {
       id: 'standard',
@@ -93,7 +114,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       features: [
         'Up to 50 Monitored VINs',
         'NHTSA & CPSC Automated Feeds',
-        'Weekly Compliance Reports',
+        'Weekly VIN Compliance Reports',
         'Email Risk Alerts'
       ]
     },
@@ -109,7 +130,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
       features: [
         'Up to 250 Monitored VINs',
-        'Real-Time Safety Sync (< 2s isolation)',
+        'Real-Time VIN Safety Sync (< 2s isolation)',
         'Full API & Webhook Access',
         'Underwriter Shareable Audit Links',
         'Priority Phone & Email Support'
@@ -183,6 +204,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* Sign In CTA */}
           <div className="shrink-0">
             <button
+              type="button"
               onClick={onSignIn}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
@@ -197,25 +219,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="relative pt-6 pb-6 px-4 max-w-4xl mx-auto text-center space-y-3">
         <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-[#06B6D4]/40 text-[11px] font-mono text-[#06B6D4]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" />
-          <span>Real-Time Safety Sync Active</span>
+          <span>Real-Time VIN Safety Sync Active</span>
         </div>
 
         <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-          Instant Fleet Safety &amp; Recall Control
+          Instant Fleet VIN Safety &amp; Recall Control
         </h1>
 
         <p className="text-slate-300 text-xs sm:text-sm max-w-xl mx-auto font-normal leading-normal">
-          Upload your fleet list to test our Real-Time Safety Sync engine with 10 free lookups.
+          Upload your fleet list of VINs to test our Real-Time Safety Sync engine with 10 free lookups.
         </p>
 
-        {/* BULK FLEET INGESTION DROPZONE (.CSV AND .TXT ONLY) */}
+        {/* BULK FLEET VIN INGESTION DROPZONE */}
         <div className="max-w-xl mx-auto rounded-xl bg-slate-900/90 border border-slate-700 p-4 shadow-xl backdrop-blur-xl text-left space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold font-mono text-slate-300 uppercase tracking-wider">
               Bulk Fleet VIN Ingestion
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">
-              {freeLookupsLeft} FREE LOOKUPS REMAINING
+              {freeLookupsLeft} FREE VIN LOOKUPS REMAINING
             </span>
           </div>
 
@@ -247,10 +269,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <div className="text-center sm:text-left">
                 <p className="text-xs font-semibold text-white">
-                  Drop fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
+                  Drop your list of VINs here or <span className="text-[#06B6D4] underline">browse files</span>
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  Supports strictly <span className="text-slate-200 font-semibold">.csv</span> and <span className="text-slate-200 font-semibold">.txt</span> formats
+                  Instant 17-character VIN parsing from <span className="text-slate-200 font-semibold">.csv</span> or <span className="text-slate-200 font-semibold">.txt</span>
                 </p>
               </div>
             </div>
@@ -302,10 +324,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
 
                 <button
-                  onClick={onSignIn}
+                  type="button"
+                  onClick={() => handleTierCheckout(tier.id)}
                   className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer ${tier.buttonStyle}`}
                 >
-                  Get Started with {tier.name}
+                  Subscribe to {tier.name}
                 </button>
               </div>
             ))}

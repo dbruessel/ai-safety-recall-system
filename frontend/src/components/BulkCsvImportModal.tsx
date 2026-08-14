@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 
-interface BulkCsvImportModalProps {
+export interface BulkCsvImportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (file: File) => void;
 }
 
-// Fixed: Changed "export default function" to "export function" to avoid duplicate default exports
-export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps) {
+export function BulkCsvImportModal({ isOpen, onClose, onSuccess }: BulkCsvImportModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<'csv' | 'txt'>('csv');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -21,7 +21,7 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
       const extension = file.name.split('.').pop()?.toLowerCase();
 
       if (extension !== 'csv' && extension !== 'txt') {
-        setErrorMsg('Invalid file type! Please upload a .csv or .txt file.');
+        setErrorMsg('Invalid file format! Please upload a strictly formatted .csv or .txt file.');
         setSelectedFile(null);
         return;
       }
@@ -31,14 +31,22 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8,vin,unit_number,make,model,year\n1HGCR2F83HA000000,UNIT-101,Honda,Accord,2017\n1FTFW1ED4MFC00000,UNIT-102,Ford,F-150,2021\n3GCPCREC0LG000000,UNIT-103,Chevrolet,Silverado,2020";
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "RecallLogic_Sample_Fleet_Template.csv");
+    const csvHeader = 'vin,unit_number,make,model,year\n';
+    const sampleRows = [
+      '1HGCR2F83HA000000,UNIT-101,Honda,Accord,2017',
+      '1FTFW1ED4MFC00000,UNIT-102,Ford,F-150,2021',
+      '3GCPCREC0LG000000,UNIT-103,Chevrolet,Silverado,2020'
+    ].join('\n');
+
+    const blob = new Blob([csvHeader + sampleRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'RecallLogic_Fleet_Import_Template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleStartIngestion = () => {
@@ -46,11 +54,13 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
 
     setIsProcessing(true);
 
-    // Simulate file reading & sync parsing
     setTimeout(() => {
       setIsProcessing(false);
+      if (onSuccess) {
+        onSuccess(selectedFile);
+      }
       onClose();
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -66,15 +76,15 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
               </svg>
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Bulk Fleet Ingestion</h3>
-              <p className="text-[11px] text-slate-400 font-mono">Upload .csv or .txt fleet inventory lists</p>
+              <h3 className="text-base font-bold text-white font-mono">Bulk Fleet Ingestion</h3>
+              <p className="text-[11px] text-slate-400 font-mono">Real-Time Safety Audit &amp; Inventory Parser</p>
             </div>
           </div>
 
           <button 
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -105,7 +115,7 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
             <button
               type="button"
               onClick={() => setActiveTab('csv')}
-              className={`pb-2 px-1 border-b-2 font-semibold transition-colors ${
+              className={`pb-2 px-1 border-b-2 font-semibold transition-colors cursor-pointer ${
                 activeTab === 'csv'
                   ? 'border-[#06B6D4] text-[#06B6D4]'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -116,7 +126,7 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
             <button
               type="button"
               onClick={() => setActiveTab('txt')}
-              className={`pb-2 px-1 border-b-2 font-semibold transition-colors ${
+              className={`pb-2 px-1 border-b-2 font-semibold transition-colors cursor-pointer ${
                 activeTab === 'txt'
                   ? 'border-[#06B6D4] text-[#06B6D4]'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -126,18 +136,19 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
             </button>
           </div>
 
-          {/* Code Example Area */}
-          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1.5 overflow-x-auto">
+          {/* Code Specification Box */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1.5 overflow-x-auto">
             {activeTab === 'csv' ? (
               <>
-                <div className="text-slate-500">// Header row with VIN column (required):</div>
-                <div className="text-emerald-400">vin,unit_number,make,model,year</div>
+                <div className="text-slate-500">// Header row with required VIN column:</div>
+                <div className="text-emerald-400 font-bold">vin,unit_number,make,model,year</div>
                 <div className="text-slate-300">1HGCR2F83HA000000,UNIT-101,Honda,Accord,2017</div>
                 <div className="text-slate-300">1FTFW1ED4MFC00000,UNIT-102,Ford,F-150,2021</div>
+                <div className="text-slate-300">3GCPCREC0LG000000,UNIT-103,Chevrolet,Silverado,2020</div>
               </>
             ) : (
               <>
-                <div className="text-slate-500">// One 17-character VIN per line:</div>
+                <div className="text-slate-500">// One 17-character VIN string per line:</div>
                 <div className="text-slate-300">1HGCR2F83HA000000</div>
                 <div className="text-slate-300">1FTFW1ED4MFC00000</div>
                 <div className="text-slate-300">3GCPCREC0LG000000</div>
@@ -146,10 +157,10 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
           </div>
         </div>
 
-        {/* File Selection Box */}
+        {/* File Picker Box */}
         <div className="space-y-2">
           <label className="block text-xs font-bold text-slate-300 font-mono uppercase">
-            Select File (.csv or .txt)
+            Upload Fleet File (.csv or .txt)
           </label>
           <input
             type="file"
@@ -159,8 +170,9 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
           />
         </div>
 
+        {/* Error Alert */}
         {errorMsg && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 font-mono text-xs flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-mono text-xs flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -168,12 +180,12 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
           </div>
         )}
 
-        {/* Action Controls */}
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+        {/* Modal Actions */}
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -200,5 +212,4 @@ export function BulkCsvImportModal({ isOpen, onClose }: BulkCsvImportModalProps)
   );
 }
 
-// Dual export handling:
 export default BulkCsvImportModal;
