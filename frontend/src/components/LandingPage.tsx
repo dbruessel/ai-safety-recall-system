@@ -28,13 +28,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onSignIn, 
   totalGlobalRecalls 
 }) => {
-  // Real count fetched from Supabase recall_definitions table
+  // Supabase count for recall_definitions table
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [freeLookupsLeft, setFreeLookupsLeft] = useState<number>(10);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
 
-  // FETCH ACCURATE COUNT DIRECTLY FROM SUPABASE `recall_definitions` TABLE
+  // Fetch exact count from Supabase recall_definitions table
   useEffect(() => {
     async function fetchRecallCount() {
       try {
@@ -46,14 +46,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           setRealRecallCount(count);
         }
       } catch (err) {
-        console.warn('Could not fetch recall count from Supabase, using fallback:', err);
+        console.warn('Could not fetch recall count from Supabase, using default count:', err);
       }
     }
 
     fetchRecallCount();
   }, []);
 
-  // File drag & drop handlers
+  // Drag and drop handlers
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -137,16 +137,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden">
       
-      {/* Background Glow */}
+      {/* Background Lighting */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-gradient-to-b from-[#06B6D4]/10 via-[#EF4444]/5 to-transparent blur-3xl opacity-60" />
       </div>
 
-      {/* CLEAN GLOBAL NAV BAR */}
+      {/* STREAMLINED GLOBAL NAV BAR */}
       <nav className="border-b border-slate-800/80 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-2.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Logo & Subtext */}
+          {/* Logo & Branding */}
           <div className="flex items-center gap-2.5 shrink-0">
             <img 
               src="/recall-logo.png" 
@@ -164,7 +164,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* ACCURATE SUPABASE RECALL COUNTER BANNER */}
+          {/* Real Supabase Record Counter Banner */}
           <div className="flex-1 max-w-md mx-2 px-3 py-1 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/40 flex items-center justify-center gap-2.5 shadow-[0_0_12px_rgba(239,68,68,0.12)]">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-75"></span>
@@ -208,7 +208,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           Upload your fleet list to test our Real-Time Safety Sync engine with 10 free lookups.
         </p>
 
-        {/* COMPACT BULK FLEET DROPZONE */}
+        {/* BULK FLEET INGESTION DROPZONE (.CSV AND .TXT ONLY) */}
         <div className="max-w-xl mx-auto rounded-xl bg-slate-900/90 border border-slate-700 p-4 shadow-xl backdrop-blur-xl text-left space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold font-mono text-slate-300 uppercase tracking-wider">
@@ -230,9 +230,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 : 'border-slate-700 hover:border-slate-500 bg-slate-950/60'
             }`}
           >
+            {/* STRICT ACCEPTANCE FORMATS */}
             <input
               type="file"
-              accept=".csv, .txt, .xlsx, .pdf"
+              accept=".csv, .txt"
               onChange={handleFileSelect}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
@@ -249,7 +250,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Drop fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  Supports .csv, .txt, .xlsx, and .pdf
+                  Supports strictly <span className="text-slate-200 font-semibold">.csv</span> and <span className="text-slate-200 font-semibold">.txt</span> formats
                 </p>
               </div>
             </div>
@@ -312,7 +313,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* BULK IMPORT MODAL DISPATCH */}
+      {/* BULK IMPORT MODAL */}
       {isBulkModalOpen && (
         <BulkCsvImportModal
           isOpen={isBulkModalOpen}
