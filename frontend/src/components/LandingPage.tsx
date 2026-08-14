@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import BulkCsvImportModal from './BulkCsvImportModal';
 
 interface LandingPageProps {
@@ -19,13 +20,38 @@ export interface PricingTier {
   features: string[];
 }
 
+const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export const LandingPage: React.FC<LandingPageProps> = ({ 
   onSignIn, 
-  totalGlobalRecalls = 124892 // Pulled from Supabase/Render cron job
+  totalGlobalRecalls 
 }) => {
+  // Real count fetched from Supabase recall_definitions table
+  const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [freeLookupsLeft, setFreeLookupsLeft] = useState<number>(10);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
+
+  // FETCH ACCURATE COUNT DIRECTLY FROM SUPABASE `recall_definitions` TABLE
+  useEffect(() => {
+    async function fetchRecallCount() {
+      try {
+        const { count, error } = await supabase
+          .from('recall_definitions')
+          .select('*', { count: 'exact', head: true });
+
+        if (!error && count !== null) {
+          setRealRecallCount(count);
+        }
+      } catch (err) {
+        console.warn('Could not fetch recall count from Supabase, using fallback:', err);
+      }
+    }
+
+    fetchRecallCount();
+  }, []);
 
   // File drag & drop handlers
   const handleDrag = (e: React.DragEvent) => {
@@ -111,16 +137,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden">
       
-      {/* Background Glow Effects */}
+      {/* Background Glow */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-gradient-to-b from-[#06B6D4]/10 via-[#EF4444]/5 to-transparent blur-3xl opacity-60" />
       </div>
 
-      {/* STREAMLINED GLOBAL NAV */}
+      {/* CLEAN GLOBAL NAV BAR */}
       <nav className="border-b border-slate-800/80 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2 sm:gap-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Logo & Branding */}
+          {/* Logo & Subtext */}
           <div className="flex items-center gap-2.5 shrink-0">
             <img 
               src="/recall-logo.png" 
@@ -131,25 +157,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="font-extrabold text-white text-base tracking-tight font-mono">
                 RecallLogic
               </span>
-              <span className="text-slate-500 text-xs hidden sm:inline">|</span>
-              <span className="text-xs font-semibold tracking-wide text-slate-300 font-mono hidden sm:inline">
+              <span className="text-slate-600 text-xs hidden sm:inline">|</span>
+              <span className="text-xs font-semibold tracking-wide text-slate-400 font-mono hidden sm:inline">
                 Safety Intelligence System
               </span>
             </div>
           </div>
 
-          {/* Red Recall Stat Banner */}
-          <div className="flex-1 max-w-xl w-full mx-auto md:mx-4 px-3 py-1 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/40 flex items-center justify-center gap-2.5 shadow-[0_0_15px_rgba(239,68,68,0.12)]">
+          {/* ACCURATE SUPABASE RECALL COUNTER BANNER */}
+          <div className="flex-1 max-w-md mx-2 px-3 py-1 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/40 flex items-center justify-center gap-2.5 shadow-[0_0_12px_rgba(239,68,68,0.12)]">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#EF4444]"></span>
             </span>
             <div className="text-center font-mono flex items-center gap-1.5 flex-wrap justify-center">
               <span className="text-[#EF4444] font-black text-sm sm:text-base tracking-wider">
-                {totalGlobalRecalls.toLocaleString()}
+                {realRecallCount.toLocaleString()}
               </span>
-              <span className="text-[#EF4444] font-bold text-[11px] uppercase tracking-wide">
-                Active Recalls Monitored Globally
+              <span className="text-[#EF4444] font-bold text-[10px] sm:text-[11px] uppercase tracking-wide">
+                Active Recalls Monitored
               </span>
             </div>
           </div>
@@ -193,7 +219,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </span>
           </div>
 
-          {/* Compact Drop Area */}
           <div
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -232,7 +257,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* STRIPE PRICING GRID — IMMEDIATELY VISIBLE ON FOLD */}
+      {/* STRIPE PRICING GRID */}
       <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
