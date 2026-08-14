@@ -1,149 +1,306 @@
 import React, { useState } from 'react';
+import BulkCsvImportModal from './BulkCsvImportModal';
 
 interface LandingPageProps {
   onSignIn: () => void;
   totalGlobalRecalls?: number;
 }
 
+export interface PricingTier {
+  id: 'standard' | 'professional' | 'enterprise';
+  name: string;
+  subtitle: string;
+  price: string;
+  billing: string;
+  badge: string;
+  popular?: boolean;
+  color: string;
+  buttonStyle: string;
+  features: string[];
+}
+
 export const LandingPage: React.FC<LandingPageProps> = ({ 
   onSignIn, 
-  totalGlobalRecalls = 124892 // Fallback or direct count from nightly cron job
+  totalGlobalRecalls = 124892 // Pulled from Supabase/Render cron job
 }) => {
+  const [freeLookupsLeft, setFreeLookupsLeft] = useState<number>(10);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
+  const [dragActive, setDragActive] = useState<boolean>(false);
+
+  // File drag & drop handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setIsBulkModalOpen(true);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setIsBulkModalOpen(true);
+    }
+  };
+
+  const pricingTiers: PricingTier[] = [
+    {
+      id: 'standard',
+      name: 'Standard',
+      subtitle: 'Compliance Essentials',
+      price: '$99',
+      billing: 'per month',
+      badge: 'ESSENTIAL',
+      color: 'border-slate-800 bg-slate-900/50',
+      buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
+      features: [
+        'Up to 50 Monitored VINs',
+        'NHTSA & CPSC Automated Feeds',
+        'Weekly Compliance Reports',
+        'Email Risk Alerts'
+      ]
+    },
+    {
+      id: 'professional',
+      name: 'Professional',
+      subtitle: 'Operational Intelligence',
+      price: '$249',
+      billing: 'per month',
+      badge: 'MOST POPULAR',
+      popular: true,
+      color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
+      buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
+      features: [
+        'Up to 250 Monitored VINs',
+        'Real-Time Safety Sync (< 2s isolation)',
+        'Full API & Webhook Access',
+        'Underwriter Shareable Audit Links',
+        'Priority Phone & Email Support'
+      ]
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      subtitle: 'Total Risk Management',
+      price: '$499',
+      billing: 'per month',
+      badge: 'TOTAL CONTROL',
+      color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
+      buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
+      features: [
+        'Unlimited Monitored VINs',
+        'Custom ERP & WMS Integrations',
+        'Multi-Site Operational Isolation',
+        'Dedicated Compliance Officer',
+        'SLA & Custom Contract Terms'
+      ]
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden">
       
-      {/* GLOBAL TOP NAVIGATION HEADER WITH CRON METRIC COUNTER */}
-      <nav className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      {/* Background Glow Effects */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-gradient-to-b from-[#06B6D4]/10 via-[#EF4444]/5 to-transparent blur-3xl opacity-60" />
+      </div>
+
+      {/* STREAMLINED GLOBAL NAV */}
+      <nav className="border-b border-slate-800/80 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2 sm:gap-3">
           
-          {/* BRAND LOGO & CORE POSITIONING */}
-          <div className="flex items-center gap-3">
+          {/* Logo & Branding */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <img 
               src="/recall-logo.png" 
               alt="RecallLogic Logo" 
-              className="h-9 w-auto object-contain"
+              className="h-7 w-auto object-contain"
             />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-base tracking-tight font-mono">RECALLLOGIC</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-wider">
-                  Verified Intelligence
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-mono hidden sm:block">Active Operational Risk & Compliance Control</p>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-white text-base tracking-tight font-mono">
+                RecallLogic
+              </span>
+              <span className="text-slate-500 text-xs hidden sm:inline">|</span>
+              <span className="text-xs font-semibold tracking-wide text-slate-300 font-mono hidden sm:inline">
+                Safety Intelligence System
+              </span>
             </div>
           </div>
 
-          {/* RIGHT SIDE: LIVE NIGHTLY CRON METRIC + SIGN IN */}
-          <div className="flex items-center gap-4 sm:gap-6">
-            
-            {/* NIGHTLY CRON RECALL COUNTER */}
-            <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800/80">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          {/* Red Recall Stat Banner */}
+          <div className="flex-1 max-w-xl w-full mx-auto md:mx-4 px-3 py-1 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/40 flex items-center justify-center gap-2.5 shadow-[0_0_15px_rgba(239,68,68,0.12)]">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#EF4444]"></span>
+            </span>
+            <div className="text-center font-mono flex items-center gap-1.5 flex-wrap justify-center">
+              <span className="text-[#EF4444] font-black text-sm sm:text-base tracking-wider">
+                {totalGlobalRecalls.toLocaleString()}
               </span>
-              <div className="text-[11px] font-mono">
-                <span className="text-slate-400">Nightly NHTSA Sync: </span>
-                <span className="text-emerald-400 font-bold tracking-wide">
-                  {totalGlobalRecalls.toLocaleString()}
-                </span>
-                <span className="text-slate-400"> Active Recalls Monitored</span>
-              </div>
+              <span className="text-[#EF4444] font-bold text-[11px] uppercase tracking-wide">
+                Active Recalls Monitored Globally
+              </span>
             </div>
+          </div>
 
+          {/* Sign In CTA */}
+          <div className="shrink-0">
             <button
               onClick={onSignIn}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/10 transition-all cursor-pointer font-mono"
+              className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
-              Sign In to Console →
+              Sign In
             </button>
           </div>
+
         </div>
       </nav>
 
-      {/* HERO SECTION — HIGH CONTRAST & TECH-FOCUSED */}
-      <section className="relative pt-20 pb-20 px-6 max-w-6xl mx-auto text-center space-y-6 overflow-hidden">
-        {/* Glow Effects */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none"></div>
-
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Verified Safety Intelligence Platform</span>
+      {/* COMPACT HERO SECTION */}
+      <section className="relative pt-6 pb-6 px-4 max-w-4xl mx-auto text-center space-y-3">
+        <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-[#06B6D4]/40 text-[11px] font-mono text-[#06B6D4]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" />
+          <span>Real-Time Safety Sync Active</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-none">
-          Continuous Recall Intelligence <br />
-          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-            For Modern Commercial Fleets
-          </span>
+        <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+          Instant Fleet Safety &amp; Recall Control
         </h1>
 
-        <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
-          RecallLogic runs automated nightly cron audits against official NHTSA databases to eliminate safety risks, document proof of remedy, and output underwriter-ready compliance certificates.
+        <p className="text-slate-300 text-xs sm:text-sm max-w-xl mx-auto font-normal leading-normal">
+          Upload your fleet list to test our Real-Time Safety Sync engine with 10 free lookups.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-          <button
-            onClick={onSignIn}
-            className="w-full sm:w-auto px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-xl shadow-emerald-500/20 transition-all cursor-pointer font-mono"
+        {/* COMPACT BULK FLEET DROPZONE */}
+        <div className="max-w-xl mx-auto rounded-xl bg-slate-900/90 border border-slate-700 p-4 shadow-xl backdrop-blur-xl text-left space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold font-mono text-slate-300 uppercase tracking-wider">
+              Bulk Fleet VIN Ingestion
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">
+              {freeLookupsLeft} FREE LOOKUPS REMAINING
+            </span>
+          </div>
+
+          {/* Compact Drop Area */}
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
+              dragActive 
+                ? 'border-[#06B6D4] bg-[#06B6D4]/10' 
+                : 'border-slate-700 hover:border-slate-500 bg-slate-950/60'
+            }`}
           >
-            Launch Workspace Console
-          </button>
+            <input
+              type="file"
+              accept=".csv, .txt, .xlsx, .pdf"
+              onChange={handleFileSelect}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            />
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pointer-events-none">
+              <div className="w-8 h-8 rounded-full bg-[#06B6D4]/10 border border-[#06B6D4]/30 flex items-center justify-center shrink-0 text-[#06B6D4]">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-semibold text-white">
+                  Drop fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  Supports .csv, .txt, .xlsx, and .pdf
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* TECH ARCHITECTURE CARDS — WHITE / EMERALD ACCENTS */}
-      <section className="px-6 py-12 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Card 1 */}
-        <div className="p-6 bg-white rounded-2xl border border-gray-200 shadow-xl space-y-3 text-slate-900">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700 font-bold text-lg">
-            ⚡
+      {/* STRIPE PRICING GRID — IMMEDIATELY VISIBLE ON FOLD */}
+      <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
+            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest">Transparent Pricing</h2>
+            <p className="text-xl sm:text-2xl font-extrabold text-white">Choose Your Safety Tier</p>
           </div>
-          <h3 className="text-base font-extrabold text-slate-900 font-mono">Nightly Cron Execution</h3>
-          <p className="text-xs text-slate-600 leading-relaxed font-sans">
-            Automatic background indexing matches your vehicle inventory against official NHTSA safety campaigns every 24 hours.
-          </p>
-          <div className="pt-2 text-[11px] font-mono font-bold text-emerald-600">
-            ✓ Zero Manual VIN Searching
+
+          <div className="grid md:grid-cols-3 gap-5 items-stretch">
+            {pricingTiers.map((tier) => (
+              <div
+                key={tier.id}
+                className={`relative rounded-xl border p-5 flex flex-col justify-between ${tier.color}`}
+              >
+                {tier.popular && (
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md">
+                    {tier.badge}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-white">{tier.name}</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{tier.subtitle}</p>
+                  </div>
+
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
+                    <span className="text-[11px] text-slate-400">{tier.billing}</span>
+                  </div>
+
+                  <ul className="space-y-2 text-[11px] text-slate-300">
+                    {tier.features.map((feat, i) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-[#06B6D4] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <button
+                  onClick={onSignIn}
+                  className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer ${tier.buttonStyle}`}
+                >
+                  Get Started with {tier.name}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Card 2 */}
-        <div className="p-6 bg-white rounded-2xl border border-gray-200 shadow-xl space-y-3 text-slate-900">
-          <div className="w-10 h-10 rounded-xl bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700 font-bold text-lg">
-            🛡️
-          </div>
-          <h3 className="text-base font-extrabold text-slate-900 font-mono">Underwriter Risk Audits</h3>
-          <p className="text-xs text-slate-600 leading-relaxed font-sans">
-            Generates verifiable, encrypted proof-of-compliance reports for insurance carriers to eliminate high policy surcharges.
-          </p>
-          <div className="pt-2 text-[11px] font-mono font-bold text-cyan-600">
-            ✓ Carrier-Grade Audit Certificates
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className="p-6 bg-white rounded-2xl border border-gray-200 shadow-xl space-y-3 text-slate-900">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800 font-bold text-lg">
-            📋
-          </div>
-          <h3 className="text-base font-extrabold text-slate-900 font-mono">Verified Proof of Remedy</h3>
-          <p className="text-xs text-slate-600 leading-relaxed font-sans">
-            Upload dealer work orders and receipt invoices directly to permanently close safety tasks in your fleet liability matrix.
-          </p>
-          <div className="pt-2 text-[11px] font-mono font-bold text-slate-700">
-            ✓ Permanent Audit Audit-Trail
-          </div>
-        </div>
-
       </section>
+
+      {/* BULK IMPORT MODAL DISPATCH */}
+      {isBulkModalOpen && (
+        <BulkCsvImportModal
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+        />
+      )}
 
       {/* FOOTER */}
-      <footer className="border-t border-slate-800/80 py-8 px-6 text-center text-xs text-slate-500 font-mono">
-        © 2026 RecallLogic Inc. Verified Safety Intelligence Platform.
+      <footer className="border-t border-slate-800/80 py-4 px-6 text-center text-[11px] text-slate-500 font-mono">
+        © 2026 RecallLogic Inc. Safety Intelligence System.
       </footer>
     </div>
   );
 };
+
+export default LandingPage;

@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// Modular App Components
 import TaskBoard from './components/TaskBoard';
 import AccountMenu from './components/AccountMenu';
 import BillingManagementModal from './components/BillingManagementModal';
 import TeamManagementModal from './components/TeamManagementModal';
+import ModalsContainer from './components/ModalsContainer';
+
+// Modular Landing Page Component
 import { LandingPage } from './components/LandingPage';
 
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
 export type UserRole = 'admin' | 'mechanic' | 'viewer';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export function App() {
+export function App(): React.ReactElement {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -33,7 +37,7 @@ export function App() {
     async function initAuth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
           setIsAuthenticated(true);
           setCurrentUserId(session.user.id);
@@ -57,7 +61,6 @@ export function App() {
 
     initAuth();
 
-    // Listen for auth state changes (e.g. Sign Out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         setIsAuthenticated(false);
@@ -71,7 +74,7 @@ export function App() {
     };
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (): Promise<void> => {
     try {
       await supabase.auth.signOut();
     } catch (error) {
@@ -87,22 +90,20 @@ export function App() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-sm">
         <div className="flex items-center gap-3">
-          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
-          <span>Loading RecallLogic...</span>
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-cyan-500 border-t-transparent"></div>
+          <span>Loading RecallLogic Safety Intelligence System...</span>
         </div>
       </div>
     );
   }
 
-  // PUBLIC MARKETING HOMEPAGE (Shown when signed out or non-paying)
+  // PUBLIC MARKETING HOMEPAGE (Delegates directly to src/components/LandingPage.tsx)
   if (!isAuthenticated) {
     return (
-      <LandingPage 
+      <LandingPage
         onSignIn={() => {
-          // If you have a Supabase Auth UI / Login Modal, trigger it here.
-          // For local dev, toggles back to active workspace:
           setIsAuthenticated(true);
-        }} 
+        }}
       />
     );
   }
@@ -112,12 +113,12 @@ export function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       <header className="border-b border-slate-800 bg-slate-950 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white font-mono text-sm shadow-md">
+          <div className="w-8 h-8 bg-[#06B6D4] rounded-lg flex items-center justify-center font-bold text-slate-950 font-mono text-sm shadow-md">
             RL
           </div>
           <div>
             <h1 className="font-bold text-white text-sm tracking-wide font-mono">RECALLLOGIC WORKSPACE</h1>
-            <p className="text-[10px] text-slate-400 font-mono">Active Operational Risk Control.</p>
+            <p className="text-[10px] text-[#06B6D4] font-mono">Safety Intelligence System Active.</p>
           </div>
         </div>
 
@@ -143,6 +144,7 @@ export function App() {
         <TaskBoard />
       </main>
 
+      {/* Workspace Management Modals */}
       <BillingManagementModal
         isOpen={isBillingModalOpen}
         subscriptionTier={subscriptionTier}
@@ -157,6 +159,9 @@ export function App() {
         onClose={() => setIsTeamModalOpen(false)}
         currentUserId={currentUserId}
       />
+
+      {/* Global Modals Orchestrator */}
+      <ModalsContainer />
     </div>
   );
 }
