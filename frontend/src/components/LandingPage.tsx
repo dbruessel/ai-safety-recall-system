@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import BulkCsvImportModal from './BulkCsvImportModal';
 
-// Blueprint interface for LandingPage component props
 export interface LandingPageProps {
   onSignIn: () => void;
   onSelectTier?: (tierId: 'standard' | 'professional' | 'enterprise') => void;
@@ -11,6 +10,7 @@ export interface LandingPageProps {
 
 export interface PricingTier {
   id: 'standard' | 'professional' | 'enterprise';
+  stripePriceId: string;
   name: string;
   subtitle: string;
   price: string;
@@ -25,13 +25,6 @@ export interface PricingTier {
 const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Fallback Stripe Payment Links (overridden if passed via App.tsx onSelectTier)
-const STRIPE_CHECKOUT_URLS: Record<string, string> = {
-  standard: import.meta.env.VITE_STRIPE_STANDARD_URL || 'https://buy.stripe.com/test_standard',
-  professional: import.meta.env.VITE_STRIPE_PROFESSIONAL_URL || 'https://buy.stripe.com/test_professional',
-  enterprise: import.meta.env.VITE_STRIPE_ENTERPRISE_URL || 'https://buy.stripe.com/test_enterprise',
-};
 
 export const LandingPage: React.FC<LandingPageProps> = ({ 
   onSignIn, 
@@ -89,21 +82,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // Route customer to Stripe Checkout for the chosen tier
-  const handleTierCheckout = (tierId: 'standard' | 'professional' | 'enterprise') => {
+  // Launch dynamic Stripe Checkout Session via Price ID or App.tsx handler
+  const handleTierCheckout = async (tier: PricingTier) => {
+    // If App.tsx provides a tier handler, delegate to it first
     if (onSelectTier) {
-      onSelectTier(tierId);
-    } else {
-      const checkoutUrl = STRIPE_CHECKOUT_URLS[tierId];
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+      onSelectTier(tier.id);
+      return;
+    }
+
+    // Otherwise, call backend API route to generate a dynamic Stripe Checkout Session
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tier: tier.id,
+          priceId: tier.stripePriceId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.sessionId) {
+        window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
+      } else {
+        console.warn('No Stripe checkout URL returned from backend API.');
       }
+    } catch (err) {
+      console.error('Error triggering Stripe checkout session:', err);
     }
   };
 
   const pricingTiers: PricingTier[] = [
     {
       id: 'standard',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || 'price_1TrIFTDXs4xycz0o1e9gfg9d',
       name: 'Standard',
       subtitle: 'Compliance Essentials',
       price: '$99',
@@ -120,6 +138,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     },
     {
       id: 'professional',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_1TrIFPRO',
       name: 'Professional',
       subtitle: 'Operational Intelligence',
       price: '$249',
@@ -138,6 +157,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     },
     {
       id: 'enterprise',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || 'price_1TrIFENTERPRISE',
       name: 'Enterprise',
       subtitle: 'Total Risk Management',
       price: '$499',
@@ -325,7 +345,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleTierCheckout(tier.id)}
+                  onClick={() => handleTierCheckout(tier)}
                   className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer ${tier.buttonStyle}`}
                 >
                   Subscribe to {tier.name}

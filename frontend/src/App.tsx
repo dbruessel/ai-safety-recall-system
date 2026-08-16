@@ -97,24 +97,37 @@ export function App(): React.ReactElement {
     );
   }
 
- // PUBLIC MARKETING HOMEPAGE
+// PUBLIC MARKETING HOMEPAGE
   if (!isAuthenticated) {
     return (
       <LandingPage
         onSignIn={() => {
-          // Dedicated to signing in existing users
           setIsAuthenticated(true);
         }}
-        onSelectTier={(tierId) => {
-          // Dedicated to Stripe Checkout for new customers
-          const stripeUrls: Record<string, string> = {
-            standard: 'https://buy.stripe.com/your_standard_link',
-            professional: 'https://buy.stripe.com/your_pro_link',
-            enterprise: 'https://buy.stripe.com/your_enterprise_link',
-          };
+        onSelectTier={async (tierId) => {
+          try {
+            // Option A: Direct API call to your backend Stripe Checkout route
+            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+            const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tier: tierId }),
+            });
 
-          if (stripeUrls[tierId]) {
-            window.location.href = stripeUrls[tierId];
+            const data = await response.json();
+
+            if (data.url) {
+              window.location.href = data.url; // Redirect to official Stripe Checkout Session
+            } else if (data.sessionId) {
+              window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
+            } else {
+              // Option B: Fallback to login/signup workspace entry if backend requires auth first
+              setIsAuthenticated(true);
+            }
+          } catch (error) {
+            console.error('Stripe checkout error:', error);
+            // Fallback: route to workspace sign-in
+            setIsAuthenticated(true);
           }
         }}
       />
