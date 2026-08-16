@@ -16,10 +16,10 @@ class PortalRequest(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
-    email: str
     tier: str
     success_url: str
     cancel_url: str
+    email: Optional[str] = None  # Optional: Allows unauthenticated landing page leads to check out directly
 
 
 def get_stripe_price_id(tier: str) -> str:
@@ -86,9 +86,11 @@ async def create_checkout_session(req: CheckoutRequest):
                 detail=f"No Stripe Price ID configured for tier '{req.tier}'. Check backend environment variables."
             )
 
-        # Look up existing customer or let Checkout create one
-        customers = stripe.Customer.list(email=req.email, limit=1)
-        customer_id = customers.data[0].id if customers.data else None
+        # Look up existing customer if email provided, otherwise let Stripe collect it on checkout
+        customer_id = None
+        if req.email:
+            customers = stripe.Customer.list(email=req.email, limit=1)
+            customer_id = customers.data[0].id if customers.data else None
 
         checkout_kwargs = {
             "payment_method_types": ["card"],
@@ -96,12 +98,15 @@ async def create_checkout_session(req: CheckoutRequest):
             "mode": "subscription",
             "success_url": req.success_url,
             "cancel_url": req.cancel_url,
-            "metadata": {"tier": req.tier.lower(), "email": req.email},
+            "metadata": {"tier": req.tier.lower()},
         }
+
+        if req.email:
+            checkout_kwargs["metadata"]["email"] = req.email
 
         if customer_id:
             checkout_kwargs["customer"] = customer_id
-        else:
+        elif req.email:
             checkout_kwargs["customer_email"] = req.email
 
         session = stripe.checkout.Session.create(**checkout_kwargs)
@@ -151,7 +156,6 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
         customer_email = data_object.get("customer_email") or data_object.get("customer_details", {}).get("email")
         tier = data_object.get("metadata", {}).get("tier")
         print(f"✅ Subscription activated! User: {customer_email} | Tier: {tier}")
-        # Insert Supabase database tier update logic here if needed
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_object.get("customer")

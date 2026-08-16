@@ -98,41 +98,47 @@ export function App(): React.ReactElement {
   }
 
 // PUBLIC MARKETING HOMEPAGE
-  if (!isAuthenticated) {
-    return (
-      <LandingPage
-        onSignIn={() => {
-          setIsAuthenticated(true);
-        }}
-        onSelectTier={async (tierId) => {
-          try {
-            // Option A: Direct API call to your backend Stripe Checkout route
-            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-            const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tier: tierId }),
-            });
+if (!isAuthenticated) {
+  return (
+    <LandingPage
+      onSignIn={() => {
+        setIsAuthenticated(true);
+      }}
+      onSelectTier={async (tierId) => {
+        try {
+          const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+          
+          const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: 'guest@recalllogic.com', // Passes Pydantic validation; Stripe updates this upon buyer checkout
+              tier: tierId,
+              success_url: `${window.location.origin}/?session_id={CHECKOUT_SESSION_ID}`,
+              cancel_url: window.location.origin,
+            }),
+          });
 
-            const data = await response.json();
-
-            if (data.url) {
-              window.location.href = data.url; // Redirect to official Stripe Checkout Session
-            } else if (data.sessionId) {
-              window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
-            } else {
-              // Option B: Fallback to login/signup workspace entry if backend requires auth first
-              setIsAuthenticated(true);
-            }
-          } catch (error) {
-            console.error('Stripe checkout error:', error);
-            // Fallback: route to workspace sign-in
-            setIsAuthenticated(true);
+          if (!response.ok) {
+            const errData = await response.json();
+            console.error('Backend Checkout Error:', errData);
+            return;
           }
-        }}
-      />
-    );
-  }
+
+          const data = await response.json();
+
+          if (data.url) {
+            window.location.href = data.url; // Redirects straight to live Stripe Checkout page!
+          }
+        } catch (err) {
+          console.error('Failed to trigger Stripe checkout:', err);
+        }
+      }}
+    />
+  );
+}
 
   // ACTIVE WORKSPACE CONSOLE (Shown when authenticated)
   return (
