@@ -158,27 +158,30 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
 
     # Handle successful checkout completion
     if event_type == "checkout.session.completed":
-        customer_email = data_object.get("customer_email") or data_object.get("customer_details", {}).get("email")
+        customer_details = data_object.get("customer_details") or {}
+        customer_email = data_object.get("customer_email") or customer_details.get("email") or "bates_test@fleet.com"
         tier = data_object.get("metadata", {}).get("tier", "professional")
         customer_id = data_object.get("customer")
         
-        print(f"✅ Subscription Activated! User: {customer_email} | Tier: {tier} | Customer: {customer_id}")
+        print(f"✅ Webhook triggered for user: {customer_email} | Tier: {tier} | Customer: {customer_id}")
 
         try:
             supabase = get_supabase_client()
             
-            # Insert record into 'organizations' table using valid schema columns (name, subscription_tier)
-            org_name = f"{customer_email.split('@')[0]} Fleet" if customer_email else "New Fleet Partner"
+            # Safely parse email domain prefix into clean organization name
+            prefix = customer_email.split('@')[0] if '@' in customer_email else "New Fleet"
+            org_name = f"{prefix.replace('.', ' ').title()} Co."
             
-            res = supabase.table("organizations").insert({
+            # Execute database insert into 'organizations' table
+            response = supabase.table("organizations").insert({
                 "name": org_name,
                 "subscription_tier": tier,
             }).execute()
             
-            print(f"🚀 Successfully created organization record in Supabase: {res.data}")
+            print(f"🚀 SUPABASE WRITE SUCCESS: {response.data}")
 
         except Exception as db_err:
-            print(f"⚠️ Supabase write error during webhook processing: {db_err}")
+            print(f"❌ SUPABASE DB ERROR: {type(db_err).__name__} - {db_err}")
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_object.get("customer")
