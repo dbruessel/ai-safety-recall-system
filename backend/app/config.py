@@ -1,6 +1,7 @@
 ﻿import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from supabase import create_client, Client
 
 
 class Settings(BaseSettings):
@@ -79,6 +80,20 @@ def get_settings() -> Settings:
 
 # Global settings singleton for services importing `settings` directly
 settings = get_settings()
+
+
+def get_supabase_client() -> Client:
+    """
+    Helper to initialize and return a Supabase client for server-side operations.
+    """
+    s = get_settings()
+    url = s.supabase_url or os.getenv("SUPABASE_URL")
+    key = s.supabase_service_key or s.supabase_key or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    
+    if not url or not key:
+        raise ValueError("SUPABASE_URL and a valid Supabase key must be configured in .env")
+        
+    return create_client(url, key)
 
 
 def init_vertex() -> None:
