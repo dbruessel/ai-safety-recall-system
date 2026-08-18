@@ -3,6 +3,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel
 from typing import Optional
+from app.config import get_supabase_client
 
 # Router prefix aligned with frontend API calls
 router = APIRouter(prefix="/stripe", tags=["Stripe Billing"])
@@ -128,7 +129,7 @@ async def create_checkout_session(req: CheckoutRequest):
 async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Header(None)):
     """
     Receives incoming webhook events from Stripe (CLI or Production)
-    to process subscription changes automatically.
+    to process subscription changes automatically and sync to Supabase.
     """
     payload = await request.body()
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -158,11 +159,38 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
     # Handle successful checkout completion
     if event_type == "checkout.session.completed":
         customer_email = data_object.get("customer_email") or data_object.get("customer_details", {}).get("email")
-        tier = data_object.get("metadata", {}).get("tier")
-        print(f"✅ Subscription activated! User: {customer_email} | Tier: {tier}")
+        tier = data_object.get("metadata", {}).get("tier", "professional")
+        customer_id = data_object.get("customer")
+        
+        print(f"✅ Subscription Activated! User: {customer_email} | Tier: {tier} | Customer: {customer_id}")
+
+        try:
+            supabase = get_supabase_client()
+            
+            # Upsert new subscriber into your 'orgs' table in Supabase
+            if customer_email:
+                supabase.table("orgs").upsert({
+                    "email": customer_email,
+                    "subscription_tier": tier,
+                    "stripe_customer_id": customer_id,
+                    "status": "active"
+                }, on_conflict="email").execute()
+                
+                print(f"🚀 Successfully synced {customer_email} to Supabase 'orgs' table!")
+            else:
+                print("⚠️ Webhook event missing customer email; skipping Supabase sync.")
+
+        except Exception as db_err:
+            print(f"⚠️ Supabase write error during webhook processing: {db_err}")
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_object.get("customer")
         print(f"⚠️ Subscription canceled for customer: {customer_id}")
+
+        try:
+            supabase = get_supabase_client()
+            supabase.table("orgs").update({"status": "canceled"}).eq("stripe_customer_id", customer_id).execute()
+        except Exception as db_err:
+            print(f"⚠️ Supabase cancellation update error: {db_err}")
 
     return {"status": "success"}
