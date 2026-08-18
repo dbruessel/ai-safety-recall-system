@@ -167,18 +167,15 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
         try:
             supabase = get_supabase_client()
             
-            # Upsert new subscriber into your 'orgs' table in Supabase
-            if customer_email:
-                supabase.table("orgs").upsert({
-                    "email": customer_email,
-                    "subscription_tier": tier,
-                    "stripe_customer_id": customer_id,
-                    "status": "active"
-                }, on_conflict="email").execute()
-                
-                print(f"🚀 Successfully synced {customer_email} to Supabase 'orgs' table!")
-            else:
-                print("⚠️ Webhook event missing customer email; skipping Supabase sync.")
+            # Insert record into 'organizations' table using valid schema columns (name, subscription_tier)
+            org_name = f"{customer_email.split('@')[0]} Fleet" if customer_email else "New Fleet Partner"
+            
+            res = supabase.table("organizations").insert({
+                "name": org_name,
+                "subscription_tier": tier,
+            }).execute()
+            
+            print(f"🚀 Successfully created organization record in Supabase: {res.data}")
 
         except Exception as db_err:
             print(f"⚠️ Supabase write error during webhook processing: {db_err}")
@@ -186,11 +183,5 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
     elif event_type == "customer.subscription.deleted":
         customer_id = data_object.get("customer")
         print(f"⚠️ Subscription canceled for customer: {customer_id}")
-
-        try:
-            supabase = get_supabase_client()
-            supabase.table("orgs").update({"status": "canceled"}).eq("stripe_customer_id", customer_id).execute()
-        except Exception as db_err:
-            print(f"⚠️ Supabase cancellation update error: {db_err}")
 
     return {"status": "success"}
