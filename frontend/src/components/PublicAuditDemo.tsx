@@ -7,9 +7,15 @@ interface PublicAuditDemoProps {
 export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe }) => {
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [copiedNote, setCopiedNote] = useState<boolean>(false);
-  const [brokerageName, setBrokerageName] = useState<string>('Apex Commercial Risk');
 
-  const underwriterNoteText = `UNDERWRITER SUBMISSION NOTE:
+  // Read ?broker= query parameter dynamically on load, fallback to default
+  const [brokerageName, setBrokerageName] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('broker') || 'Apex Commercial Risk';
+  });
+
+  // Dynamic underwriter submission note based on active brokerage name
+  const underwriterNoteText = `UNDERWRITER SUBMISSION NOTE (${brokerageName.toUpperCase()} COMMERCIAL PRACTICE):
 Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercial Transit Co. (48 Monitored Power Units). The insured maintains automated VIN recall tracking with a 94% remediation rate and an average 11-day resolution cycle. All open safety recalls are verified via attached dealer receipts. We request application of the 5% Loss Control Safety Credit for the upcoming policy term.`;
 
   const handleCopyLink = () => {
@@ -24,15 +30,83 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
     setTimeout(() => setCopiedNote(false), 2000);
   };
 
-  const handleExportPdf = () => {
-    alert('Simulating Carrier-Grade PDF Generation: Downloading Underwriter Risk Packet...');
+  const handleExportPdf = async () => {
+    const cleanBrokerName = brokerageName.replace(/\s+/g, '_');
+    
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      
+      // Attempt backend FastAPI PDF report download
+      const response = await fetch(`${apiBaseUrl}/api/pdf/generate-audit-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          brokerage_name: brokerageName,
+          fleet_name: 'Las Vegas Commercial Transit Co.',
+          remediation_rate: '94%',
+          resolution_days: 11,
+          annual_savings: '$12,450',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`PDF endpoint returned status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${cleanBrokerName}_Underwriter_Risk_Scorecard.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.warn('Backend PDF endpoint offline/unavailable, executing browser print fallback:', err);
+      
+      // Clean fallback: Native print-to-PDF dialog pre-named
+      const originalTitle = document.title;
+      document.title = `${cleanBrokerName}_Underwriter_Risk_Scorecard`;
+      window.print();
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 1000);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black">
       
+      {/* PRINT-SPECIFIC CSS STYLES */}
+      <style>{`
+        @media print {
+          button, nav, .no-print, input {
+            display: none !important;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+          }
+          main {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .rounded-2xl, .rounded-xl {
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+
       {/* BROKER PARTNER CO-BRANDING TOP BANNER */}
-      <div className="bg-gradient-to-r from-cyan-950 via-slate-900 to-cyan-950 border-b border-[#06B6D4]/40 px-4 py-2.5 text-xs font-mono">
+      <div className="no-print bg-gradient-to-r from-cyan-950 via-slate-900 to-cyan-950 border-b border-[#06B6D4]/40 px-4 py-2.5 text-xs font-mono">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 relative">
@@ -101,7 +175,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 no-print">
             <button
               onClick={handleCopyLink}
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-mono font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
@@ -128,7 +202,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </h2>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 no-print">
               <button
                 onClick={handleExportPdf}
                 className="px-4 py-2.5 rounded-xl bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-xs font-mono font-black flex items-center gap-2 transition-all shadow-md shadow-cyan-500/10 cursor-pointer uppercase tracking-wider"
@@ -182,7 +256,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </p>
             </div>
 
-            {/* Metric 4: Negotiated Premium Reduction */}
+            {/* Metric 4: Negotiated Premium Savings */}
             <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 bg-emerald-950/10 space-y-2">
               <span className="text-[11px] font-mono text-emerald-400 font-bold block uppercase tracking-wider">
                 NEGOTIATED PREMIUM SAVINGS
@@ -198,7 +272,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
 
           </div>
 
-          {/* COPYABLE UNDERWRITER SUBMISSION NOTE BOX */}
+          {/* COPYABLE UNDERWRITER SUBMISSION CHEAT SHEET */}
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-cyan-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
@@ -206,7 +280,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </span>
               <button
                 onClick={handleCopyNote}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[11px] font-mono font-bold transition-all cursor-pointer"
+                className="no-print px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[11px] font-mono font-bold transition-all cursor-pointer"
               >
                 {copiedNote ? 'Copied Note!' : 'Copy Submission Text'}
               </button>

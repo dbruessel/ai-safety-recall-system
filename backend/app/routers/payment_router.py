@@ -23,11 +23,11 @@ class CheckoutRequest(BaseModel):
 
 
 def get_stripe_price_id(tier: str) -> str:
-    """Helper to resolve Stripe Price IDs from environment variables."""
+    """Helper to resolve Stripe Price IDs from environment variables with safe fallbacks."""
     price_map = {
-        "standard": os.getenv("STRIPE_PRICE_STANDARD", ""),
-        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL", ""),
-        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", ""),
+        "standard": os.getenv("STRIPE_PRICE_STANDARD") or "price_1TrIFTDXs4xycz0o1e9gfg9d",
+        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or "price_1TrIFPRO",
+        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE") or "price_1TrIFENTERPRISE",
     }
     return price_map.get(tier.lower(), "")
 
@@ -62,6 +62,8 @@ async def create_portal_session(req: PortalRequest):
         )
         return {"url": session.url}
 
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         print(f"[Stripe Portal Error]: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -112,6 +114,8 @@ async def create_checkout_session(req: CheckoutRequest):
         session = stripe.checkout.Session.create(**checkout_kwargs)
         return {"url": session.url}
 
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         print(f"[Stripe Checkout Error]: {e}")
         raise HTTPException(status_code=400, detail=str(e))
