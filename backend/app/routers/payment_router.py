@@ -20,7 +20,7 @@ class CheckoutRequest(BaseModel):
     tier: str
     success_url: str
     cancel_url: str
-    email: Optional[str] = None  # Optional: Allows unauthenticated landing page leads to check out directly
+    email: Optional[str] = None
 
 
 def get_stripe_price_id(tier: str) -> str:
@@ -43,20 +43,17 @@ async def create_portal_session(req: PortalRequest):
         if not stripe.api_key:
             raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
 
-        # 1. Search for existing customer in Stripe Sandbox/Live by email
         customers = stripe.Customer.list(email=req.email, limit=1)
 
         if customers.data:
             customer_id = customers.data[0].id
         else:
-            # 2. Automatically provision customer if they don't exist yet
             new_customer = stripe.Customer.create(
                 email=req.email,
                 description=f"Fleet Operator ({req.email})"
             )
             customer_id = new_customer.id
 
-        # 3. Create Customer Portal Session
         session = stripe.billing_portal.Session.create(
             customer=customer_id,
             return_url="http://localhost:5173",
@@ -89,7 +86,6 @@ async def create_checkout_session(req: CheckoutRequest):
                 detail=f"No Stripe Price ID configured for tier '{req.tier}'. Check backend environment variables."
             )
 
-        # Look up existing customer if email provided, otherwise let Stripe collect it on checkout
         customer_id = None
         if req.email:
             customers = stripe.Customer.list(email=req.email, limit=1)
@@ -133,29 +129,31 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
     """
     payload = await request.body()
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    event = None
+    event_dict = {}
 
-    # Safely parse payload even if the CLI signing secret is mismatched during local testing
-    if webhook_secret and stripe_signature:
-        try:
-            event = stripe.Webhook.construct_event(
+    # 1. Safely parse Stripe Object or raw JSON into a standard Python dict
+    try:
+        if webhook_secret and stripe_signature:
+            stripe_event = stripe.Webhook.construct_event(
                 payload=payload, sig_header=stripe_signature, secret=webhook_secret
             )
-        except Exception as e:
-            print(f"⚠️ Signature verification failed ({e}). Parsing raw payload for local sandbox test...")
+            event_dict = stripe_event.to_dict() if hasattr(stripe_event, "to_dict") else dict(stripe_event)
+        else:
             import json
-            event = json.loads(payload)
-    else:
+            event_dict = json.loads(payload)
+    except Exception as parse_err:
+        print(f"⚠️ Webhook signature/parse fallback ({parse_err}). Reading raw JSON...")
         import json
-        event = json.loads(payload)
+        event_dict = json.loads(payload)
 
-    event_type = event.get("type")
-    data_object = event.get("data", {}).get("object", {})
+    # 2. Extract fields safely from dictionary
+    event_type = event_dict.get("type")
+    data_object = event_dict.get("data", {}).get("object", {})
 
     print("\n=================== WEBHOOK TRIGGERED ===================")
     print(f"🔔 Event Type: {event_type}")
 
-    # Handle successful checkout completion
+    # 3. Handle successful checkout completion
     if event_type == "checkout.session.completed":
         customer_details = data_object.get("customer_details") or {}
         customer_email = data_object.get("customer_email") or customer_details.get("email") or "bates_test@fleet.com"
@@ -168,7 +166,7 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
         try:
             supabase = get_supabase_client()
             
-            # Format clean organization name
+            # Format organization name cleanly
             prefix = customer_email.split('@')[0] if '@' in customer_email else "New Fleet"
             org_name = f"{prefix.replace('.', ' ').title()} Co."
             
