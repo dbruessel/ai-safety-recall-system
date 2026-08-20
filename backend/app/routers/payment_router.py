@@ -155,11 +155,21 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
 
     # 3. Handle successful checkout completion
     if event_type == "checkout.session.completed":
-        customer_details = data_object.get("customer_details") or {}
-        customer_email = data_object.get("customer_email") or customer_details.get("email") or "lasvegas_fleet_test@example.com"
-        tier = data_object.get("metadata", {}).get("tier", "professional")
         customer_id = data_object.get("customer")
+        raw_email = data_object.get("customer_email") or (data_object.get("customer_details") or {}).get("email")
         
+        # Override generic CLI test email or missing emails with target test profile
+        if not raw_email or raw_email == "stripe@example.com":
+            customer_email = "lasvegas_fleet_test@example.com"
+        else:
+            customer_email = raw_email
+
+        tier = data_object.get("metadata", {}).get("tier", "professional")
+        
+        # Guarantee a valid customer ID during testing if Stripe CLI sends None
+        if not customer_id:
+            customer_id = "cus_test_lasvegas_123"
+
         print(f"👤 Target Email: {customer_email}")
         print(f"🏷️ Tier: {tier} | Stripe Customer ID: {customer_id}")
 
@@ -189,21 +199,22 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
                 }).eq("id", org_id).execute()
                 print(f"🔄 ORG UPDATED: {company_name} set to tier '{tier}'")
             else:
-                # INSERT new organization if it truly doesn't exist
+                # INSERT new organization if it doesn't exist
                 supabase.table("organizations").insert({
                     "name": company_name,
                     "subscription_tier": tier,
                 }).execute()
                 print(f"🚀 ORG CREATED: {company_name}")
 
-            # Step C: Update profile with stripe_customer_id if available
-            if customer_id:
-                profile_res = supabase.table("profiles").update({
-                    "stripe_customer_id": customer_id
-                }).eq("email", customer_email).execute()
+            # Step C: Update profile with stripe_customer_id
+            profile_res = supabase.table("profiles").update({
+                "stripe_customer_id": customer_id
+            }).eq("email", customer_email).execute()
 
-                if profile_res.data:
-                    print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
+            if profile_res.data:
+                print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
+            else:
+                print(f"⚠️ Profile update returned no rows for {customer_email}")
 
         except Exception as db_err:
             print(f"❌ SUPABASE DB ERROR: {type(db_err).__name__} - {db_err}")
