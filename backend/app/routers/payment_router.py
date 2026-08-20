@@ -156,30 +156,40 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
     # 3. Handle successful checkout completion
     if event_type == "checkout.session.completed":
         customer_details = data_object.get("customer_details") or {}
-        customer_email = data_object.get("customer_email") or customer_details.get("email") or "bates_test@fleet.com"
+        customer_email = data_object.get("customer_email") or customer_details.get("email") or "lasvegas_fleet_test@example.com"
         tier = data_object.get("metadata", {}).get("tier", "professional")
         customer_id = data_object.get("customer")
         
         print(f"👤 Target Email: {customer_email}")
-        print(f"🏷️ Tier: {tier} | Stripe Customer: {customer_id}")
+        print(f"🏷️ Tier: {tier} | Stripe Customer ID: {customer_id}")
 
         try:
             supabase = get_supabase_client()
             
-            # Format organization name cleanly
+            # 1. Insert row into 'organizations' table
             prefix = customer_email.split('@')[0] if '@' in customer_email else "New Fleet"
-            org_name = f"{prefix.replace('.', ' ').title()} Co."
+            org_name = f"{prefix.replace('.', ' ').replace('_', ' ').title()} Co."
             
-            # Execute database insert into 'organizations' table
-            response = supabase.table("organizations").insert({
+            org_res = supabase.table("organizations").insert({
                 "name": org_name,
                 "subscription_tier": tier,
             }).execute()
             
-            print(f"🚀 SUPABASE SUCCESS: Inserted {org_name} -> {response.data}")
+            print(f"🚀 ORG CREATED: {org_name}")
+
+            # 2. Update existing user in 'profiles' table with stripe_customer_id
+            if customer_id:
+                profile_res = supabase.table("profiles").update({
+                    "stripe_customer_id": customer_id
+                }).eq("email", customer_email).execute()
+
+                if profile_res.data:
+                    print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
+                else:
+                    print(f"ℹ️ No existing profile found for {customer_email}. (Will link upon initial user login).")
 
         except Exception as db_err:
-            print(f"❌ SUPABASE ERROR: {type(db_err).__name__} - {db_err}")
+            print(f"❌ SUPABASE DB ERROR: {type(db_err).__name__} - {db_err}")
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_object.get("customer")
