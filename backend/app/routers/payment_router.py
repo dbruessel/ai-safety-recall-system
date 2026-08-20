@@ -125,7 +125,7 @@ async def create_checkout_session(req: CheckoutRequest):
 async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Header(None)):
     """
     Receives incoming webhook events from Stripe (CLI or Production)
-    and executes database writes to Supabase.
+    and executes database updates to Supabase (Organization & Profiles).
     """
     payload = await request.body()
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -165,19 +165,38 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
 
         try:
             supabase = get_supabase_client()
-            
-            # 1. Insert row into 'organizations' table
-            prefix = customer_email.split('@')[0] if '@' in customer_email else "New Fleet"
-            org_name = f"{prefix.replace('.', ' ').replace('_', ' ').title()} Co."
-            
-            org_res = supabase.table("organizations").insert({
-                "name": org_name,
-                "subscription_tier": tier,
-            }).execute()
-            
-            print(f"🚀 ORG CREATED: {org_name}")
 
-            # 2. Update existing user in 'profiles' table with stripe_customer_id
+            # Step A: Look up existing profile to retrieve registered company_name
+            profile_query = supabase.table("profiles").select("*").eq("email", customer_email).execute()
+            company_name = None
+            
+            if profile_query.data:
+                company_name = profile_query.data[0].get("company_name")
+
+            # Fallback org name generation if company_name is missing/null in profiles
+            if not company_name:
+                prefix = customer_email.split('@')[0] if '@' in customer_email else "New Fleet"
+                company_name = f"{prefix.replace('.', ' ').replace('_', ' ').title()} Co."
+
+            # Step B: Upsert Check — See if Organization already exists
+            existing_org = supabase.table("organizations").select("*").eq("name", company_name).execute()
+
+            if existing_org.data:
+                # UPDATE existing organization's tier to avoid duplicate rows
+                org_id = existing_org.data[0]["id"]
+                supabase.table("organizations").update({
+                    "subscription_tier": tier
+                }).eq("id", org_id).execute()
+                print(f"🔄 ORG UPDATED: {company_name} set to tier '{tier}'")
+            else:
+                # INSERT new organization if it truly doesn't exist
+                supabase.table("organizations").insert({
+                    "name": company_name,
+                    "subscription_tier": tier,
+                }).execute()
+                print(f"🚀 ORG CREATED: {company_name}")
+
+            # Step C: Update profile with stripe_customer_id if available
             if customer_id:
                 profile_res = supabase.table("profiles").update({
                     "stripe_customer_id": customer_id
@@ -185,8 +204,6 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
 
                 if profile_res.data:
                     print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
-                else:
-                    print(f"ℹ️ No existing profile found for {customer_email}. (Will link upon initial user login).")
 
         except Exception as db_err:
             print(f"❌ SUPABASE DB ERROR: {type(db_err).__name__} - {db_err}")
