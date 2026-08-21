@@ -1,5 +1,7 @@
 ﻿from dotenv import load_dotenv
 
+import app
+
 # Load environment variables from .env immediately before app configs are initialized
 load_dotenv()
 
@@ -10,6 +12,7 @@ from app.services.pdf_report import router as pdf_router
 
 # Explicitly import all system and feature routers
 from app.routers import (
+    audit_router,
     metrics,
     batches,
     vins,
@@ -18,7 +21,8 @@ from app.routers import (
     webhook_router,
     dashboard_router,
     sandbox,
-    payment_router     # Unified Stripe subscriptions & checkout router
+    payment_router,
+    audit_router          
 )
 
 # Initialize Vertex AI before application construction if configured
@@ -61,6 +65,8 @@ def create_app() -> FastAPI:
     app.include_router(sandbox.router, prefix="/api")
     app.include_router(payment_router.router, prefix="/api")
     app.include_router(pdf_router)  # Routes /api/payments/...
+    app.include_router(payment_router.router)
+    app.include_router(audit_router.router)  # Register audit router
 
     return app
 

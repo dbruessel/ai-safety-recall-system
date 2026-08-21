@@ -1,7 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface PublicAuditDemoProps {
   onSubscribe: () => void;
+}
+
+interface RecallItem {
+  campaign_number: string;
+  component: string;
+  summary: string;
+}
+
+interface AuditResult {
+  vin: string;
+  has_open_recall: boolean;
+  recall_count: number;
+  recalls: RecallItem[];
+  status_label: string;
 }
 
 export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe }) => {
@@ -13,6 +27,74 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
     const params = new URLSearchParams(window.location.search);
     return params.get('broker') || 'Apex Commercial Risk';
   });
+
+  // --- VIN SCANNER STATE ---
+  const [inputVin, setInputVin] = useState<string>('');
+  const [scansLeft, setScansLeft] = useState<number>(10);
+  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
+  const [isAuditing, setIsAuditing] = useState<boolean>(false);
+  const [scanError, setScanError] = useState<string>('');
+
+  // Track 10 Free Scans in browser session
+  useEffect(() => {
+    const storedScans = sessionStorage.getItem('recalllogic_demo_scans');
+    if (storedScans !== null) {
+      setScansLeft(parseInt(storedScans, 10));
+    } else {
+      sessionStorage.setItem('recalllogic_demo_scans', '10');
+    }
+  }, []);
+
+  // Handle Single VIN Audit Submission
+  const handleVinAudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScanError('');
+
+    if (scansLeft <= 0) {
+      setScanError('You have used all 10 free trial VIN checks. Mandate Pro Tier for unlimited fleet monitoring.');
+      return;
+    }
+
+    const cleanVin = inputVin.trim().toUpperCase();
+    if (cleanVin.length !== 17) {
+      setScanError('Please enter a valid 17-character VIN.');
+      return;
+    }
+
+    setIsAuditing(true);
+    setAuditResult(null);
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vin: cleanVin,
+          broker: brokerageName,
+          fleet: 'Las Vegas Commercial Transit Co.',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to audit VIN.');
+      }
+
+      setAuditResult(data);
+
+      // Decrement scan count
+      const nextScans = Math.max(0, scansLeft - 1);
+      setScansLeft(nextScans);
+      sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
+
+    } catch (err: any) {
+      setScanError(err.message || 'Error connecting to NHTSA recall engine.');
+    } finally {
+      setIsAuditing(false);
+    }
+  };
 
   // Dynamic underwriter submission note based on active brokerage name
   const underwriterNoteText = `UNDERWRITER SUBMISSION NOTE (${brokerageName.toUpperCase()} COMMERCIAL PRACTICE):
@@ -36,7 +118,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
       
-      // Attempt backend FastAPI PDF report download
       const response = await fetch(`${apiBaseUrl}/api/pdf/generate-audit-report`, {
         method: 'POST',
         headers: {
@@ -68,7 +149,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
     } catch (err) {
       console.warn('Backend PDF endpoint offline/unavailable, executing browser print fallback:', err);
       
-      // Clean fallback: Native print-to-PDF dialog pre-named
       const originalTitle = document.title;
       document.title = `${cleanBrokerName}_Underwriter_Risk_Scorecard`;
       window.print();
@@ -186,6 +266,75 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               <span>{copiedLink ? 'Link Copied!' : 'Copy Co-Branded Client Invite'}</span>
             </button>
           </div>
+        </div>
+
+        {/* --- INTERACTIVE 10-VIN RECALL SCANNER BAR --- */}
+        <div className="no-print rounded-2xl bg-[#0F172A] border border-slate-800 p-6 shadow-xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span className="text-[10px] font-bold text-[#06B6D4] font-mono uppercase tracking-widest block">
+                LIVE DEMO INSPECTION
+              </span>
+              <h2 className="text-base font-bold text-white font-mono">
+                Audit a Client Power Unit (10 Free Checks Included)
+              </h2>
+            </div>
+            <div className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300">
+              Free Scans Remaining: <strong className="text-white">{scansLeft}/10</strong>
+            </div>
+          </div>
+
+          <form onSubmit={handleVinAudit} className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              maxLength={17}
+              placeholder="Enter 17-digit Power Unit VIN..."
+              value={inputVin}
+              onChange={(e) => setInputVin(e.target.value.toUpperCase())}
+              disabled={scansLeft <= 0 || isAuditing}
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-xs uppercase text-white placeholder-slate-500 focus:outline-none focus:border-[#06B6D4] transition"
+            />
+            <button
+              type="submit"
+              disabled={scansLeft <= 0 || isAuditing}
+              className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap"
+            >
+              {isAuditing ? 'Auditing NHTSA...' : 'AUDIT VIN'}
+            </button>
+          </form>
+
+          {scanError && <p className="text-red-400 text-xs font-mono">{scanError}</p>}
+
+          {/* AUDIT OUTPUT DISPLAY BOX */}
+          {auditResult && (
+            <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
+              auditResult.has_open_recall
+                ? 'bg-red-950/20 border-red-800/80 text-red-200'
+                : 'bg-emerald-950/20 border-emerald-800/80 text-emerald-200'
+            }`}>
+              <div className="flex justify-between items-center font-bold">
+                <span>VIN: {auditResult.vin}</span>
+                <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[10px]">
+                  {auditResult.status_label}
+                </span>
+              </div>
+              {auditResult.has_open_recall ? (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[11px] text-red-300">Found {auditResult.recall_count} active safety recall(s):</p>
+                  {auditResult.recalls.map((r, idx) => (
+                    <div key={idx} className="bg-slate-950 p-2.5 rounded-lg border border-red-900/50 text-slate-300">
+                      <strong className="text-white">Campaign #{r.campaign_number}</strong> — {r.component}
+                      <p className="text-slate-400 text-[11px] mt-1">{r.summary}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-emerald-300">
+                  Zero active safety recalls detected on NHTSA records for this VIN.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* AUDIT SCORECARD CARD */}
