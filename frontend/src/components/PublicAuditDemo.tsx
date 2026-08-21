@@ -28,12 +28,15 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
     return params.get('broker') || 'Apex Commercial Risk';
   });
 
-  // --- VIN SCANNER STATE ---
+  // --- VIN SCANNER & FILE DROP STATE ---
+  const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
+  const [pastedText, setPastedText] = useState<string>('');
   const [inputVin, setInputVin] = useState<string>('');
   const [scansLeft, setScansLeft] = useState<number>(10);
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string>('');
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Track 10 Free Scans in browser session
   useEffect(() => {
@@ -45,22 +48,8 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
     }
   }, []);
 
-  // Handle Single VIN Audit Submission
-  const handleVinAudit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setScanError('');
-
-    if (scansLeft <= 0) {
-      setScanError('You have used all 10 free trial VIN checks. Mandate Pro Tier for unlimited fleet monitoring.');
-      return;
-    }
-
-    const cleanVin = inputVin.trim().toUpperCase();
-    if (cleanVin.length !== 17) {
-      setScanError('Please enter a valid 17-character VIN.');
-      return;
-    }
-
+  // Execute Backend Single VIN Check
+  const executeVinCheck = async (targetVin: string) => {
     setIsAuditing(true);
     setAuditResult(null);
 
@@ -70,7 +59,7 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vin: cleanVin,
+          vin: targetVin,
           broker: brokerageName,
           fleet: 'Las Vegas Commercial Transit Co.',
         }),
@@ -96,7 +85,59 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
     }
   };
 
-  // Dynamic underwriter submission note based on active brokerage name
+  // Universal VIN Extractor (Handles Raw Text, CSVs, or Form Inputs)
+  const extractAndAuditVins = async (rawInput: string) => {
+    setScanError('');
+    if (scansLeft <= 0) {
+      setScanError('You have used all 10 free trial VIN checks. Mandate Pro Tier for unlimited fleet monitoring.');
+      return;
+    }
+
+    // Bulletproof extraction: splits on slashes, commas, spaces, quotes, newlines
+    const rawTokens = rawInput.toUpperCase().split(/[^A-Z0-9]+/);
+    const uniqueVins = Array.from(new Set(rawTokens.filter(token => 
+      token.length === 17 && !/[IOQ]/.test(token)
+    )));
+
+    if (uniqueVins.length === 0) {
+      setScanError('No valid 17-character VINs found. Please check your formatting.');
+      return;
+    }
+
+    // Execute audit on the first extracted VIN from the input
+    setInputVin(uniqueVins[0]);
+    await executeVinCheck(uniqueVins[0]);
+  };
+
+  // Handle Manual Paste Submission
+  const handlePasteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pastedText.trim()) {
+      setScanError('Please enter at least one Make / Model / VIN line.');
+      return;
+    }
+    extractAndAuditVins(pastedText);
+  };
+
+  // Parse CSV or TXT File for VINs
+  const processVinFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      await extractAndAuditVins(text);
+    } catch (err) {
+      setScanError('Failed to parse file. Please upload a valid .csv or .txt file.');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processVinFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  // Dynamic underwriter submission note
   const underwriterNoteText = `UNDERWRITER SUBMISSION NOTE (${brokerageName.toUpperCase()} COMMERCIAL PRACTICE):
 Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercial Transit Co. (48 Monitored Power Units). The insured maintains automated VIN recall tracking with a 94% remediation rate and an average 11-day resolution cycle. All open safety recalls are verified via attached dealer receipts. We request application of the 5% Loss Control Safety Credit for the upcoming policy term.`;
 
@@ -117,12 +158,9 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
     
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-      
       const response = await fetch(`${apiBaseUrl}/api/pdf/generate-audit-report`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brokerage_name: brokerageName,
           fleet_name: 'Las Vegas Commercial Transit Co.',
@@ -132,9 +170,7 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`PDF endpoint returned status ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`PDF endpoint returned status ${response.status}`);
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -148,13 +184,10 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
 
     } catch (err) {
       console.warn('Backend PDF endpoint offline/unavailable, executing browser print fallback:', err);
-      
       const originalTitle = document.title;
       document.title = `${cleanBrokerName}_Underwriter_Risk_Scorecard`;
       window.print();
-      setTimeout(() => {
-        document.title = originalTitle;
-      }, 1000);
+      setTimeout(() => { document.title = originalTitle; }, 1000);
     }
   };
 
@@ -268,40 +301,113 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
           </div>
         </div>
 
-        {/* --- INTERACTIVE 10-VIN RECALL SCANNER BAR --- */}
+        {/* --- DUAL-MODE VIN INGESTION CARD --- */}
         <div className="no-print rounded-2xl bg-[#0F172A] border border-slate-800 p-6 shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <span className="text-[10px] font-bold text-[#06B6D4] font-mono uppercase tracking-widest block">
-                LIVE DEMO INSPECTION
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
+              <span className="text-xs font-bold text-cyan-300 font-mono uppercase tracking-wider">
+                Real-Time VIN Safety Sync Active
               </span>
-              <h2 className="text-base font-bold text-white font-mono">
-                Audit a Client Power Unit (10 Free Checks Included)
-              </h2>
             </div>
-            <div className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300">
-              Free Scans Remaining: <strong className="text-white">{scansLeft}/10</strong>
+            <div className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 font-bold">
+              {scansLeft} FREE VIN LOOKUPS REMAINING
             </div>
           </div>
 
-          <form onSubmit={handleVinAudit} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              maxLength={17}
-              placeholder="Enter 17-digit Power Unit VIN..."
-              value={inputVin}
-              onChange={(e) => setInputVin(e.target.value.toUpperCase())}
-              disabled={scansLeft <= 0 || isAuditing}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 font-mono text-xs uppercase text-white placeholder-slate-500 focus:outline-none focus:border-[#06B6D4] transition"
-            />
+          <div>
+            <h2 className="text-xl font-bold text-white font-mono">
+              Instant Fleet VIN Safety &amp; Recall Control
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Paste your VINs directly or drop a fleet file to test our Real-Time Safety Sync engine with 10 free lookups.
+            </p>
+          </div>
+
+          {/* TAB SELECTOR */}
+          <div className="flex border-b border-slate-800 font-mono text-xs gap-4 pt-2">
             <button
-              type="submit"
-              disabled={scansLeft <= 0 || isAuditing}
-              className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap"
+              type="button"
+              onClick={() => setIngestMode('paste')}
+              className={`pb-2 font-bold transition-all border-b-2 ${
+                ingestMode === 'paste'
+                  ? 'border-[#06B6D4] text-[#06B6D4]'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
             >
-              {isAuditing ? 'Auditing NHTSA...' : 'AUDIT VIN'}
+              Direct VIN Input / Paste
             </button>
-          </form>
+            <button
+              type="button"
+              onClick={() => setIngestMode('upload')}
+              className={`pb-2 font-bold transition-all border-b-2 ${
+                ingestMode === 'upload'
+                  ? 'border-[#06B6D4] text-[#06B6D4]'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Upload .CSV / .TXT File
+            </button>
+          </div>
+
+          {/* TAB 1: PASTE / DIRECT INPUT */}
+          {ingestMode === 'paste' ? (
+            <form onSubmit={handlePasteSubmit} className="space-y-3">
+              <textarea
+                rows={3}
+                placeholder={`Freightliner / Cascadia / 1FUJGLDR5MLKE1234\nFord / Transit / 1FTBW1Y85PKA54321\nTesla / Model 3 / 5YJ3E1EA7MF987654`}
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value.toUpperCase())}
+                disabled={scansLeft <= 0 || isAuditing}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs uppercase text-white placeholder-slate-600 focus:outline-none focus:border-[#06B6D4] transition"
+              />
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> or <strong className="text-cyan-300">Make, Model, VIN</strong> (up to 10 entries).
+                </span>
+                <button
+                  type="submit"
+                  disabled={scansLeft <= 0 || isAuditing}
+                  className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto"
+                >
+                  {isAuditing ? 'AUDITING...' : 'RUN VIN AUDIT'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* TAB 2: FILE UPLOAD / DRAG & DROP */
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                isDragging 
+                  ? 'border-[#06B6D4] bg-[#06B6D4]/10' 
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
+              }`}
+            >
+              <input
+                type="file"
+                id="file-upload"
+                accept=".csv,.txt"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && processVinFile(e.target.files[0])}
+              />
+              <label htmlFor="file-upload" className="cursor-pointer space-y-2 block">
+                <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-[#06B6D4]">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <p className="text-xs font-semibold text-white">
+                  Drop your fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
+                </p>
+                <p className="text-[11px] text-slate-500 font-mono">
+                  Supported formats: <strong className="text-slate-400">.csv</strong> or <strong className="text-slate-400">.txt</strong> (columns like Make, Model, or VIN are automatically detected).
+                </p>
+              </label>
+            </div>
+          )}
 
           {scanError && <p className="text-red-400 text-xs font-mono">{scanError}</p>}
 
@@ -367,7 +473,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
           {/* KEY UNDERWRITING METRICS GRID */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Metric 1: Surcharge Risk Status */}
             <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
               <span className="text-[11px] font-mono text-slate-400 block">Surcharge Risk Status</span>
               <div className="text-3xl font-black text-emerald-400 font-mono">94% Clean</div>
@@ -379,7 +484,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </p>
             </div>
 
-            {/* Metric 2: Underwriter Audit Speed */}
             <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
               <span className="text-[11px] font-mono text-slate-400 block">Underwriter Audit Speed</span>
               <div className="text-3xl font-black text-cyan-400 font-mono">11 Days</div>
@@ -391,7 +495,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </p>
             </div>
 
-            {/* Metric 3: Carrier Audit Proof */}
             <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
               <span className="text-[11px] font-mono text-slate-400 block">Carrier Audit Proof</span>
               <div className="text-3xl font-black text-white font-mono">
@@ -405,7 +508,6 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
               </p>
             </div>
 
-            {/* Metric 4: Negotiated Premium Savings */}
             <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 bg-emerald-950/10 space-y-2">
               <span className="text-[11px] font-mono text-emerald-400 font-bold block uppercase tracking-wider">
                 NEGOTIATED PREMIUM SAVINGS

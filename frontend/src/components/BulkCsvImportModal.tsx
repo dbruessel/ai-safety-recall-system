@@ -21,7 +21,7 @@ export function BulkCsvImportModal({ isOpen, onClose, onSuccess }: BulkCsvImport
       const extension = file.name.split('.').pop()?.toLowerCase();
 
       if (extension !== 'csv' && extension !== 'txt') {
-        setErrorMsg('Invalid file format! Please upload a strictly formatted .csv or .txt file.');
+        setErrorMsg('Invalid file format! Please upload a .csv or .txt file.');
         setSelectedFile(null);
         return;
       }
@@ -31,11 +31,11 @@ export function BulkCsvImportModal({ isOpen, onClose, onSuccess }: BulkCsvImport
   };
 
   const handleDownloadTemplate = () => {
-    const csvHeader = 'vin,unit_number,make,model,year\n';
+    const csvHeader = 'make,model,vin\n';
     const sampleRows = [
-      '1HGCR2F83HA000000,UNIT-101,Honda,Accord,2017',
-      '1FTFW1ED4MFC00000,UNIT-102,Ford,F-150,2021',
-      '3GCPCREC0LG000000,UNIT-103,Chevrolet,Silverado,2020'
+      'Freightliner,Cascadia,1FUJGLDR5MLKE1234',
+      'Ford,Transit,1FTBW1Y85PKA54321',
+      'Tesla,Model 3,5YJ3E1EA7MF987654'
     ].join('\n');
 
     const blob = new Blob([csvHeader + sampleRows], { type: 'text/csv;charset=utf-8;' });
@@ -140,18 +140,18 @@ export function BulkCsvImportModal({ isOpen, onClose, onSuccess }: BulkCsvImport
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1.5 overflow-x-auto">
             {activeTab === 'csv' ? (
               <>
-                <div className="text-slate-500">// Header row with required VIN column:</div>
-                <div className="text-emerald-400 font-bold">vin,unit_number,make,model,year</div>
-                <div className="text-slate-300">1HGCR2F83HA000000,UNIT-101,Honda,Accord,2017</div>
-                <div className="text-slate-300">1FTFW1ED4MFC00000,UNIT-102,Ford,F-150,2021</div>
-                <div className="text-slate-300">3GCPCREC0LG000000,UNIT-103,Chevrolet,Silverado,2020</div>
+                <div className="text-slate-500">// Standard Make / Model / VIN column structure:</div>
+                <div className="text-emerald-400 font-bold">make,model,vin</div>
+                <div className="text-slate-300">Freightliner,Cascadia,1FUJGLDR5MLKE1234</div>
+                <div className="text-slate-300">Ford,Transit,1FTBW1Y85PKA54321</div>
+                <div className="text-slate-300">Tesla,Model 3,5YJ3E1EA7MF987654</div>
               </>
             ) : (
               <>
-                <div className="text-slate-500">// One 17-character VIN string per line:</div>
-                <div className="text-slate-300">1HGCR2F83HA000000</div>
-                <div className="text-slate-300">1FTFW1ED4MFC00000</div>
-                <div className="text-slate-300">3GCPCREC0LG000000</div>
+                <div className="text-slate-500">// One entry per line using Make / Model / VIN or raw VINs:</div>
+                <div className="text-slate-300">Freightliner / Cascadia / 1FUJGLDR5MLKE1234</div>
+                <div className="text-slate-300">Ford / Transit / 1FTBW1Y85PKA54321</div>
+                <div className="text-slate-300">Tesla / Model 3 / 5YJ3E1EA7MF987654</div>
               </>
             )}
           </div>
