@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient'; // Centralized client import
 
 // Sub-Component Imports
 import { UnderwriterReportView } from './UnderwriterReportView';
@@ -35,11 +35,6 @@ export interface TaskboardRecallItem {
   closed_by_user_email?: string;
   closed_at?: string;
 }
-
-// Supabase Client Initialization
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const TaskBoard: React.FC = () => {
   // WORKSPACE STATES
@@ -125,12 +120,11 @@ export const TaskBoard: React.FC = () => {
     fetchUserProfile();
   }, []);
 
-  // FETCH RECALL TASKS (SELF-HEALING PARALLEL FETCH)
+  // FETCH RECALL TASKS (PARALLEL FETCH)
   const fetchTaskboardData = async () => {
     try {
       setLoading(true);
 
-      // Fetch raw tasks and raw vehicles in parallel to bypass missing relational FK definitions
       const [tasksRes, vehiclesRes] = await Promise.all([
         supabase.from('recall_tasks').select('*'),
         supabase.from('monitored_vehicles').select('*')
@@ -139,10 +133,8 @@ export const TaskBoard: React.FC = () => {
       const rawTasks = tasksRes.data || [];
       const rawVehicles = vehiclesRes.data || [];
 
-      // Map vehicles by ID
       const vehicleMap = new Map(rawVehicles.map(v => [v.id, v]));
 
-      // Format tasks into TaskboardRecallItem objects
       const formattedData: TaskboardRecallItem[] = rawTasks.map((item: any) => {
         const vehicle = vehicleMap.get(item.vehicle_id);
 
@@ -178,9 +170,8 @@ export const TaskBoard: React.FC = () => {
         };
       });
 
-      // If database query returns zero items, provide fallback data so workspace renders
       if (formattedData.length === 0) {
-        const fallbackData: TaskboardRecallItem[] = [
+        setRecalls([
           {
             id: 'demo-1',
             unit_number: 'UNIT-101',
@@ -239,8 +230,7 @@ export const TaskBoard: React.FC = () => {
             receipt_url: 'https://storage.recalllogic.com/proofs/LV_Tesla_OTA_Confirmation.pdf',
             created_at: new Date().toISOString()
           }
-        ];
-        setRecalls(fallbackData);
+        ]);
       } else {
         setRecalls(formattedData);
       }

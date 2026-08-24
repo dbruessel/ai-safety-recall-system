@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient'; // Centralized client import
 import BulkCsvImportModal from './BulkCsvImportModal';
 
 export interface LandingPageProps {
@@ -35,10 +35,6 @@ interface AuditResult {
   recalls: RecallItem[];
   status_label: string;
 }
-
-const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const LandingPage: React.FC<LandingPageProps> = ({ 
   onSignIn, 
@@ -94,7 +90,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return;
     }
 
-    // Extract all valid 17-character VINs from text/CSV
     const rawTokens = rawInput.toUpperCase().split(/[^A-Z0-9]+/);
     const uniqueVins = Array.from(new Set(rawTokens.filter(token => 
       token.length === 17 && !/[IOQ]/.test(token)
@@ -105,7 +100,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return;
     }
 
-    // Respect remaining scan allowance (up to remaining free scans)
     const vinsToAudit = uniqueVins.slice(0, scansLeft);
 
     setIsAuditing(true);
@@ -114,7 +108,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
-      // 1. Fire parallel backend checks for all extracted VINs
       const apiPromises = vinsToAudit.map(vin =>
         fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
           method: 'POST',
@@ -133,7 +126,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         throw new Error('Failed to audit the provided VIN list.');
       }
 
-      // 2. Aggregate findings across all audited VINs
       const allRecalls: RecallItem[] = [];
       let totalOpenRecalls = 0;
 
@@ -151,7 +143,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       const hasAnyOpenRecalls = totalOpenRecalls > 0;
 
-      // 3. Set aggregated audit results for display
       setAuditResult({
         vin: `${results.length} Power Unit(s) Audited (${results.map(r => r.vin.slice(-6)).join(', ')})`,
         has_open_recall: hasAnyOpenRecalls,
@@ -162,7 +153,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           : '100% CLEAN / ZERO OPEN RECALLS',
       });
 
-      // 4. Decrement scan allowance by the exact count of VINs processed
       const nextScans = Math.max(0, scansLeft - results.length);
       setScansLeft(nextScans);
       sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
@@ -200,7 +190,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // Launch dynamic Stripe Checkout Session via Price ID or App.tsx handler
   const handleTierCheckout = async (tier: PricingTier) => {
     if (onSelectTier) {
       onSelectTier(tier.id);

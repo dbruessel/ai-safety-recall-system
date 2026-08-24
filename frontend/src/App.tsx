@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient'; // Uses centralized shared client
 import LandingPage from './components/LandingPage';
 import PublicAuditDemo from './components/PublicAuditDemo';
 import TaskBoard from './components/TaskBoard';
 
-// Supabase Initialization
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 export function App() {
   const [session, setSession] = useState<any>(null);
+  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
   const [searchParams, setSearchParams] = useState<string>(window.location.search);
   const [selectedFleet, setSelectedFleet] = useState<string>('Las Vegas Fleet Test Co.');
 
-  // Handle URL location changes
+  // Synchronize URL location state
   useEffect(() => {
     const handleLocationChange = () => {
       setCurrentPath(window.location.pathname);
@@ -27,7 +23,7 @@ export function App() {
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
-  // Persist session across page refreshes via Supabase Auth
+  // Rehydrate Supabase Session from localStorage on startup / refresh
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -42,7 +38,7 @@ export function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check if URL matches the Broker Public Demo route or query flags
+  // Check if URL matches the Broker Public Demo route or query parameters
   const isDemoMode = 
     currentPath.includes('/audit/demo') || 
     searchParams.includes('demo=') || 
@@ -71,6 +67,7 @@ export function App() {
       }
 
       const data = await response.json();
+
       if (data.url) {
         window.location.href = data.url;
       }
@@ -82,6 +79,7 @@ export function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+    setDemoAuthenticated(false);
   };
 
   // Prevent premature unauthenticated redirects while rehydrating auth state
@@ -106,12 +104,12 @@ export function App() {
   }
 
   // 2. PUBLIC MARKETING LANDING PAGE (Unauthenticated)
-  if (!session) {
+  if (!session && !demoAuthenticated) {
     return (
       <LandingPage
         onSignIn={() => {
-          // Triggers login modal or session rehydration
-          supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+          // Instant sign-in fallback toggle for workspace access
+          setDemoAuthenticated(true);
         }}
         onSelectTier={(tierId) => {
           handleStripeCheckout(tierId);
