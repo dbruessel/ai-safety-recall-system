@@ -86,47 +86,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // Execute Live Single VIN Check Against NHTSA Endpoint
-  const executeVinCheck = async (targetVin: string) => {
-    setIsAuditing(true);
-    setAuditResult(null);
-
-    try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vin: targetVin,
-          broker: 'RecallLogic Direct',
-          fleet: 'Inspected Fleet Unit',
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Failed to audit VIN.');
-
-      setAuditResult(data);
-      const nextScans = Math.max(0, scansLeft - 1);
-      setScansLeft(nextScans);
-      sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
-
-    } catch (err: any) {
-      setScanError(err.message || 'Error connecting to NHTSA recall engine.');
-    } finally {
-      setIsAuditing(false);
-    }
-  };
-
-  // Universal VIN Extractor for Form / File Inputs
+  // Universal Multi-VIN Extractor & Parallel Batch Auditor
   const extractAndAuditVins = async (rawInput: string) => {
     setScanError('');
     if (scansLeft <= 0) {
-      setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited monitoring.');
+      setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited fleet monitoring.');
       return;
     }
 
-    // Bulletproof extraction: splits on slashes, commas, spaces, quotes, newlines
+    // Extract all valid 17-character VINs from text/CSV
     const rawTokens = rawInput.toUpperCase().split(/[^A-Z0-9]+/);
     const uniqueVins = Array.from(new Set(rawTokens.filter(token => 
       token.length === 17 && !/[IOQ]/.test(token)
@@ -137,7 +105,73 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return;
     }
 
-    await executeVinCheck(uniqueVins[0]);
+    // Respect remaining scan allowance (up to remaining free scans)
+    const vinsToAudit = uniqueVins.slice(0, scansLeft);
+
+    setIsAuditing(true);
+    setAuditResult(null);
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
+      // 1. Fire parallel backend checks for all extracted VINs
+      const apiPromises = vinsToAudit.map(vin =>
+        fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vin: vin,
+            broker: 'RecallLogic Direct',
+            fleet: 'Inspected Fleet Unit',
+          }),
+        }).then(res => res.ok ? res.json() : null)
+      );
+
+      const results = (await Promise.all(apiPromises)).filter(Boolean);
+
+      if (results.length === 0) {
+        throw new Error('Failed to audit the provided VIN list.');
+      }
+
+      // 2. Aggregate findings across all audited VINs
+      const allRecalls: RecallItem[] = [];
+      let totalOpenRecalls = 0;
+
+      results.forEach(res => {
+        if (res.has_open_recall) {
+          totalOpenRecalls += res.recall_count;
+          res.recalls.forEach((r: RecallItem) => {
+            allRecalls.push({
+              ...r,
+              campaign_number: `${res.vin} — ${r.campaign_number}`
+            });
+          });
+        }
+      });
+
+      const hasAnyOpenRecalls = totalOpenRecalls > 0;
+
+      // 3. Set aggregated audit results for display
+      setAuditResult({
+        vin: `${results.length} Power Unit(s) Audited (${results.map(r => r.vin.slice(-6)).join(', ')})`,
+        has_open_recall: hasAnyOpenRecalls,
+        recall_count: totalOpenRecalls,
+        recalls: allRecalls,
+        status_label: hasAnyOpenRecalls 
+          ? `CRITICAL: ${totalOpenRecalls} OPEN RECALL(S) DETECTED` 
+          : '100% CLEAN / ZERO OPEN RECALLS',
+      });
+
+      // 4. Decrement scan allowance by the exact count of VINs processed
+      const nextScans = Math.max(0, scansLeft - results.length);
+      setScansLeft(nextScans);
+      sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
+
+    } catch (err: any) {
+      setScanError(err.message || 'Error connecting to NHTSA recall engine.');
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   const handlePasteSubmit = (e: React.FormEvent) => {
@@ -391,7 +425,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   disabled={scansLeft <= 0 || isAuditing}
                   className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto"
                 >
-                  {isAuditing ? 'AUDITING...' : 'RUN VIN AUDIT'}
+                  {isAuditing ? 'AUDITING FLEET...' : 'RUN VIN AUDIT'}
                 </button>
               </div>
             </form>
@@ -440,7 +474,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 : 'bg-emerald-950/20 border-emerald-800/80 text-emerald-200'
             }`}>
               <div className="flex justify-between items-center font-bold">
-                <span>VIN: {auditResult.vin}</span>
+                <span>{auditResult.vin}</span>
                 <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[10px]">
                   {auditResult.status_label}
                 </span>
@@ -457,7 +491,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[11px] text-emerald-300">
-                  Zero active safety recalls detected on NHTSA records for this VIN.
+                  Zero active safety recalls detected on NHTSA records across the audited VINs.
                 </p>
               )}
             </div>
