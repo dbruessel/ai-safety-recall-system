@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Centralized client import
+import { supabase } from '../supabaseClient';
 import BulkCsvImportModal from './BulkCsvImportModal';
 
 export interface LandingPageProps {
@@ -44,7 +44,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
 
-  // --- DUAL-MODE VIN SCANNER STATE ---
+  // AUTH MODAL STATES
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('lasvegas_fleet_test@example.com');
+  const [password, setPassword] = useState<string>('');
+  const [authError, setAuthError] = useState<string>('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
+
+  // DUAL-MODE VIN SCANNER STATE
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
   const [pastedText, setPastedText] = useState<string>('');
   const [scansLeft, setScansLeft] = useState<number>(10);
@@ -81,6 +88,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     fetchRecallCount();
   }, []);
+
+  // REAL SUPABASE EMAIL/PASSWORD LOGIN HANDLER
+  const handleSupabaseLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setIsSubmittingAuth(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+      } else if (data.session) {
+        setIsAuthModalOpen(false);
+        onSignIn(); // Triggers app state update
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'An unexpected error occurred during sign in.');
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
 
   // Universal Multi-VIN Extractor & Parallel Batch Auditor
   const extractAndAuditVins = async (rawInput: string) => {
@@ -281,7 +313,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden">
+    <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden relative">
       
       {/* Background Lighting */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -326,11 +358,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Sign In CTA */}
+          {/* Sign In CTA Button (Opens Login Modal) */}
           <div className="shrink-0">
             <button
               type="button"
-              onClick={onSignIn}
+              onClick={() => setIsAuthModalOpen(true)}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
               Sign In
@@ -343,7 +375,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* HERO SECTION WITH INLINE COMPREHENSIVE VIN SCANNER */}
       <section className="relative pt-6 pb-8 px-4 max-w-5xl mx-auto text-center space-y-4">
         
-        {/* --- INLINE FLEET VIN SAFETY & RECALL CONTROL CARD --- */}
+        {/* INLINE FLEET VIN SAFETY & RECALL CONTROL CARD */}
         <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left">
           
           {/* Header Status Bar */}
@@ -545,6 +577,78 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
       </section>
+
+      {/* AUTH SIGN IN MODAL OVERLAY */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white font-mono">Sign In to RecallLogic</h3>
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(false)}
+                className="text-slate-400 hover:text-white transition cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSupabaseLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                  placeholder="name@company.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {authError && (
+                <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
+                  {authError}
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Demo fallback sign in
+                    setIsAuthModalOpen(false);
+                    onSignIn();
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-300 font-mono transition"
+                >
+                  Bypass (Demo Mode)
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingAuth}
+                  className="px-5 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono cursor-pointer"
+                >
+                  {isSubmittingAuth ? 'Authenticating...' : 'Sign In'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* BULK IMPORT MODAL */}
       {isBulkModalOpen && (
