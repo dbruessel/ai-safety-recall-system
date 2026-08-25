@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient'; // Centralized client import
+import { supabase } from '../supabaseClient'; // Centralized client import
 import BulkCsvImportModal from './BulkCsvImportModal';
 
 export interface LandingPageProps {

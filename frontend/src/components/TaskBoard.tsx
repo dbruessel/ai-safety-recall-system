@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from './supabaseClient'; // Centralized client import
+import { supabase } from '../supabaseClient'; // Centralized client import
 
 // Sub-Component Imports
 import { UnderwriterReportView } from './UnderwriterReportView';
