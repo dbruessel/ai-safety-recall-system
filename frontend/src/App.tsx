@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient'; // Uses centralized shared client
+import { supabase } from './supabaseClient';
 import LandingPage from './components/LandingPage';
 import PublicAuditDemo from './components/PublicAuditDemo';
 import TaskBoard from './components/TaskBoard';
@@ -38,9 +38,10 @@ export function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check if URL matches the Broker Public Demo route or query parameters
+  // Check if URL matches Public Audit Share links, Demo routes, or query flags
   const isDemoMode = 
     currentPath.includes('/audit/demo') || 
+    currentPath.includes('/audit/share/') || 
     searchParams.includes('demo=') || 
     searchParams.includes('broker=');
 
@@ -94,7 +95,7 @@ export function App() {
     );
   }
 
-  // 1. PUBLIC READ-ONLY BROKER AUDIT DEMO ROUTE (/audit/demo)
+  // 1. PUBLIC READ-ONLY BROKER & UNDERWRITER AUDIT ROUTE (/audit/demo & /audit/share/*)
   if (isDemoMode) {
     return (
       <PublicAuditDemo
@@ -108,7 +109,6 @@ export function App() {
     return (
       <LandingPage
         onSignIn={() => {
-          // Instant sign-in fallback toggle for workspace access
           setDemoAuthenticated(true);
         }}
         onSelectTier={(tierId) => {
