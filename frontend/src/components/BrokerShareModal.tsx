@@ -1,177 +1,103 @@
 import React, { useState } from 'react';
-import { 
-  ShieldCheck, 
-  Copy, 
-  Check, 
-  Lock, 
-  Key, 
-  Calendar, 
-  Mail, 
-  Sparkles, 
-  X 
-} from 'lucide-react';
 
-interface ShareModalProps {
+export interface BrokerShareModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  userTier: 'standard' | 'professional' | 'enterprise';
+  userTier: string;
   shareUrl: string;
-  onUpgrade: () => void;
+  onClose: () => void;
+  onUpgrade?: () => void;
 }
 
-export const BrokerShareModal: React.FC<ShareModalProps> = ({
+export const BrokerShareModal: React.FC<BrokerShareModalProps> = ({
   isOpen,
-  onClose,
-  userTier,
   shareUrl,
-  onUpgrade
+  onClose,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
-  const isEnterprise = userTier === 'enterprise';
-
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy share link:', err);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-[#0B101D] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 text-slate-100 font-sans relative">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
-              <ShieldCheck className="w-5 h-5" />
+        {/* MODAL HEADER */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#06B6D4]/10 border border-[#06B6D4]/30 flex items-center justify-center text-[#06B6D4]">
+              🛡️
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Underwriter Audit Link</h3>
-              <p className="text-xs text-slate-400">Share verifiable recall compliance with carriers</p>
+              <h3 className="text-base font-bold text-white font-mono tracking-tight">
+                Underwriter Audit Link
+              </h3>
+              <p className="text-xs text-slate-400">
+                Share verifiable recall compliance with insurance carriers.
+              </p>
             </div>
           </div>
-          <button 
+          <button
+            type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-slate-400 hover:text-white transition p-1 text-sm cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            ✕
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-6">
-          
-          {/* Main Share Link Box */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-300">Read-Only Audit URL</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={shareUrl}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-300 focus:outline-none select-all"
-              />
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-xl transition-all shrink-0"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
+        {/* LINK COPY CONTAINER */}
+        <div className="space-y-2">
+          <label className="block text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
+            Read-Only Audit URL
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={shareUrl}
+              className="flex-1 bg-[#070B14] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-300 font-mono focus:outline-none select-all overflow-hidden text-ellipsis whitespace-nowrap"
+            />
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`px-4 py-2.5 text-xs font-bold font-mono rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                copied
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/10'
+              }`}
+            >
+              {copied ? '✓ Copied!' : '📋 Copy'}
+            </button>
           </div>
-
-          {/* Enterprise Security Features (Locked for Pro & Standard) */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Audit Controls
-              </span>
-              {!isEnterprise && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
-                  <Sparkles className="w-3 h-3" /> Enterprise Feature
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2.5">
-              {/* Feature 1: Passcode Protection */}
-              <div className={`flex items-center justify-between p-3 rounded-xl border ${
-                isEnterprise ? 'bg-slate-950 border-slate-800' : 'bg-slate-950/40 border-slate-800/50 opacity-60'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <Key className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Passcode Protection</p>
-                    <p className="text-xs text-slate-400">Require PIN to view audit report</p>
-                  </div>
-                </div>
-                {isEnterprise ? (
-                  <input type="checkbox" className="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0" />
-                ) : (
-                  <Lock className="w-4 h-4 text-slate-500" />
-                )}
-              </div>
-
-              {/* Feature 2: Custom Expiration */}
-              <div className={`flex items-center justify-between p-3 rounded-xl border ${
-                isEnterprise ? 'bg-slate-950 border-slate-800' : 'bg-slate-950/40 border-slate-800/50 opacity-60'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Custom Link Expiration</p>
-                    <p className="text-xs text-slate-400">Auto-revoke access after specified days</p>
-                  </div>
-                </div>
-                {isEnterprise ? (
-                  <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg px-2 py-1">
-                    <option>7 Days</option>
-                    <option>30 Days</option>
-                    <option>Never</option>
-                  </select>
-                ) : (
-                  <Lock className="w-4 h-4 text-slate-500" />
-                )}
-              </div>
-
-              {/* Feature 3: Direct Email Dispatch */}
-              <div className={`flex items-center justify-between p-3 rounded-xl border ${
-                isEnterprise ? 'bg-slate-950 border-slate-800' : 'bg-slate-950/40 border-slate-800/50 opacity-60'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Direct Underwriter Dispatch</p>
-                    <p className="text-xs text-slate-400">Email directly to insurance carrier</p>
-                  </div>
-                </div>
-                {!isEnterprise && <Lock className="w-4 h-4 text-slate-500" />}
-              </div>
-            </div>
-          </div>
-
-          {/* Upsell Banner for Non-Enterprise */}
-          {!isEnterprise && (
-            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/20 flex items-center justify-between">
-              <div className="pr-2">
-                <p className="text-xs font-semibold text-white">Upgrade to Enterprise</p>
-                <p className="text-[11px] text-slate-300">Unlock custom link branding, passcode protection, & instant revocation.</p>
-              </div>
-              <button
-                onClick={onUpgrade}
-                className="px-3 py-1.5 bg-white text-slate-950 text-xs font-semibold rounded-lg hover:bg-slate-200 transition-colors shrink-0"
-              >
-                Upgrade
-              </button>
-            </div>
-          )}
-
+          <p className="text-[11px] text-slate-500 font-mono mt-1">
+            Anyone with this secure link can view your real-time compliance status without logging in.
+          </p>
         </div>
+
+        {/* FOOTER CLOSE ACTION */}
+        <div className="pt-2 border-t border-slate-800/80 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+          >
+            Done
+          </button>
+        </div>
+
       </div>
     </div>
   );
 };
+
+export default BrokerShareModal;
