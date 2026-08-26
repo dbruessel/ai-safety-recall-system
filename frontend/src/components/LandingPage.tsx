@@ -105,7 +105,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         setAuthError(error.message);
       } else if (data.session) {
         setIsAuthModalOpen(false);
-        onSignIn(); // Triggers app state update
+        onSignIn();
       }
     } catch (err: any) {
       setAuthError(err.message || 'An unexpected error occurred during sign in.');
@@ -260,24 +260,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id: 'standard',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || 'price_1TrIFTDXs4xycz0o1e9gfg9d',
       name: 'Standard',
-      subtitle: 'Compliance Essentials',
+      subtitle: 'Fleet Operations Baseline',
       price: '$99',
       billing: 'per month',
-      badge: 'ESSENTIAL',
+      badge: 'ESSENTIAL MONITORING',
       color: 'border-slate-800 bg-slate-900/50',
       buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
       features: [
-        'Up to 50 Monitored VINs',
-        'NHTSA & CPSC Automated Feeds',
-        'Weekly VIN Compliance Reports',
-        'Email Risk Alerts'
+        'Up to 50 Vehicles Monitored',
+        'Continuous Active NHTSA & CPSC Monitoring',
+        'Full Kanban TaskBoard Workspace Access',
+        'Manual Status & Remediation Tracking',
+        'Standard Email Risk & Safety Alerts',
+        'Standard Email Support'
       ]
     },
     {
       id: 'professional',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_1TrIFPRO',
       name: 'Professional',
-      subtitle: 'Operational Intelligence',
+      subtitle: 'Underwriter & Risk Intelligence',
       price: '$249',
       billing: 'per month',
       badge: 'MOST POPULAR',
@@ -285,10 +287,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
       buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
       features: [
-        'Up to 250 Monitored VINs',
-        'Real-Time VIN Safety Sync (< 2s isolation)',
-        'Full API & Webhook Access',
-        'Underwriter Shareable Audit Links',
+        'Everything in Standard, plus:',
+        'Up to 250 Vehicles Monitored',
+        'Instant Single-VIN Scan Console',
+        'Real-Time Thermal & High-Severity Hazard Alerts',
+        'Signed Underwriter Compliance Cards (PDF Certificates)',
+        'Shareable Read-Only Broker Audit Links',
+        'Proof-of-Remedy & Repair Receipt Storage',
         'Priority Phone & Email Support'
       ]
     },
@@ -296,18 +301,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id: 'enterprise',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || 'price_1TrIFENTERPRISE',
       name: 'Enterprise',
-      subtitle: 'Total Risk Management',
+      subtitle: 'Automated Multi-Fleet Control',
       price: '$499',
       billing: 'per month',
-      badge: 'TOTAL CONTROL',
+      badge: 'TOTAL AUTOMATION',
       color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
       buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
       features: [
-        'Unlimited Monitored VINs',
-        'Custom ERP & WMS Integrations',
-        'Multi-Site Operational Isolation',
-        'Dedicated Compliance Officer',
-        'SLA & Custom Contract Terms'
+        'Everything in Professional, plus:',
+        'Unlimited Vehicles & Multi-Fleet Portfolios',
+        'Telematics & TMS Platform Integrations',
+        'Dedicated Broker Quarterly Business Reviews (QBR)',
+        'Custom Batch Ingestion Engine & Webhooks',
+        'Multi-Site Operational Isolation & SSO',
+        'Custom Carrier SLA & Terms'
       ]
     }
   ];
@@ -358,7 +365,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Sign In CTA Button (Opens Login Modal) */}
+          {/* Sign In CTA Button */}
           <div className="shrink-0">
             <button
               type="button"
@@ -400,7 +407,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
-          {/* Tab Navigation (Direct Input vs Upload File) */}
+          {/* Tab Navigation */}
           <div className="flex border-b border-slate-800/80 font-mono text-xs gap-4 pt-2">
             <button
               type="button"
@@ -555,8 +562,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                   <ul className="space-y-2 text-[11px] text-slate-300">
                     {tier.features.map((feat, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5 text-[#06B6D4] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <li key={i} className="flex items-start gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-[#06B6D4] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         <span>{feat}</span>
@@ -628,7 +635,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    // Demo fallback sign in
                     setIsAuthModalOpen(false);
                     onSignIn();
                   }}
