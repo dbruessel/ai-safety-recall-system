@@ -271,8 +271,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         'Continuous Active NHTSA & CPSC Monitoring',
         'Full Kanban TaskBoard Workspace Access',
         'Manual Status & Remediation Tracking',
-        'Standard Email Risk & Safety Alerts',
-        'Standard Email Support'
+        'Standard Email Risk & Safety Alerts'
       ]
     },
     {
@@ -293,8 +292,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         'Real-Time Thermal & High-Severity Hazard Alerts',
         'Signed Underwriter Compliance Cards (PDF Certificates)',
         'Shareable Read-Only Broker Audit Links',
-        'Proof-of-Remedy & Repair Receipt Storage',
-        'Priority Phone & Email Support'
+        'Proof-of-Remedy & Repair Receipt Storage'
       ]
     },
     {
