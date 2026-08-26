@@ -1,24 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
 import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
 import Footer from './components/Footer';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-export const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userTier, setUserTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
+const MainApp: React.FC = () => {
+  const { user, userTier, signOut, signInDemo, demoAuthenticated } = useAuth();
+
+  // User is authenticated if a Supabase session exists OR if demo mode was clicked
+  const isAuthenticated = Boolean(user) || demoAuthenticated;
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between font-sans">
-      
       {/* MAIN WORKSPACE & PAGE ROUTING CONTENT */}
       <main className="flex-1">
         {!isAuthenticated ? (
           <LandingPage
-            onSignIn={() => setIsAuthenticated(true)}
-            onSelectTier={(tier) => {
-              setUserTier(tier);
-              setIsAuthenticated(true);
-            }}
+            onSignIn={signInDemo}
+            onSelectTier={() => signInDemo()}
           />
         ) : (
           <div className="py-6">
@@ -42,12 +41,12 @@ export const App: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>Las Vegas Fleet Test Co.</span>
+                  <span>{user?.email || 'Las Vegas Fleet Test Co.'}</span>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setIsAuthenticated(false)}
+                  onClick={signOut}
                   className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
                 >
                   Sign Out
@@ -56,18 +55,22 @@ export const App: React.FC = () => {
             </header>
 
             {/* MAIN TASKBOARD APP WORKSPACE */}
-            <TaskBoard
-              userTier={userTier}
-              onUpgradeTier={(newTier) => setUserTier(newTier)}
-            />
+            <TaskBoard userTier={userTier} />
           </div>
         )}
       </main>
 
       {/* PERSISTENT GLOBAL FOOTER WITH DIRECT SUPPORT ACCESS */}
       <Footer />
-
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 };
 
