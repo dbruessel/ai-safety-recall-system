@@ -664,10 +664,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         />
       )}
 
-      {/* FOOTER */}
-      <footer className="border-t border-slate-800/80 py-4 px-6 text-center text-[11px] text-slate-500 font-mono">
-        © 2026 RecallLogic Inc. Safety Intelligence System.
-      </footer>
     </div>
   );
 };
