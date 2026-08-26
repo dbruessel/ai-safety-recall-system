@@ -1,14 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
 import Footer from './components/Footer';
+import AccountMenu from './components/AccountMenu';
+import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const MainApp: React.FC = () => {
-  const { user, userTier, signOut, signInDemo, demoAuthenticated } = useAuth();
+  const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
 
-  // User is authenticated if a Supabase session exists OR if demo mode was clicked
+  // Modal display states for header controls
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
+
   const isAuthenticated = Boolean(user) || demoAuthenticated;
+
+  // Handlers for AccountMenu quick tools
+  const handleCopyUnderwriterLink = () => {
+    setIsShareModalOpen(true);
+  };
+
+  const handleDownloadRiskCard = () => {
+    alert('Generating & downloading official Underwriter Risk Certificate (PDF)...');
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between font-sans">
@@ -38,19 +52,19 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
+              {/* INTEGRATED ACCOUNT MENU DROPDOWN */}
               <div className="flex items-center gap-3">
-                <div className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>{user?.email || 'Las Vegas Fleet Test Co.'}</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
-                >
-                  Sign Out
-                </button>
+                <AccountMenu
+                  userEmail={user?.email || 'lasvegas_fleet_test@example.com'}
+                  orgName="Las Vegas Fleet Test Co."
+                  userRole={userRole as any}
+                  subscriptionTier={userTier as any}
+                  onOpenTeamModal={() => setActiveAdminModal('team')}
+                  onOpenUpgradeModal={() => setActiveAdminModal('billing')}
+                  onCopyUnderwriterLink={handleCopyUnderwriterLink}
+                  onDownloadRiskCard={handleDownloadRiskCard}
+                  onSignOut={signOut}
+                />
               </div>
             </header>
 
@@ -59,6 +73,105 @@ const MainApp: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* TEAM & PERMISSIONS MANAGEMENT MODAL */}
+      {activeAdminModal === 'team' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                👥 Manage Team &amp; Role Permissions
+              </h3>
+              <button 
+                onClick={() => setActiveAdminModal(null)} 
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-white font-bold">{user?.email || 'lasvegas_fleet_test@example.com'}</p>
+                  <p className="text-[10px] text-slate-400">Account Owner</p>
+                </div>
+                <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">
+                  {userRole}
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-white font-bold">lasvegas_mechanic_test@example.com</p>
+                  <p className="text-[10px] text-slate-400">Fleet Mechanic</p>
+                </div>
+                <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-2 py-1 focus:outline-none">
+                  <option value="mechanic">MECHANIC</option>
+                  <option value="admin">ADMIN</option>
+                  <option value="viewer">VIEWER</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setActiveAdminModal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PLAN & BILLING SURCHARGE MODAL */}
+      {activeAdminModal === 'billing' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                💳 Plan &amp; Billing Portal
+              </h3>
+              <button 
+                onClick={() => setActiveAdminModal(null)} 
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+              <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
+              <p className="text-lg font-bold text-cyan-400 uppercase">{userTier} TIER ($249/MO)</p>
+              <p className="text-[11px] text-emerald-400">Status: Active (Stripe ID: cus_test_lasvegas_123)</p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAdminModal(null);
+                  alert('Redirecting to secure Stripe billing portal...');
+                }}
+                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
+              >
+                Manage Subscription
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BROKER SHARE LINK MODAL */}
+      <BrokerShareModal
+        isOpen={isShareModalOpen}
+        userTier={userTier}
+        shareUrl={`${window.location.origin}/audit/share/FLT-${Math.random().toString(36).substring(2, 10)}`}
+        onClose={() => setIsShareModalOpen(false)}
+      />
 
       {/* PERSISTENT GLOBAL FOOTER WITH DIRECT SUPPORT ACCESS */}
       <Footer />
