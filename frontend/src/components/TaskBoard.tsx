@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TIER_PERMISSIONS, Tier } from '../lib/tierPermissions';
+import { useAuth } from '../context/AuthContext'; // Updated auth hook import
 import BrokerShareModal from './BrokerShareModal';
 import BulkCsvImportModal from './BulkCsvImportModal';
 
@@ -27,9 +28,13 @@ export interface TaskBoardProps {
 }
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({
-  userTier = 'standard',
+  userTier: propUserTier,
   onUpgradeTier,
 }) => {
+  // Pull authenticated user tier from AuthContext, falling back to props or standard
+  const { userTier: authUserTier } = useAuth();
+  const userTier = authUserTier || propUserTier || 'standard';
+
   const permissions = TIER_PERMISSIONS[userTier];
 
   // REAL FLEET ASSETS STATE
