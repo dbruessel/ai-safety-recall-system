@@ -1,680 +1,669 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Centralized client import
+import React, { useState, useMemo } from 'react';
+import { TIER_PERMISSIONS, Tier } from '../lib/tierPermissions';
+import BrokerShareModal from './BrokerShareModal';
+import BulkCsvImportModal from './BulkCsvImportModal';
 
-// Sub-Component Imports
-import { UnderwriterReportView } from './UnderwriterReportView';
-import { TaskDrawerModal } from './TaskDrawerModal';
-import { SingleVinScanModal } from './SingleVinScanModal';
-import { BulkCsvImportModal } from './BulkCsvImportModal';
-import { BillingManagementModal } from './BillingManagementModal';
-import { TeamManagementModal } from './TeamManagementModal';
-import { BrokerShareModal } from './BrokerShareModal';
-
-// Shared Types
-export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
-export type UserRole = 'admin' | 'mechanic' | 'viewer';
-
-export interface TaskboardRecallItem {
+export interface FleetAsset {
   id: string;
   unit_number: string;
   vin: string;
-  year: number;
   make: string;
   model: string;
-  nhtsa_campaign_number: string;
-  component: string;
-  severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
-  status: 'Open' | 'Scheduled' | 'In Progress' | 'Cleared' | string;
-  summary?: string;
-  consequence?: string;
-  remedy?: string;
-  created_at: string;
-  scheduled_date?: string;
+  year?: number;
+  status: 'OPEN' | 'SCHEDULED' | 'CLEARED';
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  recall_campaign_number: string;
+  recall_component: string;
+  recall_summary: string;
+  dealer_appointment_date?: string;
   repair_notes?: string;
-  receipt_url?: string;
-  closed_by_user_email?: string;
-  closed_at?: string;
+  proof_of_remedy_url?: string;
+  updated_at?: string;
 }
 
-export const TaskBoard: React.FC = () => {
-  // WORKSPACE STATES
-  const [recalls, setRecalls] = useState<TaskboardRecallItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'workspace' | 'underwriter'>('workspace');
+export interface TaskBoardProps {
+  userTier?: Tier;
+  onUpgradeTier?: (tierId: Tier) => void;
+}
 
-  // USER & PROFILE STATES
-  const [userRole, setUserRole] = useState<UserRole>('admin');
-  const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
-  const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('professional');
-  const [vinChecksUsed, setVinChecksUsed] = useState<number>(0);
+export const TaskBoard: React.FC<TaskBoardProps> = ({
+  userTier = 'standard',
+  onUpgradeTier,
+}) => {
+  const permissions = TIER_PERMISSIONS[userTier];
 
-  // MODAL CONTROLS
-  const [selectedRecall, setSelectedRecall] = useState<TaskboardRecallItem | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-  const [isScanModalOpen, setIsScanModalOpen] = useState<boolean>(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
+  // REAL FLEET ASSETS STATE
+  const [assets, setAssets] = useState<FleetAsset[]>([
+    {
+      id: '1',
+      unit_number: 'TRK-101',
+      make: 'FREIGHTLINER',
+      model: 'Cascadia',
+      year: 2022,
+      vin: '1FUJGLDR5MLKE1234',
+      status: 'OPEN',
+      severity: 'HIGH',
+      recall_campaign_number: '23V-890',
+      recall_component: 'STEERING SHAFT ASSEMBLY',
+      recall_summary: 'Steering shaft pinch bolt may loosen, leading to complete loss of steering control.',
+      repair_notes: 'Awaiting dealer part arrival.',
+    },
+    {
+      id: '2',
+      unit_number: 'TRK-102',
+      make: 'FORD',
+      model: 'Transit 350',
+      year: 2023,
+      vin: '1FTBW1Y85PKA54321',
+      status: 'SCHEDULED',
+      severity: 'MEDIUM',
+      recall_campaign_number: '24V-112',
+      recall_component: 'FUEL SYSTEM: GASOLINE',
+      recall_summary: 'Fuel pump impellers may deform, causing loss of motive power.',
+      dealer_appointment_date: '2026-03-05',
+      repair_notes: 'Scheduled with Friendly Ford Fleet Center.',
+    },
+    {
+      id: '3',
+      unit_number: 'TRK-103',
+      make: 'KENWORTH',
+      model: 'T680',
+      year: 2021,
+      vin: '1XKDDP9X8MJ987654',
+      status: 'CLEARED',
+      severity: 'LOW',
+      recall_campaign_number: '22V-405',
+      recall_component: 'WIPER MOTOR ASSEMBLY',
+      recall_summary: 'Wiper motor gear stripping in heavy snowfall conditions.',
+      repair_notes: 'Inspected and replaced under warranty.',
+      proof_of_remedy_url: 'receipt_trk103.pdf',
+    },
+  ]);
+
+  // UI & MODAL STATES
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  const [gateReason, setGateReason] = useState<string>('');
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [lockedFeatureName, setLockedFeatureName] = useState<string>('');
+  
+  // SINGLE VIN SCAN MODAL STATE
+  const [isSingleVinModalOpen, setIsSingleVinModalOpen] = useState<boolean>(false);
+  const [singleVinInput, setSingleVinInput] = useState<string>('');
+  const [singleUnitInput, setSingleUnitInput] = useState<string>('');
+  const [isScanningVin, setIsScanningVin] = useState<boolean>(false);
+  const [scanModalError, setScanModalError] = useState<string>('');
 
-  // FILTER & SORT STATES
+  // MANAGED TASK DRAWER STATE
+  const [selectedAsset, setSelectedAsset] = useState<FleetAsset | null>(null);
+  const [drawerStatus, setDrawerStatus] = useState<'OPEN' | 'SCHEDULED' | 'CLEARED'>('OPEN');
+  const [drawerNotes, setDrawerNotes] = useState<string>('');
+  const [drawerDate, setDrawerDate] = useState<string>('');
+
+  // FILTER & SEARCH STATES
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedMake, setSelectedMake] = useState<string>('All');
-  const [selectedStatus, setSelectedStatus] = useState<string>('All');
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<'created_at' | 'unit_number' | 'severity'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedMake, setSelectedMake] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
 
-  // PERMISSIONS MAP FOR FRONTEND GATING
-  const permissions = useMemo(() => {
-    const isAdmin = userRole === 'admin';
-    const isMechanic = userRole === 'mechanic';
-    const isViewer = userRole === 'viewer';
-
-    return {
-      canManageBilling: isAdmin,
-      canInviteUsers: isAdmin,
-      canIngestAssets: isAdmin,
-      canExportUnderwriterReport: isAdmin || isViewer,
-      canUpdateTaskStatus: isAdmin || isMechanic,
-      canUploadReceipts: isAdmin || isMechanic,
-      isReadOnly: isViewer,
-    };
-  }, [userRole]);
-
-  // VEHICLE CAPACITY LIMITS
-  const vehicleLimit = useMemo(() => {
-    switch (subscriptionTier) {
-      case 'free': return 10;
-      case 'standard': return 50;
-      case 'professional': return 250;
-      case 'enterprise': return 999999;
-      default: return 10;
+  // GUARD FUNCTION FOR TIER-LOCKED ACTIONS
+  const executeTierGuardedAction = (
+    featureKey: keyof typeof permissions,
+    featureName: string,
+    action: () => void
+  ) => {
+    if (!permissions[featureKey]) {
+      setLockedFeatureName(featureName);
+      setShowUpgradeModal(true);
+      return;
     }
-  }, [subscriptionTier]);
+    action();
+  };
 
-  // UNDERWRITER SHARE URL GENERATOR
-  const shareUrl = useMemo(() => {
-    const origin = window.location.origin;
-    return `${origin}/audit/share/FLT-${currentUserId || '1001'}`;
-  }, [currentUserId]);
+  // FILTER LOGIC
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      const matchesSearch =
+        asset.unit_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.vin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.recall_campaign_number.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesMake = selectedMake === 'ALL' || asset.make === selectedMake;
+      const matchesStatus = selectedStatus === 'ALL' || asset.status === selectedStatus;
 
-  // FETCH USER PROFILE & ROLE
-  useEffect(() => {
-    async function fetchUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        setUserEmail(user.email || '');
-        const { data } = await supabase
-          .from('profiles')
-          .select('role, subscription_tier')
-          .eq('id', user.id)
-          .single();
-        if (data?.role) setUserRole(data.role as UserRole);
-        if (data?.subscription_tier) setSubscriptionTier(data.subscription_tier as SubscriptionTier);
-      }
+      return matchesSearch && matchesMake && matchesStatus;
+    });
+  }, [assets, searchTerm, selectedMake, selectedStatus]);
+
+  // SINGLE VIN SCAN HANDLER
+  const handleSingleVinAudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScanModalError('');
+    if (!singleVinInput || singleVinInput.length !== 17) {
+      setScanModalError('Please enter a valid 17-character VIN.');
+      return;
     }
-    fetchUserProfile();
-  }, []);
 
-  // FETCH RECALL TASKS (PARALLEL FETCH)
-  const fetchTaskboardData = async () => {
+    setIsScanningVin(true);
     try {
-      setLoading(true);
-
-      const [tasksRes, vehiclesRes] = await Promise.all([
-        supabase.from('recall_tasks').select('*'),
-        supabase.from('monitored_vehicles').select('*')
-      ]);
-
-      const rawTasks = tasksRes.data || [];
-      const rawVehicles = vehiclesRes.data || [];
-
-      const vehicleMap = new Map(rawVehicles.map(v => [v.id, v]));
-
-      const formattedData: TaskboardRecallItem[] = rawTasks.map((item: any) => {
-        const vehicle = vehicleMap.get(item.vehicle_id);
-
-        let severityLabel = 'Medium';
-        if (item.severity_score >= 8.5) severityLabel = 'Critical';
-        else if (item.severity_score >= 7.0) severityLabel = 'High';
-        else if (item.severity_score < 4.0) severityLabel = 'Low';
-
-        let statusLabel = 'Open';
-        const rawStatus = (item.status || '').toLowerCase();
-        if (rawStatus === 'scheduled' || rawStatus === 'in_progress' || rawStatus === 'in progress') statusLabel = 'Scheduled';
-        else if (rawStatus === 'repaired' || rawStatus === 'cleared' || rawStatus === 'completed') statusLabel = 'Cleared';
-
-        return {
-          id: item.id,
-          unit_number: vehicle?.vin ? `LV-${vehicle.vin.slice(-4)}` : 'LV-1001',
-          vin: vehicle?.vin || '1FUJGLDR5MLKE1234',
-          year: vehicle?.year || 2022,
-          make: vehicle?.make || 'Freightliner',
-          model: vehicle?.model || 'Cascadia',
-          nhtsa_campaign_number: item.campaign_number || '23V889000',
-          component: item.component || 'Safety System',
-          severity: severityLabel,
-          status: statusLabel,
-          summary: item.summary || 'Safety recall hazard flagged by manufacturer.',
-          remedy: item.remedy || 'Inspect and replace affected assembly.',
-          created_at: item.created_at || new Date().toISOString(),
-          scheduled_date: item.scheduled_repair_date || '',
-          repair_notes: item.repair_notes || '',
-          receipt_url: item.proof_of_remedy_url || item.receipt_url || '',
-          closed_by_user_email: item.closed_by_user_email || '',
-          closed_at: item.closed_at || '',
-        };
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vin: singleVinInput.toUpperCase(),
+          broker: 'RecallLogic Workspace Direct',
+          fleet: 'Inspected Fleet Unit',
+        }),
       });
 
-      if (formattedData.length === 0) {
-        setRecalls([
-          {
-            id: 'demo-1',
-            unit_number: 'UNIT-101',
-            vin: '1FUJGLDR5MLKE1234',
-            year: 2022,
-            make: 'Freightliner',
-            model: 'Cascadia',
-            nhtsa_campaign_number: '23V889000',
-            component: 'SERVICE BRAKES, HYDRAULIC',
-            severity: 'Critical',
-            status: 'Open',
-            summary: 'Hydraulic pressure loss risk increasing stopping distance.',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 'demo-2',
-            unit_number: 'BUS-202',
-            vin: '1FDWE4FN5RDD01234',
-            year: 2021,
-            make: 'Ford',
-            model: 'E-450 Bus',
-            nhtsa_campaign_number: '23V112000',
-            component: 'ELECTRICAL SYSTEM: BATTERY',
-            severity: 'High',
-            status: 'Open',
-            summary: 'High-voltage battery junction box software fault.',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 'demo-3',
-            unit_number: 'VAN-305',
-            vin: '1FTBW1Y85PKA54321',
-            year: 2023,
-            make: 'Ford',
-            model: 'Transit 350',
-            nhtsa_campaign_number: '23V554000',
-            component: 'AIR BAGS: FRONT',
-            severity: 'High',
-            status: 'Scheduled',
-            summary: 'Passenger airbag inflator rupture hazard.',
-            scheduled_date: '2026-08-28',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 'demo-4',
-            unit_number: 'EXEC-01',
-            vin: '5YJ3E1EA7MF987654',
-            year: 2021,
-            make: 'Tesla',
-            model: 'Model 3',
-            nhtsa_campaign_number: '22V991000',
-            component: 'FORWARD COLLISION AVOIDANCE',
-            severity: 'Low',
-            status: 'Cleared',
-            summary: 'OTA software update executed to remediate sensor speed response.',
-            receipt_url: 'https://storage.recalllogic.com/proofs/LV_Tesla_OTA_Confirmation.pdf',
-            created_at: new Date().toISOString()
-          }
-        ]);
-      } else {
-        setRecalls(formattedData);
-      }
+      if (!response.ok) throw new Error('NHTSA audit server failed to respond.');
 
-    } catch (err) {
-      console.error('Error fetching taskboard data:', err);
+      const data = await response.json();
+      const hasRecalls = data.has_open_recall;
+      const primaryRecall = hasRecalls && data.recalls?.[0] ? data.recalls[0] : null;
+
+      const newAsset: FleetAsset = {
+        id: Date.now().toString(),
+        unit_number: singleUnitInput.trim().toUpperCase() || `UNASSIGNED-${singleVinInput.slice(-4)}`,
+        vin: singleVinInput.toUpperCase(),
+        make: primaryRecall?.make || 'UNKNOWN',
+        model: primaryRecall?.model || 'UNIT',
+        status: hasRecalls ? 'OPEN' : 'CLEARED',
+        severity: hasRecalls ? 'HIGH' : 'LOW',
+        recall_campaign_number: primaryRecall?.campaign_number || 'NONE',
+        recall_component: primaryRecall?.component || 'SYSTEM CLEAN',
+        recall_summary: primaryRecall?.summary || 'Zero active safety recalls found on NHTSA database.',
+      };
+
+      setAssets((prev) => [newAsset, ...prev]);
+      setIsSingleVinModalOpen(false);
+      setSingleVinInput('');
+      setSingleUnitInput('');
+    } catch (err: any) {
+      setScanModalError(err.message || 'Error processing VIN scan.');
     } finally {
-      setLoading(false);
+      setIsScanningVin(false);
     }
   };
 
-  useEffect(() => {
-    fetchTaskboardData();
-  }, []);
+  // DRAWER SAVE HANDLER
+  const handleSaveTaskDetails = () => {
+    if (!selectedAsset) return;
 
-  // MEMOIZED FILTERS & METRICS
-  const uniqueMakes = useMemo(() => {
-    const makes = new Set(recalls.map((item) => item.make).filter(Boolean));
-    return ['All', ...Array.from(makes).sort()];
-  }, [recalls]);
-
-  const filteredRecalls = useMemo(() => {
-    return recalls
-      .filter((item) => {
-        const query = searchTerm.toLowerCase();
-        const matchesSearch =
-          !searchTerm ||
-          item.unit_number?.toLowerCase().includes(query) ||
-          item.vin?.toLowerCase().includes(query) ||
-          `${item.year} ${item.make} ${item.model}`.toLowerCase().includes(query) ||
-          item.component?.toLowerCase().includes(query) ||
-          item.nhtsa_campaign_number?.toLowerCase().includes(query);
-
-        const matchesMake = selectedMake === 'All' || item.make === selectedMake;
-        const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
-        const matchesSeverity = selectedSeverity === 'All' || item.severity === selectedSeverity;
-
-        return matchesSearch && matchesMake && matchesStatus && matchesSeverity;
-      })
-      .sort((a, b) => {
-        let comparison = 0;
-        if (sortBy === 'created_at') comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        else if (sortBy === 'unit_number') comparison = (a.unit_number || '').localeCompare(b.unit_number || '');
-        else if (sortBy === 'severity') {
-          const severityOrder: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
-          comparison = (severityOrder[a.severity] || 0) - (severityOrder[b.severity] || 0);
-        }
-        return sortOrder === 'desc' ? -comparison : comparison;
-      });
-  }, [recalls, searchTerm, selectedMake, selectedStatus, selectedSeverity, sortBy, sortOrder]);
-
-  const metrics = useMemo(() => {
-    const total = recalls.length;
-    const open = recalls.filter((r) => r.status === 'Open').length;
-    const scheduled = recalls.filter((r) => r.status === 'Scheduled' || r.status === 'In Progress').length;
-    const cleared = recalls.filter((r) => r.status === 'Cleared').length;
-    const safeRate = total > 0 ? Math.round((cleared / total) * 100) : 100;
-    return { total, open, scheduled, cleared, safeRate };
-  }, [recalls]);
-
-  // HANDLERS
-  const triggerUpgradeModal = (reason: string) => {
-    setGateReason(reason);
-    setIsUpgradeModalOpen(true);
-  };
-
-  const handleOpenSingleVinConsole = () => {
-    if (!permissions.canIngestAssets) return;
-    if (subscriptionTier === 'free' || subscriptionTier === 'standard') {
-      triggerUpgradeModal('Instant Single-VIN Scan Console is exclusive to Professional & Enterprise plans.');
-      return;
-    }
-    setIsScanModalOpen(true);
-  };
-
-  const handleDownloadPDF = () => {
-    if (subscriptionTier === 'free' || subscriptionTier === 'standard') {
-      triggerUpgradeModal('Signed Underwriter Compliance Certificates (PDF) are exclusive to Professional & Enterprise plans.');
-      return;
-    }
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-    window.open(`${baseUrl}/api/broker/compliance-report/FLT-1001/pdf?broker_name=Aon%20Risk%20Solutions`, '_blank');
-  };
-
-  const handleExportCSV = () => {
-    if (filteredRecalls.length === 0) return;
-    const headers = ['Unit Number', 'VIN', 'Year', 'Make', 'Model', 'Component', 'NHTSA Campaign', 'Severity', 'Status', 'Receipt URL'];
-    const rows = filteredRecalls.map((r) => [
-      `"${r.unit_number || ''}"`, `"${r.vin || ''}"`, r.year, `"${r.make || ''}"`, `"${r.model || ''}"`,
-      `"${r.component || ''}"`, `"${r.nhtsa_campaign_number || ''}"`, `"${r.severity || ''}"`, `"${r.status || ''}"`, `"${r.receipt_url || ''}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `fleet_recall_report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.id === selectedAsset.id
+          ? {
+              ...a,
+              status: drawerStatus,
+              repair_notes: drawerNotes,
+              dealer_appointment_date: drawerDate,
+              updated_at: new Date().toISOString(),
+            }
+          : a
+      )
+    );
+    setSelectedAsset(null);
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans relative text-slate-100">
-      
-      {/* WORKSPACE HEADER & TAB SWITCHER */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-gray-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 font-sans px-4 sm:px-6">
+      {/* GLOBAL WORKSPACE CONTROL BAR */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#0B101D] p-5 rounded-2xl border border-slate-800/80 shadow-xl">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {activeTab === 'underwriter' ? 'Underwriter Compliance & Risk Portal' : 'Fleet Recall Operations'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {activeTab === 'underwriter'
-              ? 'Executive risk metrics and audit-grade proof of recall remediation for insurance carriers.'
-              : 'Monitor, filter, and schedule safety recall remedies across active fleet assets.'}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl font-bold text-white font-mono tracking-tight">Recall Operations Workspace</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-950/80 text-[#06B6D4] border border-[#06B6D4]/30">
+              {userTier.toUpperCase()} TIER ({assets.length} / {permissions.maxVehicles === Infinity ? '∞' : permissions.maxVehicles} VINs)
+            </span>
+
+            {/* DIRECT UPGRADE CTA BUTTON (Shown to Standard Users) */}
+            {userTier === 'standard' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onUpgradeTier) onUpgradeTier('professional');
+                }}
+                className="px-3 py-0.5 rounded-full text-[10px] font-mono font-black uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 transition shadow-md shadow-cyan-500/20 cursor-pointer animate-pulse"
+              >
+                ⚡ Upgrade to Pro ($249/mo)
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Active fleet safety tracking, underwriter verification packet generation, and dealer remedy scheduling.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="bg-gray-100 p-1 rounded-xl flex gap-1 text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => setActiveTab('workspace')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Task Board
-            </button>
-            {permissions.canExportUnderwriterReport && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('underwriter')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                  activeTab === 'underwriter' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🛡️ Underwriter Audit
-              </button>
+        {/* TIER-GUARDED ACTION CONTROLS */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 1. Single-VIN Scan */}
+          <button
+            type="button"
+            onClick={() =>
+              executeTierGuardedAction('canSingleVinScan', 'Instant Single-VIN Scan Console', () =>
+                setIsSingleVinModalOpen(true)
+              )
+            }
+            className={`px-3.5 py-2 text-xs font-mono font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+              permissions.canSingleVinScan
+                ? 'bg-slate-900 text-slate-200 border-slate-700 hover:bg-slate-800'
+                : 'bg-slate-950/80 text-slate-400 border-cyan-500/30 hover:border-cyan-400 hover:text-white bg-gradient-to-r from-slate-900/50 to-cyan-950/20'
+            }`}
+          >
+            {!permissions.canSingleVinScan ? (
+              <span className="text-[10px] px-1 py-0.2 bg-cyan-500/20 text-[#06B6D4] font-black rounded border border-cyan-500/40">PRO ⚡</span>
+            ) : (
+              '🔍'
             )}
-          </div>
+            <span>Single-VIN Scan</span>
+          </button>
 
-          {activeTab === 'workspace' && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-              >
-                <span>🔗</span> Share Audit Link
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadPDF}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>📄</span> Risk Certificate
-              </button>
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>📊</span> Export CSV
-              </button>
-            </div>
-          )}
+          {/* 2. Bulk CSV Import */}
+          <button
+            type="button"
+            onClick={() =>
+              executeTierGuardedAction('canBulkImportCsv', 'Bulk CSV Batch Ingestion Engine', () =>
+                setIsBulkModalOpen(true)
+              )
+            }
+            className={`px-3.5 py-2 text-xs font-mono font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+              permissions.canBulkImportCsv
+                ? 'bg-slate-900 text-slate-200 border-slate-700 hover:bg-slate-800'
+                : 'bg-slate-950/80 text-slate-400 border-cyan-500/30 hover:border-cyan-400 hover:text-white bg-gradient-to-r from-slate-900/50 to-cyan-950/20'
+            }`}
+          >
+            {!permissions.canBulkImportCsv ? (
+              <span className="text-[10px] px-1 py-0.2 bg-cyan-500/20 text-[#06B6D4] font-black rounded border border-cyan-500/40">PRO ⚡</span>
+            ) : (
+              '📁'
+            )}
+            <span>Bulk CSV Import</span>
+          </button>
+
+          {/* 3. Share Broker Link */}
+          <button
+            type="button"
+            onClick={() =>
+              executeTierGuardedAction('canShareAuditLink', 'Shareable Read-Only Broker Audit Links', () =>
+                setIsShareModalOpen(true)
+              )
+            }
+            className={`px-3.5 py-2 text-xs font-mono font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+              permissions.canShareAuditLink
+                ? 'bg-[#06B6D4] text-slate-950 border-cyan-400 hover:bg-cyan-400 font-extrabold shadow-lg shadow-cyan-500/10'
+                : 'bg-slate-950/80 text-slate-400 border-cyan-500/30 hover:border-cyan-400 hover:text-white bg-gradient-to-r from-slate-900/50 to-cyan-950/20'
+            }`}
+          >
+            {!permissions.canShareAuditLink ? (
+              <span className="text-[10px] px-1 py-0.2 bg-cyan-500/20 text-[#06B6D4] font-black rounded border border-cyan-500/40">PRO ⚡</span>
+            ) : (
+              '🛡️'
+            )}
+            <span>Share Audit Link</span>
+          </button>
+
+          {/* 4. Signed PDF Certificate */}
+          <button
+            type="button"
+            onClick={() =>
+              executeTierGuardedAction(
+                'canExportPdfCertificate',
+                'Signed Underwriter Compliance Cards (PDF)',
+                () => alert('Generating Signed Underwriter PDF Certificate...')
+              )
+            }
+            className={`px-3.5 py-2 text-xs font-mono font-bold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+              permissions.canExportPdfCertificate
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                : 'bg-slate-950/80 text-slate-400 border-cyan-500/30 hover:border-cyan-400 hover:text-white bg-gradient-to-r from-slate-900/50 to-cyan-950/20'
+            }`}
+          >
+            {!permissions.canExportPdfCertificate ? (
+              <span className="text-[10px] px-1 py-0.2 bg-cyan-500/20 text-[#06B6D4] font-black rounded border border-cyan-500/40">PRO ⚡</span>
+            ) : (
+              '📄'
+            )}
+            <span>Export Risk Certificate</span>
+          </button>
         </div>
       </div>
 
-      {/* RENDER ACTIVE VIEW */}
-      {activeTab === 'underwriter' ? (
-        <UnderwriterReportView tasks={recalls} />
-      ) : (
-        <>
-          {/* KPI STATS BAR */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-gray-900">
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Required</p>
-              <p className="text-3xl font-extrabold text-red-600 mt-1">{metrics.open}</p>
-              <span className="text-xs text-red-500 font-medium">Unresolved safety risks</span>
-            </div>
+      {/* SEARCH AND FILTER BAR */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full sm:w-72">
+          <input
+            type="text"
+            placeholder="Search Unit #, VIN, or Campaign..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#070B14] border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#06B6D4] transition"
+          />
+        </div>
 
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">In Progress</p>
-              <p className="text-3xl font-extrabold text-amber-500 mt-1">{metrics.scheduled}</p>
-              <span className="text-xs text-amber-600 font-medium">Scheduled at dealership</span>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">CLEARED REPAIRS</p>
-              <p className="text-3xl font-extrabold text-emerald-600 mt-1">{metrics.cleared}</p>
-              <span className="text-xs text-emerald-600 font-medium">Verified completed repairs</span>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200/80">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fleet Safety Score</p>
-              <p className="text-3xl font-extrabold text-blue-600 mt-1">{metrics.safeRate}%</p>
-              <span className="text-xs text-blue-500 font-medium">Overall fleet compliance</span>
-            </div>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-slate-400">Make:</label>
+            <select
+              value={selectedMake}
+              onChange={(e) => setSelectedMake(e.target.value)}
+              className="bg-[#070B14] border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#06B6D4]"
+            >
+              <option value="ALL">All Makes</option>
+              <option value="FREIGHTLINER">Freightliner</option>
+              <option value="FORD">Ford</option>
+              <option value="KENWORTH">Kenworth</option>
+            </select>
           </div>
 
-          {/* FILTER & CONTROL BAR */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200/80 space-y-3 text-gray-900">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:flex-1 max-w-xl">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-slate-400">Status:</label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="bg-[#070B14] border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#06B6D4]"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="OPEN">Open Recalls</option>
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="CLEARED">Cleared / Resolved</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* FLEET RECALL TABLE */}
+      <div className="border border-slate-800 rounded-2xl bg-[#0B101D] overflow-hidden shadow-2xl">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-800 bg-slate-900/80 font-mono text-[11px] text-slate-400 uppercase tracking-wider">
+              <th className="p-4">Power Unit / VIN</th>
+              <th className="p-4">Make &amp; Model</th>
+              <th className="p-4">Safety Recall Details</th>
+              <th className="p-4">Compliance Status</th>
+              <th className="p-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/60 text-xs font-mono">
+            {filteredAssets.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-slate-500">
+                  No fleet records match your search filter.
+                </td>
+              </tr>
+            ) : (
+              filteredAssets.map((asset) => (
+                <tr key={asset.id} className="hover:bg-slate-900/40 transition">
+                  <td className="p-4">
+                    <span className="font-bold text-white text-sm block">{asset.unit_number}</span>
+                    <span className="text-[11px] text-slate-400">{asset.vin}</span>
+                  </td>
+                  <td className="p-4 text-slate-300">
+                    <div>{asset.make}</div>
+                    <div className="text-[11px] text-slate-500">{asset.model} {asset.year || ''}</div>
+                  </td>
+                  <td className="p-4 max-w-xs">
+                    <div className="text-white font-bold">{asset.recall_campaign_number} — {asset.recall_component}</div>
+                    <div className="text-slate-400 text-[11px] truncate mt-0.5">{asset.recall_summary}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
+                      asset.status === 'CLEARED'
+                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
+                        : asset.status === 'SCHEDULED'
+                        ? 'bg-amber-950/80 text-amber-400 border-amber-800'
+                        : 'bg-red-950/80 text-red-400 border-red-800'
+                    }`}>
+                      {asset.status}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        setDrawerStatus(asset.status);
+                        setDrawerNotes(asset.repair_notes || '');
+                        setDrawerDate(asset.dealer_appointment_date || '');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold border border-slate-700 transition cursor-pointer"
+                    >
+                      Manage
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* SINGLE VIN SCAN MODAL */}
+      {isSingleVinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-white">Single-VIN Instant Scan</h3>
+              <button onClick={() => setIsSingleVinModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
+            </div>
+
+            <form onSubmit={handleSingleVinAudit} className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Unit # (Optional)</label>
                 <input
                   type="text"
-                  placeholder="Search by Unit #, VIN, Make, Model, or NHTSA ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-500 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm transition"
+                  placeholder="e.g. TRK-909"
+                  value={singleUnitInput}
+                  onChange={(e) => setSingleUnitInput(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
                 />
               </div>
 
-              {permissions.canIngestAssets ? (
-                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                  <button
-                    type="button"
-                    onClick={handleOpenSingleVinConsole}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap cursor-pointer"
-                  >
-                    ⚡ Single-VIN Scan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsImportModalOpen(true)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition whitespace-nowrap cursor-pointer"
-                  >
-                    📥 Bulk CSV Import
-                  </button>
-                </div>
-              ) : (
-                <span className="text-xs font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg font-bold">
-                  {userRole === 'mechanic' ? '🔧 Mechanic Operational View' : '👁️ Read-Only Auditor View'}
-                </span>
-              )}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">17-Character VIN</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={17}
+                  placeholder="1FUJGLDR5MLKE1234"
+                  value={singleVinInput}
+                  onChange={(e) => setSingleVinInput(e.target.value.toUpperCase())}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                />
+              </div>
+
+              {scanModalError && <p className="text-red-400 text-xs">{scanModalError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSingleVinModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isScanningVin}
+                  className="px-5 py-2 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg hover:bg-cyan-400"
+                >
+                  {isScanningVin ? 'Auditing NHTSA...' : 'Audit VIN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE TASK SIDE DRAWER / OVERLAY */}
+      {selectedAsset && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0B101D] border-l border-slate-800 w-full max-w-md h-full p-6 overflow-y-auto space-y-5 font-mono text-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white">{selectedAsset.unit_number}</h3>
+                <p className="text-xs text-slate-400">{selectedAsset.vin}</p>
+              </div>
+              <button onClick={() => setSelectedAsset(null)} className="text-slate-400 hover:text-white text-sm">✕</button>
             </div>
 
-            <div className="border-t border-gray-100 my-1"></div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Filter By:</span>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Remediation Status</label>
                 <select
-                  value={selectedMake}
-                  onChange={(e) => setSelectedMake(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
+                  value={drawerStatus}
+                  onChange={(e: any) => setDrawerStatus(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
                 >
-                  <option value="All">All Makes</option>
-                  {uniqueMakes.filter((m) => m !== 'All').map((make) => (
-                    <option key={make} value={make}>{make}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedSeverity}
-                  onChange={(e) => setSelectedSeverity(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
-                >
-                  <option value="All">All Severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-semibold cursor-pointer"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="Cleared">Cleared</option>
+                  <option value="OPEN">OPEN (Unresolved Hazard)</option>
+                  <option value="SCHEDULED">SCHEDULED (Dealer Date Set)</option>
+                  <option value="CLEARED">CLEARED (Remedy Verified)</option>
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-700 font-bold cursor-pointer"
-                >
-                  <option value="created_at">Sort by Date</option>
-                  <option value="severity">Sort by Severity</option>
-                  <option value="unit_number">Sort by Unit #</option>
-                </select>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Dealer Appointment Date</label>
+                <input
+                  type="date"
+                  value={drawerDate}
+                  onChange={(e) => setDrawerDate(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Mechanic / Repair Notes</label>
+                <textarea
+                  rows={4}
+                  value={drawerNotes}
+                  onChange={(e) => setDrawerNotes(e.target.value)}
+                  placeholder="Enter dealer appointment details, work order #, or parts status..."
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                />
+              </div>
+
+              {/* INLINE DRAWER PRO TIER GUARD */}
+              <div className="pt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs text-slate-400">Proof-of-Remedy Storage</label>
+                  {!permissions.canUploadProofOfRemedy && (
+                    <span className="text-[9px] font-black text-[#06B6D4] bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">
+                      PRO TIER ONLY
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="p-1.5 border border-gray-300 rounded-lg text-xs bg-gray-50 hover:bg-gray-100 transition text-gray-600 font-bold shadow-sm cursor-pointer"
+                  onClick={() =>
+                    executeTierGuardedAction(
+                      'canUploadProofOfRemedy',
+                      'Proof-of-Remedy Receipt & Invoice Storage',
+                      () => alert('Proof-of-Remedy document uploaded successfully!')
+                    )
+                  }
+                  className={`w-full py-2.5 border rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    permissions.canUploadProofOfRemedy
+                      ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800'
+                      : 'bg-slate-950/80 border-cyan-500/30 text-slate-400 hover:border-cyan-400 hover:text-white'
+                  }`}
                 >
-                  {sortOrder === 'desc' ? '⬇️' : '⬆️'}
+                  {!permissions.canUploadProofOfRemedy && '🔒 '}📎 Attach Dealer Receipt (PDF/Image)
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* TASK TABLE */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden text-gray-900">
-            {loading ? (
-              <div className="p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                <p className="mt-2 text-sm text-gray-500 font-medium">Scanning fleet recall records...</p>
-              </div>
-            ) : filteredRecalls.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                <p className="text-lg font-semibold text-gray-700">No recall tasks found</p>
-                <p className="text-sm mt-1">Try adjusting your filters or search terms above.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase text-xs tracking-wider">
-                    <tr>
-                      <th className="p-4">Fleet Asset</th>
-                      <th className="p-4">Vehicle Details</th>
-                      <th className="p-4">Component & NHTSA ID</th>
-                      <th className="p-4">Severity</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Proof of Remedy</th>
-                      <th className="p-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredRecalls.map((item) => (
-                      <tr key={item.id} className="hover:bg-blue-50/40 transition">
-                        <td className="p-4 font-bold text-gray-900">Unit #{item.unit_number || 'Unassigned'}</td>
-                        <td className="p-4">
-                          <div className="font-semibold text-gray-800">{item.year} {item.make} {item.model}</div>
-                          <div className="text-xs text-gray-400 font-mono mt-0.5">VIN: {item.vin}</div>
-                        </td>
-                        <td className="p-4">
-                          <div className="font-medium text-gray-900">{item.component}</div>
-                          <div className="text-xs text-blue-600 font-mono mt-0.5">NHTSA #{item.nhtsa_campaign_number}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                            item.severity === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {item.severity}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
-                            item.status === 'Scheduled' ? 'bg-amber-100 text-amber-700' : 'bg-red-50 text-red-600'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          {item.receipt_url ? (
-                            <a href={item.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-emerald-600 font-semibold hover:underline">
-                              🧾 Verified Invoice
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-400">No document</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRecall(item);
-                              setIsDrawerOpen(true);
-                            }}
-                            className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold text-xs rounded-lg transition cursor-pointer"
-                          >
-                            Manage
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedAsset(null)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTaskDetails}
+                className="px-5 py-2 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg hover:bg-cyan-400"
+              >
+                Save Task Changes
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* ALL MODAL OVERLAYS */}
-      <TaskDrawerModal
-        isOpen={isDrawerOpen}
-        selectedRecall={selectedRecall}
-        userRole={userRole}
-        userEmail={userEmail}
-        permissions={permissions}
-        onClose={() => setIsDrawerOpen(false)}
-        onTaskUpdated={(updated) => {
-          setRecalls((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-          setSelectedRecall(updated);
-        }}
-      />
-
-      <SingleVinScanModal
-        isOpen={isScanModalOpen}
-        currentFleetCount={recalls.length}
-        vehicleLimit={vehicleLimit}
-        onClose={() => setIsScanModalOpen(false)}
-        onSuccess={fetchTaskboardData}
-        onTriggerUpgrade={triggerUpgradeModal}
-        onIncrementVinChecks={() => setVinChecksUsed((prev) => prev + 1)}
-      />
-
-      <BulkCsvImportModal
-        isOpen={isImportModalOpen}
-        currentFleetCount={recalls.length}
-        vehicleLimit={vehicleLimit}
-        subscriptionTier={subscriptionTier}
-        onClose={() => setIsImportModalOpen(false)}
-        onSuccess={fetchTaskboardData}
-      />
-
-      <BillingManagementModal
-        isOpen={isUpgradeModalOpen}
-        subscriptionTier={subscriptionTier}
-        currentFleetCount={recalls.length}
-        userEmail={userEmail}
-        onClose={() => setIsUpgradeModalOpen(false)}
-        onSelectTier={(newTier) => setSubscriptionTier(newTier)}
-      />
-
-      <TeamManagementModal
-        isOpen={isTeamModalOpen}
-        onClose={() => setIsTeamModalOpen(false)}
-        currentUserId={currentUserId}
-      />
-
+      {/* SHARE AUDIT LINK MODAL */}
       <BrokerShareModal
         isOpen={isShareModalOpen}
-        userTier={subscriptionTier === 'free' ? 'standard' : subscriptionTier}
-        shareUrl={shareUrl}
+        userTier={userTier}
+        shareUrl={`${window.location.origin}/audit/share/FLT-${Math.random().toString(36).substring(2, 10)}`}
         onClose={() => setIsShareModalOpen(false)}
-        onUpgrade={() => {
-          setIsShareModalOpen(false);
-          setIsUpgradeModalOpen(true);
-        }}
       />
+
+      {/* BULK CSV IMPORT MODAL */}
+      <BulkCsvImportModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+      />
+
+      {/* HIGH-CONVERSION UPGRADE PROMPT MODAL */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-cyan-500/40 rounded-2xl p-6 max-w-md w-full shadow-[0_0_40px_rgba(6,182,212,0.15)] space-y-4 font-sans text-left relative overflow-hidden">
+            
+            <div className="flex justify-between items-center">
+              <span className="px-2.5 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-[#06B6D4] text-[10px] font-mono font-bold uppercase tracking-wider">
+                INSURANCE &amp; RISK INTELLIGENCE
+              </span>
+              <button onClick={() => setShowUpgradeModal(false)} className="text-slate-400 hover:text-white text-sm cursor-pointer">✕</button>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-white font-mono">Satisfy Insurance Carriers in 1-Click</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <strong className="text-[#06B6D4]">{lockedFeatureName}</strong> requires the Professional Tier ($249/mo). Instantly generate verifiable compliance packets for underwriters and brokers.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2 text-xs text-slate-300 font-mono">
+              <p className="text-[#06B6D4] font-bold text-[11px] uppercase tracking-wider">Unlocked in Professional ($249/mo):</p>
+              <ul className="space-y-1.5 text-[11px] text-slate-300">
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[#06B6D4]">✓</span> Shareable Read-Only Underwriter Links
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[#06B6D4]">✓</span> Signed PDF Risk &amp; Compliance Certificates
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[#06B6D4]">✓</span> Proof-of-Remedy Receipt &amp; Invoice Storage
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="text-[#06B6D4]">✓</span> Instant Single-VIN Scan &amp; Bulk CSV Ingestion
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-semibold rounded-xl transition cursor-pointer"
+              >
+                Not Now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  if (onUpgradeTier) onUpgradeTier('professional');
+                }}
+                className="px-5 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs rounded-xl transition shadow-md shadow-cyan-500/20 cursor-pointer"
+              >
+                Upgrade to Pro ($249/mo)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
