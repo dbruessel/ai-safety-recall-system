@@ -1,170 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
+import React, { useState } from 'react';
 import LandingPage from './components/LandingPage';
-import PublicAuditDemo from './components/PublicAuditDemo';
 import TaskBoard from './components/TaskBoard';
+import Footer from './components/Footer';
 
-export function App() {
-  const [session, setSession] = useState<any>(null);
-  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
-  const [searchParams, setSearchParams] = useState<string>(window.location.search);
-  const [selectedFleet, setSelectedFleet] = useState<string>('Las Vegas Fleet Test Co.');
+export const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userTier, setUserTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
 
-  // Synchronize URL location state
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-      setSearchParams(window.location.search);
-    };
-
-    window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
-
-  // Rehydrate Supabase Session from localStorage on startup / refresh
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setAuthLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Check if URL matches Public Audit Share links, Demo routes, or query flags
-  const isDemoMode = 
-    currentPath.includes('/audit/demo') || 
-    currentPath.includes('/audit/share/') || 
-    searchParams.includes('demo=') || 
-    searchParams.includes('broker=');
-
-  // Trigger FastAPI Backend Stripe Checkout Session
-  const handleStripeCheckout = async (tierId: string) => {
-    try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tier: tierId,
-          success_url: `${window.location.origin}/?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: window.location.origin,
-        }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        console.error('Stripe Checkout Error:', errData);
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (err) {
-      console.error('Failed to trigger Stripe checkout:', err);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setDemoAuthenticated(false);
-  };
-
-  // Prevent premature unauthenticated redirects while rehydrating auth state
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center font-mono text-slate-400">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin" />
-          <span>Restoring Session...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // 1. PUBLIC READ-ONLY BROKER & UNDERWRITER AUDIT ROUTE (/audit/demo & /audit/share/*)
-  if (isDemoMode) {
-    return (
-      <PublicAuditDemo
-        onSubscribe={() => handleStripeCheckout('professional')}
-      />
-    );
-  }
-
-  // 2. PUBLIC MARKETING LANDING PAGE (Unauthenticated)
-  if (!session && !demoAuthenticated) {
-    return (
-      <LandingPage
-        onSignIn={() => {
-          setDemoAuthenticated(true);
-        }}
-        onSelectTier={(tierId) => {
-          handleStripeCheckout(tierId);
-        }}
-      />
-    );
-  }
-
-  // 3. FULL AUTHENTICATED WORKSPACE
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black">
+    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between font-sans">
       
-      {/* WORKSPACE GLOBAL NAV HEADER */}
-      <nav className="border-b border-slate-800/80 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/recall-logo.png" 
-              alt="RecallLogic Logo" 
-              className="h-7 w-auto object-contain" 
-            />
-            <div>
-              <div className="flex items-center gap-2">
+      {/* MAIN WORKSPACE & PAGE ROUTING CONTENT */}
+      <main className="flex-1">
+        {!isAuthenticated ? (
+          <LandingPage
+            onSignIn={() => setIsAuthenticated(true)}
+            onSelectTier={(tier) => {
+              setUserTier(tier);
+              setIsAuthenticated(true);
+            }}
+          />
+        ) : (
+          <div className="py-6">
+            {/* WORKSPACE NAVIGATION HEADER */}
+            <header className="px-6 mb-6 flex justify-between items-center border-b border-slate-800/80 pb-4">
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/recall-logo.png" 
+                  alt="RecallLogic Logo" 
+                  className="h-6 w-auto object-contain"
+                />
                 <span className="font-extrabold text-white text-sm tracking-tight font-mono">
                   RECALLLOGIC WORKSPACE
                 </span>
+                <span className="text-slate-600 text-xs">|</span>
+                <span className="text-xs text-slate-400 font-mono">
+                  Safety Intelligence System
+                </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono tracking-wide">
-                Safety Intelligence System
-              </p>
-            </div>
+
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span>Las Vegas Fleet Test Co.</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAuthenticated(false)}
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </header>
+
+            {/* MAIN TASKBOARD APP WORKSPACE */}
+            <TaskBoard
+              userTier={userTier}
+              onUpgradeTier={(newTier) => setUserTier(newTier)}
+            />
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>{selectedFleet}</span>
-            </div>
-
-            <button
-              onClick={handleSignOut}
-              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs rounded border border-slate-700 transition-all cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* WORKSPACE BODY CONTENT */}
-      <main className="max-w-7xl mx-auto py-6">
-        <TaskBoard />
+        )}
       </main>
+
+      {/* PERSISTENT GLOBAL FOOTER WITH DIRECT SUPPORT ACCESS */}
+      <Footer />
+
     </div>
   );
-}
+};
 
 export default App;
