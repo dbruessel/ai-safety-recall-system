@@ -216,7 +216,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               {userTier.toUpperCase()} TIER ({assets.length} / {permissions.maxVehicles === Infinity ? '∞' : permissions.maxVehicles} VINs)
             </span>
 
-            {/* DIRECT UPGRADE CTA BUTTON (Shown to Standard Users) */}
+            {/* DIRECT UPGRADE CTA BUTTON */}
             {userTier === 'standard' && (
               <button
                 type="button"
