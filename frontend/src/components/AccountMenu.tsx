@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
-export type UserRole = 'admin' | 'mechanic' | 'viewer';
-export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise';
+export type UserRole = 'admin' | 'mechanic' | 'viewer' | string;
+export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise' | string;
 
 export interface AccountMenuProps {
   userEmail: string;
@@ -18,7 +18,7 @@ export interface AccountMenuProps {
 export const AccountMenu: React.FC<AccountMenuProps> = ({
   userEmail,
   orgName = 'Las Vegas Fleet Test Co.',
-  userRole,
+  userRole = 'admin',
   subscriptionTier,
   onOpenTeamModal,
   onOpenUpgradeModal,
@@ -28,6 +28,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const displayTitle = orgName || 'Las Vegas Fleet Test Co.';
+
+  // Normalize role check (case-insensitive & fallback to admin if unassigned)
+  const normalizedRole = (userRole || 'admin').toString().toLowerCase();
+  const isAdmin = normalizedRole === 'admin';
 
   return (
     <div className="relative inline-block text-left font-sans">
@@ -69,14 +73,14 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400 truncate max-w-[160px]">{userEmail}</span>
                 <span className="bg-cyan-500/10 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-cyan-500/30">
-                  {userRole}
+                  {normalizedRole}
                 </span>
               </div>
             </div>
 
             {/* BLOCK 2: ADMINISTRATION (ADMIN ONLY) */}
-            {userRole === 'admin' && (
-              <div className="space-y-1">
+            {isAdmin && (
+              <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
                 <button
                   type="button"
@@ -86,7 +90,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
                 >
-                  <span>👥 Team & Permissions</span>
+                  <span>👥 Team &amp; Permissions</span>
                   <span className="text-slate-500">→</span>
                 </button>
 
@@ -98,7 +102,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-cyan-400 font-bold transition flex items-center justify-between cursor-pointer"
                 >
-                  <span>💳 Plan & Billing Surcharge</span>
+                  <span>💳 Plan &amp; Billing Portal</span>
                   <span className="text-slate-500">→</span>
                 </button>
               </div>
