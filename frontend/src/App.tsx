@@ -52,13 +52,13 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
-              {/* INTEGRATED ACCOUNT MENU DROPDOWN */}
+              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH GUARANTEED ADMIN FALLBACK */}
               <div className="flex items-center gap-3">
                 <AccountMenu
                   userEmail={user?.email || 'lasvegas_fleet_test@example.com'}
                   orgName="Las Vegas Fleet Test Co."
-                  userRole={userRole as any}
-                  subscriptionTier={userTier as any}
+                  userRole={(userRole || 'admin') as any}
+                  subscriptionTier={(userTier || 'professional') as any}
                   onOpenTeamModal={() => setActiveAdminModal('team')}
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
@@ -93,23 +93,35 @@ const MainApp: React.FC = () => {
             <div className="space-y-3">
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-white font-bold">{user?.email || 'lasvegas_fleet_test@example.com'}</p>
-                  <p className="text-[10px] text-slate-400">Account Owner</p>
+                  <p className="text-xs text-[#06B6D4] font-bold">{user?.email || 'lasvegas_fleet_test@example.com'}</p>
+                  <p className="text-[10px] text-slate-400">Account Owner / System Administrator</p>
                 </div>
                 <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">
-                  {userRole}
+                  {userRole || 'ADMIN'}
                 </span>
               </div>
 
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
                 <div>
                   <p className="text-xs text-white font-bold">lasvegas_mechanic_test@example.com</p>
-                  <p className="text-[10px] text-slate-400">Fleet Mechanic</p>
+                  <p className="text-[10px] text-slate-400">Fleet Operations Specialist</p>
                 </div>
                 <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-2 py-1 focus:outline-none">
                   <option value="mechanic">MECHANIC</option>
                   <option value="admin">ADMIN</option>
                   <option value="viewer">VIEWER</option>
+                </select>
+              </div>
+
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-white font-bold">lasvegas_viewer_test@example.com</p>
+                  <p className="text-[10px] text-slate-400">Insurance Auditor (Read-Only)</p>
+                </div>
+                <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-2 py-1 focus:outline-none">
+                  <option value="viewer">VIEWER</option>
+                  <option value="mechanic">MECHANIC</option>
+                  <option value="admin">ADMIN</option>
                 </select>
               </div>
             </div>
@@ -145,7 +157,7 @@ const MainApp: React.FC = () => {
 
             <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
               <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
-              <p className="text-lg font-bold text-cyan-400 uppercase">{userTier} TIER ($249/MO)</p>
+              <p className="text-lg font-bold text-[#06B6D4] uppercase">{(userTier || 'professional').toUpperCase()} TIER ($249/MO)</p>
               <p className="text-[11px] text-emerald-400">Status: Active (Stripe ID: cus_test_lasvegas_123)</p>
             </div>
 
@@ -156,7 +168,7 @@ const MainApp: React.FC = () => {
                   setActiveAdminModal(null);
                   alert('Redirecting to secure Stripe billing portal...');
                 }}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
+                className="px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
               >
                 Manage Subscription
               </button>
