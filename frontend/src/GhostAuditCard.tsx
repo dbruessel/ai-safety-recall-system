@@ -221,22 +221,3 @@ export function GhostAuditCard() {
     </div>
   );
 }
-🚀 How to Render It in Your Application
-To display this on your landing page, simply import GhostAuditCard inside your main App.tsx component (or wherever you want it to appear on your main layout):
-import { GhostAuditCard } from './GhostAuditCard';
-
-function App() {
-  return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
-      {/* Your standard navbar & header */}
-      <header className="mb-12 text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight">RecallLogic Portal</h1>
-      </header>
-
-      {/* Render the dynamic hook-driven card here */}
-      <GhostAuditCard />
-    </div>
-  );
-}
-
-export default App;
