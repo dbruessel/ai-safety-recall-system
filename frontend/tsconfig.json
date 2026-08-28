@@ -18,9 +18,9 @@
     "jsx": "react-jsx",
 
     /* PATH ALIAS CONFIGURATION */
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"],
+      "*": ["./*"]
     },
 
     /* Linting */
