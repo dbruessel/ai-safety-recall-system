@@ -16,14 +16,9 @@ const MainApp: React.FC = () => {
 
   const isAuthenticated = Boolean(user) || demoAuthenticated;
 
-  // Stripe Checkout Invocation Handler
+  // Direct Stripe Checkout Invocation Handler
   const handleCheckout = async (tierId: string) => {
     try {
-      // If user isn't authenticated yet, authenticate demo user first
-      if (!isAuthenticated) {
-        await signInDemo();
-      }
-
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: { tier: tierId },
       });
@@ -35,11 +30,11 @@ const MainApp: React.FC = () => {
       }
 
       if (data?.url) {
-        // Redirect user directly to live Stripe Checkout
+        // Redirect user directly to live Stripe Checkout page
         window.location.href = data.url;
       } else {
         console.error('No checkout URL returned:', data);
-        alert('Could not start checkout session. Please try again.');
+        alert('Could not start checkout session. Please check your Supabase Edge Function logs.');
       }
     } catch (err: any) {
       console.error('Checkout execution error:', err);
