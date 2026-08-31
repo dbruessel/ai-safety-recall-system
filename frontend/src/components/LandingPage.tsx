@@ -109,7 +109,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     } catch (err: any) {
       setAuthError(err.message || 'An unexpected error occurred during sign in.');
-    } finally {
+    } font-mono finally {
       setIsSubmittingAuth(false);
     }
   };
@@ -222,33 +222,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  // UPDATED SAFE TIER CHECKOUT HANDLER
   const handleTierCheckout = async (tier: PricingTier) => {
-    if (onSelectTier) {
-      onSelectTier(tier.id);
-      return;
+    if (typeof onSelectTier === 'function') {
+      try {
+        onSelectTier(tier.id);
+        return;
+      } catch (err) {
+        console.error('Error invoking onSelectTier callback:', err);
+      }
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tier: tier.id,
-          priceId: tier.stripePriceId,
-        }),
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { tier: tier.id },
       });
 
-      const data = await response.json();
-
-      if (data.url) {
+      if (data?.url) {
         window.location.href = data.url;
-      } else if (data.sessionId) {
-        window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
       } else {
-        console.warn('No Stripe checkout URL returned from backend API.');
+        console.warn('No Stripe checkout URL returned from Supabase Edge Function.', error);
       }
     } catch (err) {
       console.error('Error triggering Stripe checkout session:', err);
