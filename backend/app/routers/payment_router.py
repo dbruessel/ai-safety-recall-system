@@ -20,18 +20,34 @@ class CheckoutRequest(BaseModel):
     email: Optional[str] = None
 
 
+def get_secret(secret_name: str) -> str:
+    """Dynamically fetches secrets from Supabase Vault/RPC, falling back to os.getenv."""
+    try:
+        supabase = get_supabase_client()
+        # RPC function call to read vault secrets if configured in Supabase
+        res = supabase.rpc("read_secret", {"secret_name": secret_name}).execute()
+        if res.data:
+            return res.data
+    except Exception as err:
+        print(f"⚠️ Vault lookup skipped for {secret_name}: {err}")
+
+    # Fall back to process environment variables
+    return os.getenv(secret_name, "")
+
+
 def get_stripe_price_id(tier: str) -> str:
-    """Helper to resolve Stripe Price IDs strictly from live environment variables."""
-    price_map = {
-        "standard": os.getenv("STRIPE_PRICE_STANDARD"),
-        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO"),
-        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE"),
-    }
-    price_id = price_map.get(tier.lower())
+    """Resolves Stripe Price IDs dynamically from secrets."""
+    secret_key = f"STRIPE_PRICE_{tier.upper()}"
+    price_id = get_secret(secret_key)
+    
+    # Check alternate naming convention for Pro tier if applicable
+    if not price_id and tier.lower() in ["professional", "pro"]:
+        price_id = get_secret("STRIPE_PRICE_PRO")
+
     if not price_id:
         raise HTTPException(
             status_code=400,
-            detail=f"Environment variable for tier '{tier}' is missing. Please set STRIPE_PRICE_{tier.upper()} in Render."
+            detail=f"Secret or Environment variable '{secret_key}' was not found in Supabase."
         )
     return price_id
 
@@ -42,10 +58,9 @@ async def create_portal_session(req: PortalRequest):
     Creates a hosted Stripe Customer Portal session for managing 
     invoices, payment methods, and receipts.
     """
-    # Dynamically bind latest key on execution
-    stripe_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe_key = get_secret("STRIPE_SECRET_KEY")
     if not stripe_key:
-        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing from Supabase secrets.")
     stripe.api_key = stripe_key
 
     try:
@@ -81,10 +96,9 @@ async def create_checkout_session(req: CheckoutRequest):
     """
     Creates a Stripe Checkout Session for upgrading or switching subscription tiers.
     """
-    # Dynamically bind latest key on execution
-    stripe_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe_key = get_secret("STRIPE_SECRET_KEY")
     if not stripe_key:
-        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing from Supabase secrets.")
     stripe.api_key = stripe_key
 
     try:
@@ -132,7 +146,7 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
     and executes database updates to Supabase (Organization & Profiles).
     """
     payload = await request.body()
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    webhook_secret = get_secret("STRIPE_WEBHOOK_SECRET")
     event_dict = {}
 
     # 1. Safely parse Stripe Object or raw JSON into a standard Python dict
