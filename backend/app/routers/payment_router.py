@@ -47,9 +47,9 @@ def get_stripe_price_id(tier: str) -> str:
 
     # 2. Hardcoded Live Production Price IDs as a safe backup
     production_prices = {
-        "standard": "price_1TrlFTDXs4xycz0o1e9gfg9d",
-        "professional": "price_1TsR6jDXs4xycz0ohAfewQgk",
-        "enterprise": "price_1TrlFxDXs4xycz0ofyuV70Rf",
+        "standard": "price_1UAKtuDQL6wtekozHDd3cVi5",
+        "professional": "price_1UAKtuDQL6wtekozwwuE45f9",
+        "enterprise": "price_1UAKtuDQL6wtekozyanRnve5",
     }
     
     resolved_price = production_prices.get(tier.lower(), "")
