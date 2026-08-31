@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { supabase } from './lib/supabase';
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
@@ -14,6 +15,37 @@ const MainApp: React.FC = () => {
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
   const isAuthenticated = Boolean(user) || demoAuthenticated;
+
+  // Stripe Checkout Invocation Handler
+  const handleCheckout = async (tierId: string) => {
+    try {
+      // If user isn't authenticated yet, authenticate demo user first
+      if (!isAuthenticated) {
+        await signInDemo();
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { tier: tierId },
+      });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        alert(`Checkout error: ${error.message || 'Failed to initialize session'}`);
+        return;
+      }
+
+      if (data?.url) {
+        // Redirect user directly to live Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        console.error('No checkout URL returned:', data);
+        alert('Could not start checkout session. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Checkout execution error:', err);
+      alert(`Checkout failed: ${err.message || 'Unknown error'}`);
+    }
+  };
 
   // Handlers for AccountMenu quick tools
   const handleCopyUnderwriterLink = () => {
@@ -31,7 +63,7 @@ const MainApp: React.FC = () => {
         {!isAuthenticated ? (
           <LandingPage
             onSignIn={signInDemo}
-            onSelectTier={() => signInDemo()}
+            onSelectTier={(tierId) => handleCheckout(tierId)}
           />
         ) : (
           <div className="py-6">
@@ -158,19 +190,16 @@ const MainApp: React.FC = () => {
             <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
               <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
               <p className="text-lg font-bold text-[#06B6D4] uppercase">{(userTier || 'professional').toUpperCase()} TIER ($249/MO)</p>
-              <p className="text-[11px] text-emerald-400">Status: Active (Stripe ID: cus_test_lasvegas_123)</p>
+              <p className="text-[11px] text-emerald-400">Status: Active</p>
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => {
-                  setActiveAdminModal(null);
-                  alert('Redirecting to secure Stripe billing portal...');
-                }}
+                onClick={() => handleCheckout('professional')}
                 className="px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
               >
-                Manage Subscription
+                Manage / Upgrade Subscription
               </button>
             </div>
           </div>
