@@ -24,12 +24,13 @@ def get_secret(secret_name: str) -> str:
     """Dynamically fetches secrets from Supabase Vault/RPC, falling back to os.getenv."""
     try:
         supabase = get_supabase_client()
-        # RPC function call to read vault secrets if configured in Supabase
         res = supabase.rpc("read_secret", {"secret_name": secret_name}).execute()
         if res.data:
             return res.data
+        else:
+            print(f"⚠️ RPC read_secret for '{secret_name}' returned empty/None: {res}")
     except Exception as err:
-        print(f"⚠️ Vault lookup skipped for {secret_name}: {err}")
+        print(f"❌ RPC Exception fetching '{secret_name}': {err}")
 
     # Fall back to process environment variables
     return os.getenv(secret_name, "")
@@ -47,7 +48,7 @@ def get_stripe_price_id(tier: str) -> str:
     if not price_id:
         raise HTTPException(
             status_code=400,
-            detail=f"Secret or Environment variable '{secret_key}' was not found in Supabase."
+            detail=f"Secret or Environment variable '{secret_key}' was not found in Supabase Vault."
         )
     return price_id
 
