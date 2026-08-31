@@ -8,8 +8,6 @@ interface AuthContextType {
   user: User | null;
   userTier: Tier;
   authLoading: boolean;
-  demoAuthenticated: boolean;
-  signInDemo: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -19,7 +17,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [userTier, setUserTier] = useState<Tier>('standard');
   const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
 
   // Helper to fetch user profile and joined organization subscription_tier
   const fetchUserTier = async (userId: string) => {
@@ -77,13 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInDemo = () => setDemoAuthenticated(true);
-
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
     setUserTier('standard');
-    setDemoAuthenticated(false);
   };
 
   return (
@@ -93,8 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user: session?.user ?? null,
         userTier,
         authLoading,
-        demoAuthenticated,
-        signInDemo,
         signOut,
       }}
     >
