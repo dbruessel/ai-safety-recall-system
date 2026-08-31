@@ -18,8 +18,8 @@ class PortalRequest(BaseModel):
 
 class CheckoutRequest(BaseModel):
     tier: str
-    success_url: str
-    cancel_url: str
+    success_url: Optional[str] = "https://recalllogic.ai?checkout=success"
+    cancel_url: Optional[str] = "https://recalllogic.ai?checkout=cancel"
     email: Optional[str] = None
 
 
@@ -56,7 +56,7 @@ async def create_portal_session(req: PortalRequest):
 
         session = stripe.billing_portal.Session.create(
             customer=customer_id,
-            return_url="http://localhost:5173",
+            return_url="https://recalllogic.ai",
         )
         return {"url": session.url}
 
