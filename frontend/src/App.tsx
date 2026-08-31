@@ -5,7 +5,6 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { supabase } from './supabaseClient';
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
@@ -16,25 +15,33 @@ const MainApp: React.FC = () => {
 
   const isAuthenticated = Boolean(user) || demoAuthenticated;
 
-  // Direct Stripe Checkout Invocation Handler
+  // Direct Stripe Checkout Backend Handler
   const handleCheckout = async (tierId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { tier: tierId },
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+
+      const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tier: tierId }),
       });
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        alert(`Checkout error: ${error.message || 'Failed to initialize session'}`);
-        return;
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
       }
 
+      const data = await response.json();
+
       if (data?.url) {
-        // Redirect user directly to live Stripe Checkout page
+        // Redirect user directly to live Stripe Checkout
         window.location.href = data.url;
+      } else if (data?.sessionId) {
+        window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
       } else {
         console.error('No checkout URL returned:', data);
-        alert('Could not start checkout session. Please check your Supabase Edge Function logs.');
+        alert('Could not start checkout session. Please try again.');
       }
     } catch (err: any) {
       console.error('Checkout execution error:', err);
@@ -182,7 +189,7 @@ const MainApp: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+            <div className="p-4 bg-[#070B14] border border-slate-800 rounded-xl space-y-2">
               <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
               <p className="text-lg font-bold text-[#06B6D4] uppercase">{(userTier || 'professional').toUpperCase()} TIER ($249/MO)</p>
               <p className="text-[11px] text-emerald-400">Status: Active</p>
