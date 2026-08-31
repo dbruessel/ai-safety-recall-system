@@ -5,7 +5,7 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { supabase } from './lib/supabase';
+import { supabase } from './supabaseClient';
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
