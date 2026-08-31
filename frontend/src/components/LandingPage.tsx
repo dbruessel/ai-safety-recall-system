@@ -109,7 +109,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     } catch (err: any) {
       setAuthError(err.message || 'An unexpected error occurred during sign in.');
-    } font-mono finally {
+    } finally {
       setIsSubmittingAuth(false);
     }
   };
