@@ -59,14 +59,20 @@ def create_app() -> FastAPI:
         version="2026.4.2"
     )
 
-    # Configure CORS middleware to support local development origins
+    # Configure CORS middleware with production origins
+    origins = [
+        "https://recalllogic.ai",
+        "https://www.recalllogic.ai",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+    if hasattr(settings, "frontend_origin") and settings.frontend_origin:
+        origins.append(settings.frontend_origin)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            settings.frontend_origin if hasattr(settings, "frontend_origin") else "*",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173"
-        ],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -113,7 +119,7 @@ def create_app() -> FastAPI:
             <hr style="border-color: #1e293b; margin: 24px 0;" />
             <p style="color: #94a3b8; font-size: 11px;">
               ⚡ <strong>Need a Signed Underwriter Compliance Certificate for your broker?</strong><br/>
-              <a href="https://app.recalllogic.ai" style="color: #06B6D4;">Upgrade to Professional ($249/mo)</a> to generate instant PDF risk packets and shareable broker links.
+              <a href="https://recalllogic.ai" style="color: #06B6D4;">Upgrade to Professional ($249/mo)</a> to generate instant PDF risk packets and shareable broker links.
             </p>
             """
 
@@ -126,7 +132,7 @@ def create_app() -> FastAPI:
             {recall_rows}
           </div>
 
-          <a href="https://app.recalllogic.ai" style="display: inline-block; background-color: #06B6D4; color: #020617; font-weight: bold; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-size: 12px;">Open Operations Workspace</a>
+          <a href="https://recalllogic.ai" style="display: inline-block; background-color: #06B6D4; color: #020617; font-weight: bold; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-size: 12px;">Open Operations Workspace</a>
           
           {upgrade_banner}
         </div>
