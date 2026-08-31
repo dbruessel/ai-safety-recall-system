@@ -93,7 +93,7 @@ const MainApp: React.FC = () => {
             <div className="space-y-3">
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-[#06B6D4] font-bold">{user?.email || 'lasvegas_fleet_test@example.com'}</p>
+                  <p className="text-xs text-[#06B6D4] font-bold">userEmail={user?.email || ''}</p>
                   <p className="text-[10px] text-slate-400">Account Owner / System Administrator</p>
                 </div>
                 <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">

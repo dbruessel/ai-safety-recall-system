@@ -46,7 +46,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   // AUTH MODAL STATES
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>('lasvegas_fleet_test@example.com');
+  const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);

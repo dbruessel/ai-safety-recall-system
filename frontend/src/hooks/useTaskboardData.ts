@@ -35,7 +35,7 @@ export function useTaskboardData() {
   const [recalls, setRecalls] = useState<TaskboardRecallItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [userRole, setUserRole] = useState<UserRole>('admin');
-  const [userEmail, setUserEmail] = useState<string>('lasvegas_fleet_test@example.com');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('professional');
   const [vinChecksUsed, setVinChecksUsed] = useState<number>(0);
