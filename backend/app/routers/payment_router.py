@@ -8,9 +8,6 @@ from app.config import get_supabase_client
 # Router prefix aligned with main.py router registration
 router = APIRouter(prefix="/stripe", tags=["Stripe Billing"])
 
-# Fetch Stripe API Key from environment
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
 
 class PortalRequest(BaseModel):
     email: str
@@ -24,13 +21,19 @@ class CheckoutRequest(BaseModel):
 
 
 def get_stripe_price_id(tier: str) -> str:
-    """Helper to resolve Stripe Price IDs from environment variables with safe fallbacks."""
+    """Helper to resolve Stripe Price IDs strictly from live environment variables."""
     price_map = {
-        "standard": os.getenv("STRIPE_PRICE_STANDARD") or "price_1TrlFTDXs4xycz0o1e9gfg9d",
-        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or "price_1TsR6jDXs4xycz0ohAfewQgk",
-        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE") or "price_1TrlFxDXs4xycz0ofyuV70Rf",
+        "standard": os.getenv("STRIPE_PRICE_STANDARD"),
+        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO"),
+        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE"),
     }
-    return price_map.get(tier.lower(), "")
+    price_id = price_map.get(tier.lower())
+    if not price_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Environment variable for tier '{tier}' is missing. Please set STRIPE_PRICE_{tier.upper()} in Render."
+        )
+    return price_id
 
 
 @router.post("/create-portal-session")
@@ -39,10 +42,13 @@ async def create_portal_session(req: PortalRequest):
     Creates a hosted Stripe Customer Portal session for managing 
     invoices, payment methods, and receipts.
     """
-    try:
-        if not stripe.api_key:
-            raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+    # Dynamically bind latest key on execution
+    stripe_key = os.getenv("STRIPE_SECRET_KEY")
+    if not stripe_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+    stripe.api_key = stripe_key
 
+    try:
         customers = stripe.Customer.list(email=req.email, limit=1)
 
         if customers.data:
@@ -75,16 +81,14 @@ async def create_checkout_session(req: CheckoutRequest):
     """
     Creates a Stripe Checkout Session for upgrading or switching subscription tiers.
     """
-    try:
-        if not stripe.api_key:
-            raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+    # Dynamically bind latest key on execution
+    stripe_key = os.getenv("STRIPE_SECRET_KEY")
+    if not stripe_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured on the backend.")
+    stripe.api_key = stripe_key
 
+    try:
         price_id = get_stripe_price_id(req.tier)
-        if not price_id:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"No Stripe Price ID configured for tier '{req.tier}'. Check backend environment variables."
-            )
 
         customer_id = None
         if req.email:
@@ -158,17 +162,8 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
         customer_id = data_object.get("customer")
         raw_email = data_object.get("customer_email") or (data_object.get("customer_details") or {}).get("email")
         
-        # Override generic CLI test email or missing emails with target test profile
-        if not raw_email or raw_email == "stripe@example.com":
-            customer_email = "lasvegas_fleet_test@example.com"
-        else:
-            customer_email = raw_email
-
+        customer_email = raw_email or "lasvegas_fleet_test@example.com"
         tier = data_object.get("metadata", {}).get("tier", "professional")
-        
-        # Guarantee a valid customer ID during testing if Stripe CLI sends None
-        if not customer_id:
-            customer_id = "cus_test_lasvegas_123"
 
         print(f"👤 Target Email: {customer_email}")
         print(f"🏷️ Tier: {tier} | Stripe Customer ID: {customer_id}")
@@ -207,14 +202,13 @@ async def stripe_webhook(request: Request, stripe_signature: Optional[str] = Hea
                 print(f"🚀 ORG CREATED: {company_name}")
 
             # Step C: Update profile with stripe_customer_id
-            profile_res = supabase.table("profiles").update({
-                "stripe_customer_id": customer_id
-            }).eq("email", customer_email).execute()
+            if customer_id:
+                profile_res = supabase.table("profiles").update({
+                    "stripe_customer_id": customer_id
+                }).eq("email", customer_email).execute()
 
-            if profile_res.data:
-                print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
-            else:
-                print(f"⚠️ Profile update returned no rows for {customer_email}")
+                if profile_res.data:
+                    print(f"🔗 PROFILE LINKED: Updated stripe_customer_id for {customer_email}")
 
         except Exception as db_err:
             print(f"❌ SUPABASE DB ERROR: {type(db_err).__name__} - {db_err}")
