@@ -74,6 +74,15 @@ const MainApp: React.FC = () => {
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 
+  // Dynamic calculation for active workspace organization name
+  const getUserOrgName = (): string => {
+    if (user?.email) {
+      const prefix = user.email.split('@')[0];
+      return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+    }
+    return 'My Fleet Co.';
+  };
+
   // Force Professional tier when viewing broker demo routes
   const effectiveTier = isDemoPath ? 'professional' : (userTier || 'standard');
 
@@ -151,11 +160,11 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
-              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH GUARANTEED ADMIN FALLBACK */}
+              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH DYNAMIC ORG NAME */}
               <div className="flex items-center gap-3">
                 <AccountMenu
                   userEmail={user?.email || 'broker_demo@recalllogic.ai'}
-                  orgName="Las Vegas Fleet Test Co."
+                  orgName={getUserOrgName()}
                   userRole={(userRole || 'admin') as any}
                   subscriptionTier={effectiveTier as any}
                   onOpenTeamModal={() => setActiveAdminModal('team')}
@@ -192,7 +201,7 @@ const MainApp: React.FC = () => {
             <div className="space-y-3">
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-[#06B6D4] font-bold">userEmail={user?.email || 'broker_demo@recalllogic.ai'}</p>
+                  <p className="text-xs text-[#06B6D4] font-bold">{user?.email || 'broker_demo@recalllogic.ai'}</p>
                   <p className="text-[10px] text-slate-400">Account Owner / System Administrator</p>
                 </div>
                 <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">
@@ -232,7 +241,7 @@ const MainApp: React.FC = () => {
 
             <div className="p-4 bg-[#070B14] border border-slate-800 rounded-xl space-y-2">
               <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
-              <p className="text-lg font-bold text-[#06B6D4] uppercase">{effectiveTier.toUpperCase()} TIER ($249/MO)</p>
+              <p className="text-lg font-bold text-[#06B6D4] uppercase">{effectiveTier.toUpperCase()} TIER</p>
               <p className="text-[11px] text-emerald-400">Status: Active</p>
             </div>
 
