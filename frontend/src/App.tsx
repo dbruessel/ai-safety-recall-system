@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
 import Footer from './components/Footer';
@@ -12,8 +12,18 @@ const MainApp: React.FC = () => {
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
+  
+  // Track direct URL subpaths for broker/demo views
+  const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
 
-  const isAuthenticated = Boolean(user) || demoAuthenticated;
+  useEffect(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes('/audit/demo') || path.includes('/audit/share')) {
+      setIsDemoPath(true);
+    }
+  }, []);
+
+  const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 
   // Direct Stripe Checkout Backend Handler
   const handleCheckout = async (tierId: string) => {
@@ -25,7 +35,11 @@ const MainApp: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ tier: tierId }),
+        body: JSON.stringify({ 
+          tier: tierId,
+          success_url: `${window.location.origin}?checkout=success`,
+          cancel_url: `${window.location.origin}?checkout=cancel`
+        }),
       });
 
       if (!response.ok) {
@@ -35,7 +49,6 @@ const MainApp: React.FC = () => {
       const data = await response.json();
 
       if (data?.url) {
-        // Redirect user directly to live Stripe Checkout
         window.location.href = data.url;
       } else if (data?.sessionId) {
         window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
@@ -81,15 +94,15 @@ const MainApp: React.FC = () => {
                   RECALLLOGIC WORKSPACE
                 </span>
                 <span className="text-slate-600 text-xs">|</span>
-                <span className="text-xs text-slate-400 font-mono">
-                  Safety Intelligence System
+                <span className="text-xs text-[#06B6D4] font-mono font-bold">
+                  {isDemoPath ? 'BROKER AUDIT DEMO MODE' : 'Safety Intelligence System'}
                 </span>
               </div>
 
               {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH GUARANTEED ADMIN FALLBACK */}
               <div className="flex items-center gap-3">
                 <AccountMenu
-                  userEmail={user?.email || 'lasvegas_fleet_test@example.com'}
+                  userEmail={user?.email || 'broker_demo@recalllogic.ai'}
                   orgName="Las Vegas Fleet Test Co."
                   userRole={(userRole || 'admin') as any}
                   subscriptionTier={(userTier || 'professional') as any}
@@ -103,7 +116,7 @@ const MainApp: React.FC = () => {
             </header>
 
             {/* MAIN TASKBOARD APP WORKSPACE */}
-            <TaskBoard userTier={userTier} />
+            <TaskBoard userTier={userTier || 'professional'} />
           </div>
         )}
       </main>
@@ -127,36 +140,12 @@ const MainApp: React.FC = () => {
             <div className="space-y-3">
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-xs text-[#06B6D4] font-bold">userEmail={user?.email || ''}</p>
+                  <p className="text-xs text-[#06B6D4] font-bold">userEmail={user?.email || 'broker_demo@recalllogic.ai'}</p>
                   <p className="text-[10px] text-slate-400">Account Owner / System Administrator</p>
                 </div>
                 <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">
                   {userRole || 'ADMIN'}
                 </span>
-              </div>
-
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
-                <div>
-                  <p className="text-xs text-white font-bold">lasvegas_mechanic_test@example.com</p>
-                  <p className="text-[10px] text-slate-400">Fleet Operations Specialist</p>
-                </div>
-                <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-2 py-1 focus:outline-none">
-                  <option value="mechanic">MECHANIC</option>
-                  <option value="admin">ADMIN</option>
-                  <option value="viewer">VIEWER</option>
-                </select>
-              </div>
-
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
-                <div>
-                  <p className="text-xs text-white font-bold">lasvegas_viewer_test@example.com</p>
-                  <p className="text-[10px] text-slate-400">Insurance Auditor (Read-Only)</p>
-                </div>
-                <select className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded px-2 py-1 focus:outline-none">
-                  <option value="viewer">VIEWER</option>
-                  <option value="mechanic">MECHANIC</option>
-                  <option value="admin">ADMIN</option>
-                </select>
               </div>
             </div>
 
@@ -212,7 +201,7 @@ const MainApp: React.FC = () => {
       <BrokerShareModal
         isOpen={isShareModalOpen}
         userTier={userTier}
-        shareUrl={`${window.location.origin}/audit/share/FLT-${Math.random().toString(36).substring(2, 10)}`}
+        shareUrl={`${window.location.origin}/audit/demo`}
         onClose={() => setIsShareModalOpen(false)}
       />
 
