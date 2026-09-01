@@ -122,7 +122,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         setIsAuthModalOpen(false);
         onSignIn();
       } else {
-        // Sign In Flow
+        // 1. Authenticate with Supabase
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password,
