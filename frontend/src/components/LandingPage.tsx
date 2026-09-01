@@ -99,18 +99,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     try {
       if (isSignUp) {
-        // 1. Create User in Supabase auth.users
+        const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
+
+        // 1. Create User in Supabase auth.users passing company_name in options metadata
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
+          options: {
+            data: {
+              company_name: finalCompanyName,
+            },
+          },
         });
 
         if (error) throw error;
 
-        // 2. Provision matching Profile row with explicit company name
+        // 2. Ensure explicit sync on matching profile row
         if (data.user) {
-          const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
-
           await supabase.from('profiles').upsert({
             id: data.user.id,
             email: data.user.email,
@@ -122,7 +127,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         setIsAuthModalOpen(false);
         onSignIn();
       } else {
-        // 1. Authenticate with Supabase
+        // Sign In Flow
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password,
