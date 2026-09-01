@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { supabase } from './lib/supabaseClient'; // Ensure correct path to your Supabase client
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
@@ -22,6 +23,49 @@ const MainApp: React.FC = () => {
       setIsDemoPath(true);
     }
   }, []);
+
+  // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
+  useEffect(() => {
+    const handlePostCheckoutSync = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('checkout') === 'success') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const activeUser = session?.user || user;
+
+          if (activeUser?.email) {
+            const userEmail = activeUser.email;
+            const prefix = userEmail.split('@')[0];
+            const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+
+            // 1. Upsert Organization Tier in Supabase
+            await supabase.from('organizations').upsert(
+              {
+                name: companyName,
+                subscription_tier: 'professional',
+              },
+              { onConflict: 'name' }
+            );
+
+            // 2. Update Profile Record
+            await supabase
+              .from('profiles')
+              .update({ company_name: companyName })
+              .eq('email', userEmail);
+
+            console.log('✅ Supabase organization and profile provisioned post-checkout.');
+          }
+        } catch (err) {
+          console.error('⚠️ Post-checkout Supabase sync failed:', err);
+        } finally {
+          // Clean up URL query param without refreshing the page
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+
+    handlePostCheckoutSync();
+  }, [user]);
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 
