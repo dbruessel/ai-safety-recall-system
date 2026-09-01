@@ -13,7 +13,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MainApp: React.FC = () => {
-  const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
+  const { user, userTier, userRole, companyName, signOut, signInDemo, demoAuthenticated } = useAuth();
 
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -41,12 +41,13 @@ const MainApp: React.FC = () => {
           if (activeUser?.email) {
             const userEmail = activeUser.email;
             const prefix = userEmail.split('@')[0];
-            const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+            const fallbackName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+            const finalOrgName = companyName || fallbackName;
 
             // 1. Upsert Organization Tier in Supabase
             await supabase.from('organizations').upsert(
               {
-                name: companyName,
+                name: finalOrgName,
                 subscription_tier: 'professional',
               },
               { onConflict: 'name' }
@@ -55,7 +56,7 @@ const MainApp: React.FC = () => {
             // 2. Update Profile Record
             await supabase
               .from('profiles')
-              .update({ company_name: companyName })
+              .update({ company_name: finalOrgName })
               .eq('email', userEmail);
 
             console.log('✅ Supabase organization and profile provisioned post-checkout.');
@@ -70,12 +71,15 @@ const MainApp: React.FC = () => {
     };
 
     handlePostCheckoutSync();
-  }, [user]);
+  }, [user, companyName]);
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 
-  // Dynamic calculation for active workspace organization name
+  // Resolve active organization name: checks database-backed context state first
   const getUserOrgName = (): string => {
+    if (companyName && companyName.trim() !== '') {
+      return companyName;
+    }
     if (user?.email) {
       const prefix = user.email.split('@')[0];
       return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
@@ -160,7 +164,7 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
-              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH DYNAMIC ORG NAME */}
+              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH PERSISTED ORG NAME */}
               <div className="flex items-center gap-3">
                 <AccountMenu
                   userEmail={user?.email || 'broker_demo@recalllogic.ai'}
