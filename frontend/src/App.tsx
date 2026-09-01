@@ -12,7 +12,7 @@ const MainApp: React.FC = () => {
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
-  
+
   // Track direct URL subpaths for broker/demo views
   const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
 
@@ -24,6 +24,9 @@ const MainApp: React.FC = () => {
   }, []);
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
+
+  // Force Professional tier when viewing broker demo routes
+  const effectiveTier = isDemoPath ? 'professional' : (userTier || 'standard');
 
   // Direct Stripe Checkout Backend Handler
   const handleCheckout = async (tierId: string) => {
@@ -105,7 +108,7 @@ const MainApp: React.FC = () => {
                   userEmail={user?.email || 'broker_demo@recalllogic.ai'}
                   orgName="Las Vegas Fleet Test Co."
                   userRole={(userRole || 'admin') as any}
-                  subscriptionTier={(userTier || 'professional') as any}
+                  subscriptionTier={effectiveTier as any}
                   onOpenTeamModal={() => setActiveAdminModal('team')}
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
@@ -116,7 +119,7 @@ const MainApp: React.FC = () => {
             </header>
 
             {/* MAIN TASKBOARD APP WORKSPACE */}
-            <TaskBoard userTier={userTier || 'professional'} />
+            <TaskBoard userTier={effectiveTier} />
           </div>
         )}
       </main>
@@ -180,7 +183,7 @@ const MainApp: React.FC = () => {
 
             <div className="p-4 bg-[#070B14] border border-slate-800 rounded-xl space-y-2">
               <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
-              <p className="text-lg font-bold text-[#06B6D4] uppercase">{(userTier || 'professional').toUpperCase()} TIER ($249/MO)</p>
+              <p className="text-lg font-bold text-[#06B6D4] uppercase">{effectiveTier.toUpperCase()} TIER ($249/MO)</p>
               <p className="text-[11px] text-emerald-400">Status: Active</p>
             </div>
 
@@ -200,7 +203,7 @@ const MainApp: React.FC = () => {
       {/* BROKER SHARE LINK MODAL */}
       <BrokerShareModal
         isOpen={isShareModalOpen}
-        userTier={userTier}
+        userTier={effectiveTier}
         shareUrl={`${window.location.origin}/audit/demo`}
         onClose={() => setIsShareModalOpen(false)}
       />
