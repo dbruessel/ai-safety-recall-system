@@ -7,7 +7,12 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   userTier: Tier;
+  userRole: string;
   authLoading: boolean;
+  demoAuthenticated: boolean;
+  signUp: (email: string, pass: string) => Promise<any>;
+  signIn: (email: string, pass: string) => Promise<any>;
+  signInDemo: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -16,7 +21,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userTier, setUserTier] = useState<Tier>('standard');
+  const [userRole, setUserRole] = useState<string>('admin');
   const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
 
   // Helper to fetch user profile and joined organization subscription_tier
   const fetchUserTier = async (userId: string) => {
@@ -25,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select(`
           subscription_tier,
+          role,
           organizations (
             subscription_tier
           )
@@ -35,6 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Error fetching tier details:', error);
         return;
+      }
+
+      if (data?.role) {
+        setUserRole(data.role);
       }
 
       // Check organization tier first, fallback to profile tier, default to 'standard'
@@ -74,9 +86,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
+  // Real Supabase Account Registration
+  const signUp = async (email: string, pass: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: pass,
+    });
+
+    if (error) throw error;
+
+    // Provision matching profile row if auth user was generated
+    if (data.user) {
+      const prefix = email.split('@')[0];
+      const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email: data.user.email,
+        company_name: companyName,
+        role: 'admin',
+      });
+    }
+
+    return data;
+  };
+
+  // Real Supabase Password Sign In
+  const signIn = async (email: string, pass: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pass,
+    });
+
+    if (error) throw error;
+    return data;
+  };
+
+  // Dev Bypass Handler
+  const signInDemo = () => {
+    setDemoAuthenticated(true);
+    setUserTier('professional');
+    setUserRole('admin');
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+    setDemoAuthenticated(false);
     setUserTier('standard');
   };
 
@@ -86,7 +142,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         user: session?.user ?? null,
         userTier,
+        userRole,
         authLoading,
+        demoAuthenticated,
+        signUp,
+        signIn,
+        signInDemo,
         signOut,
       }}
     >
