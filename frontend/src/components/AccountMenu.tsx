@@ -17,7 +17,7 @@ export interface AccountMenuProps {
 
 export const AccountMenu: React.FC<AccountMenuProps> = ({
   userEmail,
-  orgName = 'Las Vegas Fleet Test Co.',
+  orgName = 'My Fleet Co.',
   userRole = 'admin',
   subscriptionTier,
   onOpenTeamModal,
@@ -27,7 +27,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   onSignOut,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const displayTitle = orgName || 'Las Vegas Fleet Test Co.';
+  const displayTitle = orgName || 'My Fleet Co.';
 
   // Normalize role check (case-insensitive & fallback to admin if unassigned)
   const normalizedRole = (userRole || 'admin').toString().toLowerCase();
