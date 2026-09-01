@@ -44,8 +44,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
 
-  // AUTH MODAL STATES
+  // AUTH MODAL STATES (SIGN IN VS SIGN UP TOGGLE)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
@@ -89,26 +90,53 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // REAL SUPABASE EMAIL/PASSWORD LOGIN HANDLER
-  const handleSupabaseLogin = async (e: React.FormEvent) => {
+  // REAL SUPABASE SIGN IN / SIGN UP AUTH HANDLER
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     setIsSubmittingAuth(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      });
+      if (isSignUp) {
+        // 1. Create User in Supabase auth.users
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password,
+        });
 
-      if (error) {
-        setAuthError(error.message);
-      } else if (data.session) {
+        if (error) throw error;
+
+        // 2. Provision matching Profile row
+        if (data.user) {
+          const prefix = email.split('@')[0];
+          const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            email: data.user.email,
+            company_name: companyName,
+            role: 'admin',
+          });
+        }
+
         setIsAuthModalOpen(false);
         onSignIn();
+      } else {
+        // Sign In Flow
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password,
+        });
+
+        if (error) throw error;
+
+        if (data.session) {
+          setIsAuthModalOpen(false);
+          onSignIn();
+        }
       }
     } catch (err: any) {
-      setAuthError(err.message || 'An unexpected error occurred during sign in.');
+      setAuthError(err.message || 'An error occurred during authentication.');
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -222,7 +250,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // UPDATED SAFE TIER CHECKOUT HANDLER
   const handleTierCheckout = async (tier: PricingTier) => {
     if (typeof onSelectTier === 'function') {
       try {
@@ -356,11 +383,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Sign In CTA Button */}
-          <div className="shrink-0">
+          {/* Sign In / Sign Up Trigger */}
+          <div className="shrink-0 flex gap-2">
             <button
               type="button"
-              onClick={() => setIsAuthModalOpen(true)}
+              onClick={() => {
+                setIsSignUp(false);
+                setIsAuthModalOpen(true);
+              }}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
               Sign In
@@ -372,11 +402,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* HERO SECTION WITH INLINE COMPREHENSIVE VIN SCANNER */}
       <section className="relative pt-6 pb-8 px-4 max-w-5xl mx-auto text-center space-y-4">
-        
-        {/* INLINE FLEET VIN SAFETY & RECALL CONTROL CARD */}
         <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left">
           
-          {/* Header Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
@@ -398,7 +425,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
-          {/* Tab Navigation */}
           <div className="flex border-b border-slate-800/80 font-mono text-xs gap-4 pt-2">
             <button
               type="button"
@@ -424,7 +450,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
           </div>
 
-          {/* TAB 1: DIRECT PASTE TEXTAREA */}
           {ingestMode === 'paste' ? (
             <form onSubmit={handlePasteSubmit} className="space-y-3">
               <textarea
@@ -449,7 +474,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </form>
           ) : (
-            /* TAB 2: FILE UPLOAD DRAG & DROP */
             <div
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
@@ -485,7 +509,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {scanError && <p className="text-red-400 text-xs font-mono">{scanError}</p>}
 
-          {/* AUDIT RESULTS DISPLAY */}
           {auditResult && (
             <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
               auditResult.has_open_recall
@@ -517,7 +540,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           )}
 
         </div>
-
       </section>
 
       {/* STRIPE PRICING GRID */}
@@ -576,12 +598,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* AUTH SIGN IN MODAL OVERLAY */}
+      {/* AUTHENTICATION MODAL OVERLAY (TOGGLES BETWEEN SIGN IN & SIGN UP) */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white font-mono">Sign In to RecallLogic</h3>
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
+            
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                {isSignUp ? 'Create Your Account' : 'Sign In to RecallLogic'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsAuthModalOpen(false)}
@@ -591,9 +616,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSupabaseLogin} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Email Address</label>
+                <label className="block text-xs text-slate-400 mb-1">Email Address</label>
                 <input
                   type="email"
                   required
@@ -605,7 +630,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Password</label>
+                <label className="block text-xs text-slate-400 mb-1">Password</label>
                 <input
                   type="password"
                   required
@@ -629,7 +654,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     setIsAuthModalOpen(false);
                     onSignIn();
                   }}
-                  className="text-xs text-slate-500 hover:text-slate-300 font-mono transition"
+                  className="text-xs text-slate-500 hover:text-slate-300 transition cursor-pointer"
                 >
                   Bypass (Demo Mode)
                 </button>
@@ -637,12 +662,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmittingAuth}
-                  className="px-5 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono cursor-pointer"
+                  className="px-5 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer"
                 >
-                  {isSubmittingAuth ? 'Authenticating...' : 'Sign In'}
+                  {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
                 </button>
               </div>
             </form>
+
+            <div className="border-t border-slate-800/80 pt-3 text-center">
+              <p className="text-xs text-slate-400">
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError('');
+                    setIsSignUp(!isSignUp);
+                  }}
+                  className="text-[#06B6D4] font-bold hover:underline ml-1 cursor-pointer"
+                >
+                  {isSignUp ? 'Sign In' : 'Sign Up'}
+                </button>
+              </p>
+            </div>
+
           </div>
         </div>
       )}
