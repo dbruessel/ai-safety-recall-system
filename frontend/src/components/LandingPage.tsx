@@ -137,7 +137,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     } catch (err: any) {
       setAuthError(err.message || 'An error occurred during authentication.');
-    } font-mono finally {
+    } finally {
       setIsSubmittingAuth(false);
     }
   };
