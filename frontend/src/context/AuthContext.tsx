@@ -54,13 +54,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserRole(data.role);
       }
 
-      // Check organization name first, fallback to profiles company_name
+      // Check profiles company_name first, then organization name
       const rawOrgName = Array.isArray(data?.organizations)
         ? data?.organizations[0]?.name
         : (data?.organizations as any)?.name;
 
       const activeCompanyName = data?.company_name || rawOrgName || '';
-      setCompanyName(activeCompanyName);
+      if (activeCompanyName) {
+        setCompanyName(activeCompanyName);
+      }
 
       // Check organization tier first, fallback to profile tier
       const rawOrgTier = Array.isArray(data?.organizations)
@@ -147,12 +149,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data;
   };
 
-  // Dev Bypass Handler
+  // Dev Bypass Handler (Preserves existing DB company_name if present)
   const signInDemo = () => {
     setDemoAuthenticated(true);
     setUserTier('professional');
     setUserRole('admin');
-    setCompanyName('Demo Fleet Operations');
+    setCompanyName((prevName) => (prevName && prevName.trim() !== '' ? prevName : 'Demo Fleet Operations'));
   };
 
   const signOut = async () => {
