@@ -49,6 +49,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
@@ -106,15 +107,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         if (error) throw error;
 
-        // 2. Provision matching Profile row
+        // 2. Provision matching Profile row with explicit company name
         if (data.user) {
-          const prefix = email.split('@')[0];
-          const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+          const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
           await supabase.from('profiles').upsert({
             id: data.user.id,
             email: data.user.email,
-            company_name: companyName,
+            company_name: finalCompanyName,
             role: 'admin',
           });
         }
@@ -628,6 +628,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   placeholder="name@company.com"
                 />
               </div>
+
+              {isSignUp && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Company / Fleet Name</label>
+                  <input
+                    type="text"
+                    required={isSignUp}
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    placeholder="e.g. Apex Freight Logistics"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Password</label>
