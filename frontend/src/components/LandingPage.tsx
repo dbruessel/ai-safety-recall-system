@@ -137,7 +137,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     } catch (err: any) {
       setAuthError(err.message || 'An error occurred during authentication.');
-    } finally {
+    } font-mono finally {
       setIsSubmittingAuth(false);
     }
   };
@@ -647,22 +647,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-between items-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAuthModalOpen(false);
-                    onSignIn();
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-300 transition cursor-pointer"
-                >
-                  Bypass (Demo Mode)
-                </button>
-
+              <div className="flex justify-end items-center pt-2">
                 <button
                   type="submit"
                   disabled={isSubmittingAuth}
-                  className="px-5 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer"
+                  className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
                 >
                   {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
                 </button>
