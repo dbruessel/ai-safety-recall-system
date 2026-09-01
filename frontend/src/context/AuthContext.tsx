@@ -8,12 +8,14 @@ interface AuthContextType {
   user: User | null;
   userTier: Tier;
   userRole: string;
+  companyName: string;
   authLoading: boolean;
   demoAuthenticated: boolean;
-  signUp: (email: string, pass: string) => Promise<any>;
+  signUp: (email: string, pass: string, company?: string) => Promise<any>;
   signIn: (email: string, pass: string) => Promise<any>;
   signInDemo: () => void;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,18 +24,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [userTier, setUserTier] = useState<Tier>('standard');
   const [userRole, setUserRole] = useState<string>('admin');
+  const [companyName, setCompanyName] = useState<string>('');
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
 
-  // Helper to fetch user profile and joined organization subscription_tier
-  const fetchUserTier = async (userId: string) => {
+  // Helper to fetch user profile, company_name, and joined organization tier
+  const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select(`
+          company_name,
           subscription_tier,
           role,
           organizations (
+            name,
             subscription_tier
           )
         `)
@@ -41,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
-        console.error('Error fetching tier details:', error);
+        console.error('Error fetching profile details:', error);
         return;
       }
 
@@ -49,7 +54,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserRole(data.role);
       }
 
-      // Check organization tier first, fallback to profile tier, default to 'standard'
+      // Check organization name first, fallback to profiles company_name
+      const rawOrgName = Array.isArray(data?.organizations)
+        ? data?.organizations[0]?.name
+        : (data?.organizations as any)?.name;
+
+      const activeCompanyName = data?.company_name || rawOrgName || '';
+      setCompanyName(activeCompanyName);
+
+      // Check organization tier first, fallback to profile tier
       const rawOrgTier = Array.isArray(data?.organizations)
         ? data?.organizations[0]?.subscription_tier
         : (data?.organizations as any)?.subscription_tier;
@@ -57,17 +70,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const activeTier = (rawOrgTier || data?.subscription_tier || 'standard').toLowerCase() as Tier;
       setUserTier(activeTier);
     } catch (err) {
-      console.error('Failed to resolve subscription tier:', err);
+      console.error('Failed to resolve user profile:', err);
       setUserTier('standard');
     }
   };
 
+  const refreshProfile = async () => {
+    if (session?.user) {
+      await fetchUserProfile(session.user.id);
+    }
+  };
+
   useEffect(() => {
-    // 1. Fetch initial session and tier details
+    // 1. Fetch initial session and profile details
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        fetchUserTier(session.user.id);
+        fetchUserProfile(session.user.id);
       }
       setAuthLoading(false);
     });
@@ -76,9 +95,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-        fetchUserTier(session.user.id);
+        fetchUserProfile(session.user.id);
       } else {
         setUserTier('standard');
+        setCompanyName('');
       }
       setAuthLoading(false);
     });
@@ -86,8 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  // Real Supabase Account Registration
-  const signUp = async (email: string, pass: string) => {
+  // Real Supabase Account Registration with optional company name
+  const signUp = async (email: string, pass: string, company?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password: pass,
@@ -95,17 +115,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (error) throw error;
 
-    // Provision matching profile row if auth user was generated
     if (data.user) {
       const prefix = email.split('@')[0];
-      const companyName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+      const defaultName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+      const finalCompanyName = company?.trim() || defaultName;
 
       await supabase.from('profiles').upsert({
         id: data.user.id,
         email: data.user.email,
-        company_name: companyName,
+        company_name: finalCompanyName,
         role: 'admin',
       });
+
+      setCompanyName(finalCompanyName);
     }
 
     return data;
@@ -119,6 +141,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (error) throw error;
+    if (data.user) {
+      await fetchUserProfile(data.user.id);
+    }
     return data;
   };
 
@@ -127,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setDemoAuthenticated(true);
     setUserTier('professional');
     setUserRole('admin');
+    setCompanyName('Demo Fleet Operations');
   };
 
   const signOut = async () => {
@@ -134,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setDemoAuthenticated(false);
     setUserTier('standard');
+    setCompanyName('');
   };
 
   return (
@@ -143,12 +170,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user: session?.user ?? null,
         userTier,
         userRole,
+        companyName,
         authLoading,
         demoAuthenticated,
         signUp,
         signIn,
         signInDemo,
         signOut,
+        refreshProfile,
       }}
     >
       {children}
