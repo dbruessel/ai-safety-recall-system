@@ -5,7 +5,12 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { supabase } from './lib/supabaseClient'; // Ensure correct path to your Supabase client
+import { createClient } from '@supabase/supabase-js';
+
+// Safe inline Supabase client initialization
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, signOut, signInDemo, demoAuthenticated } = useAuth();
