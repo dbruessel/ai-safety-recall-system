@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { FleetVinScanner } from './FleetVinScanner'; // Adjust path if fleetscanner sits in another folder
+import { FleetVinScanner } from './fleetscanner'; // Adjust path if fleetscanner sits in another folder
 
 interface TaskBoardProps {
   userTier?: string;
@@ -462,7 +462,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       )}
 
-      {/* BULK CSV IMPORT MODAL REUSING FLEETVINSCANNER */}
+      {/* BULK CSV IMPORT MODAL REUSING FLEETVINSCANNER WITH WORKSPACE FLAG */}
       {isBulkImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="max-w-4xl w-full bg-[#0D1322] border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
@@ -471,7 +471,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
               <button 
                 onClick={() => {
                   setIsBulkImportOpen(false);
-                  fetchFleetData(); // Refresh list upon closing modal
+                  fetchFleetData();
                 }} 
                 className="text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 border border-slate-700 cursor-pointer"
               >
@@ -479,7 +479,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
               </button>
             </div>
 
-            <FleetVinScanner />
+            <FleetVinScanner isWorkspace={true} />
           </div>
         </div>
       )}
