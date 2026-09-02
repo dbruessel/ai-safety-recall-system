@@ -10,6 +10,7 @@ export interface AccountMenuProps {
   orgName?: string;
   userRole: UserRole;
   subscriptionTier: SubscriptionTier;
+  isBrokerPortal?: boolean;
   onOpenTeamModal: () => void;
   onOpenUpgradeModal: () => void;
   onCopyUnderwriterLink: () => void;
@@ -22,6 +23,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   orgName = 'My Fleet Co.',
   userRole = 'admin',
   subscriptionTier,
+  isBrokerPortal = false,
   onOpenTeamModal,
   onOpenUpgradeModal,
   onCopyUnderwriterLink,
@@ -138,8 +140,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             </div>
 
-            {/* ADMINISTRATION */}
-            {isAdmin && (
+            {/* ADMINISTRATION (Hidden when viewing Broker Portal) */}
+            {isAdmin && !isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
                 
