@@ -62,6 +62,7 @@ export const BrokerPortal: React.FC = () => {
   const [fleets, setFleets] = useState<ClientFleetSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDemoData, setIsDemoData] = useState<boolean>(false);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchBrokerFleets() {
@@ -127,11 +128,25 @@ export const BrokerPortal: React.FC = () => {
               const brokerId = userProfile?.brokerage_id || 'demo-broker';
               const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
               navigator.clipboard.writeText(inviteUrl);
-              alert(`Fleet invite link copied!\n\n${inviteUrl}`);
+              
+              setCopiedLink(true);
+              setTimeout(() => setCopiedLink(false), 2500);
             }}
-            className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap text-[11px]"
+            className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap text-[11px] flex items-center gap-1.5 ${
+              copiedLink
+                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+            }`}
           >
-            + Copy Fleet Invite Link
+            {copiedLink ? (
+              <>
+                <span>✓</span> Link Copied to Clipboard!
+              </>
+            ) : (
+              <>
+                <span>+</span> Copy Fleet Invite Link
+              </>
+            )}
           </button>
         </div>
       )}
