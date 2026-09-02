@@ -17,8 +17,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
 
-  // Navigation state for active workspace view
-  const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>('workspace');
+  // Navigation state for active workspace view (defaults to broker_portal if on /audit/demo path)
+  const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
+    const path = window.location.pathname.toLowerCase();
+    return (path.includes('/audit/demo') || path.includes('/broker')) ? 'broker_portal' : 'workspace';
+  });
 
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -29,8 +32,11 @@ const MainApp: React.FC = () => {
 
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
-    if (path.includes('/audit/demo') || path.includes('/audit/share')) {
+    if (path.includes('/audit/demo') || path.includes('/audit/share') || path.includes('/broker')) {
       setIsDemoPath(true);
+      if (path.includes('/audit/demo') || path.includes('/broker')) {
+        setActiveView('broker_portal');
+      }
     }
   }, []);
 
@@ -171,8 +177,8 @@ const MainApp: React.FC = () => {
 
               {/* NAVIGATION VIEWS & ACCOUNT MENU */}
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {/* VIEW TOGGLE SWITCH (Visible if user is a Broker) */}
-                {userProfile?.is_broker && (
+                {/* VIEW TOGGLE SWITCH (Visible if user is a Broker or viewing demo) */}
+                {(userProfile?.is_broker || isDemoPath) && (
                   <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
                     <button
                       onClick={() => setActiveView('workspace')}
@@ -212,7 +218,7 @@ const MainApp: React.FC = () => {
             </header>
 
             {/* MAIN WORKSPACE ROUTING */}
-            {activeView === 'broker_portal' && userProfile?.is_broker ? (
+            {activeView === 'broker_portal' || (isDemoPath && !window.location.pathname.includes('/audit/share')) ? (
               <BrokerPortal />
             ) : (
               <TaskBoard userTier={effectiveTier} />
