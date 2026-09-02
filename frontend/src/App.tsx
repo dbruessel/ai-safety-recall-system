@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
+import BrokerPortal from './components/BrokerPortal';
 import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
+import TeamManagementModal from './components/TeamManagementModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
@@ -13,7 +15,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MainApp: React.FC = () => {
-  const { user, userTier, userRole, companyName, signOut, signInDemo, demoAuthenticated } = useAuth();
+  const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
+
+  // Navigation state for active workspace view
+  const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>('workspace');
 
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -148,7 +153,7 @@ const MainApp: React.FC = () => {
         ) : (
           <div className="py-6">
             {/* WORKSPACE NAVIGATION HEADER */}
-            <header className="px-6 mb-6 flex justify-between items-center border-b border-slate-800/80 pb-4">
+            <header className="px-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/80 pb-4 gap-4">
               <div className="flex items-center gap-3">
                 <img 
                   src="/recall-logo.png" 
@@ -164,8 +169,34 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
-              {/* INTEGRATED ACCOUNT MENU DROPDOWN WITH PERSISTED ORG NAME */}
-              <div className="flex items-center gap-3">
+              {/* NAVIGATION VIEWS & ACCOUNT MENU */}
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                {/* VIEW TOGGLE SWITCH (Visible if user is a Broker) */}
+                {userProfile?.is_broker && (
+                  <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
+                    <button
+                      onClick={() => setActiveView('workspace')}
+                      className={`px-3 py-1 rounded transition-all cursor-pointer ${
+                        activeView === 'workspace'
+                          ? 'bg-slate-800 text-white font-bold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Fleet Workspace
+                    </button>
+                    <button
+                      onClick={() => setActiveView('broker_portal')}
+                      className={`px-3 py-1 rounded transition-all cursor-pointer flex items-center gap-1 ${
+                        activeView === 'broker_portal'
+                          ? 'bg-cyan-950 border border-cyan-500/50 text-[#06B6D4] font-bold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      🏢 Broker Command
+                    </button>
+                  </div>
+                )}
+
                 <AccountMenu
                   userEmail={user?.email || 'broker_demo@recalllogic.ai'}
                   orgName={getUserOrgName()}
@@ -180,52 +211,21 @@ const MainApp: React.FC = () => {
               </div>
             </header>
 
-            {/* MAIN TASKBOARD APP WORKSPACE */}
-            <TaskBoard userTier={effectiveTier} />
+            {/* MAIN WORKSPACE ROUTING */}
+            {activeView === 'broker_portal' && userProfile?.is_broker ? (
+              <BrokerPortal />
+            ) : (
+              <TaskBoard userTier={effectiveTier} />
+            )}
           </div>
         )}
       </main>
 
       {/* TEAM & PERMISSIONS MANAGEMENT MODAL */}
-      {activeAdminModal === 'team' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                👥 Manage Team &amp; Role Permissions
-              </h3>
-              <button 
-                onClick={() => setActiveAdminModal(null)} 
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
-                <div>
-                  <p className="text-xs text-[#06B6D4] font-bold">{user?.email || 'broker_demo@recalllogic.ai'}</p>
-                  <p className="text-[10px] text-slate-400">Account Owner / System Administrator</p>
-                </div>
-                <span className="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded font-bold uppercase">
-                  {userRole || 'ADMIN'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setActiveAdminModal(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeamManagementModal
+        isOpen={activeAdminModal === 'team'}
+        onClose={() => setActiveAdminModal(null)}
+      />
 
       {/* PLAN & BILLING SURCHARGE MODAL */}
       {activeAdminModal === 'billing' && (
