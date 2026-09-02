@@ -139,21 +139,19 @@ const MainApp: React.FC = () => {
         window.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
       } else {
         console.error('No checkout URL returned:', data);
-        alert('Could not start checkout session. Please try again.');
       }
     } catch (err: any) {
       console.error('Checkout execution error:', err);
-      alert(`Checkout failed: ${err.message || 'Unknown error'}`);
     }
   };
 
-  // Handlers for AccountMenu quick tools
+  // Handlers for AccountMenu quick tools (No alerts)
   const handleCopyUnderwriterLink = () => {
     setIsShareModalOpen(true);
   };
 
   const handleDownloadRiskCard = () => {
-    alert('Generating & downloading official Underwriter Risk Certificate (PDF)...');
+    console.log('Exporting Underwriter Risk Certificate...');
   };
 
   return (
