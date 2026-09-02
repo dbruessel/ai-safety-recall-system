@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 export type UserRole = 'admin' | 'mechanic' | 'viewer' | string;
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise' | string;
@@ -27,11 +28,20 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   onDownloadRiskCard,
   onSignOut,
 }) => {
+  const { refreshProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [currentOrgName, setCurrentOrgName] = useState(orgName);
   const [newOrgName, setNewOrgName] = useState(orgName);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Sync internal state when parent props change
+  useEffect(() => {
+    if (orgName) {
+      setCurrentOrgName(orgName);
+      setNewOrgName(orgName);
+    }
+  }, [orgName]);
 
   const displayTitle = currentOrgName || 'My Fleet Co.';
   const normalizedRole = (userRole || 'admin').toString().toLowerCase();
@@ -39,22 +49,49 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
   const handleSaveOrgName = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOrgName.trim()) return;
+    const trimmedName = newOrgName.trim();
+    if (!trimmedName) return;
 
     setIsSaving(true);
     try {
-      // Update profile record in Supabase
-      const { error } = await supabase
+      // 1. Fetch current profile to get organization_id or old company_name
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({ company_name: newOrgName.trim() })
+        .select('organization_id, company_name')
+        .eq('email', userEmail)
+        .single();
+
+      const oldName = profile?.company_name || currentOrgName;
+
+      // 2. Update profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ company_name: trimmedName })
         .eq('email', userEmail);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      setCurrentOrgName(newOrgName.trim());
+      // 3. Update organizations table (by foreign key ID first, fallback to name)
+      if (profile?.organization_id) {
+        await supabase
+          .from('organizations')
+          .update({ name: trimmedName })
+          .eq('id', profile.organization_id);
+      } else if (oldName) {
+        await supabase
+          .from('organizations')
+          .update({ name: trimmedName })
+          .eq('name', oldName);
+      }
+
+      // 4. Sync state & refresh global auth context
+      setCurrentOrgName(trimmedName);
       setIsOrgModalOpen(false);
+      if (refreshProfile) {
+        await refreshProfile();
+      }
     } catch (err: any) {
-      alert(`Failed to update organization name: ${err.message}`);
+      alert(`Failed to update organization name: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
