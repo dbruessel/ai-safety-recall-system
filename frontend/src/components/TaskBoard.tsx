@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient'; // Adjust path if necessary
-import { useAuth } from '../context/AuthContext';   // Adjust path if necessary
+import { supabase } from '../supabaseClient'; // or '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'; // or '../AuthContext'
 
 interface TaskBoardProps {
   userTier?: string;
