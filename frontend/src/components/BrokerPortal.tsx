@@ -99,20 +99,25 @@ export const BrokerPortal: React.FC = () => {
     fetchBrokerFleets();
   }, [userProfile?.brokerage_id]);
 
-  // Handle PDF Generation via FastAPI ReportLab Backend Engine
+  // Handle Consolidated Multi-Fleet PDF Generation via FastAPI Engine
   const handleExportPDF = async () => {
     setExportState('generating');
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-      // Use selected fleet ID or fallback to demo fleet ID
-      const fleetId = fleets[0]?.organization_id || 'demo-fleet-001';
       
-      // Call your backend ReportLab PDF endpoint
+      // POST payload containing full list of fleets to multi-fleet ReportLab endpoint
       const response = await fetch(
-        `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=RecallLogic%20Partner%20Brokerage`,
+        `${apiBaseUrl}/api/broker/portfolio-audit/pdf`,
         {
-          method: 'GET',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            broker_name: userProfile?.company_name || 'RecallLogic Partner Brokerage',
+            fleets: fleets,
+          }),
         }
       );
 
@@ -120,12 +125,12 @@ export const BrokerPortal: React.FC = () => {
         throw new Error(`Server returned status ${response.status}`);
       }
 
-      // Convert response to PDF Blob and trigger immediate browser download
+      // Convert response to PDF Blob and trigger browser download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RecallLogic_Risk_Certificate_${fleetId}.pdf`;
+      link.download = `RecallLogic_Portfolio_Audit_${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -136,7 +141,7 @@ export const BrokerPortal: React.FC = () => {
       setExportState('done');
       setTimeout(() => setExportState('idle'), 3000);
     } catch (err) {
-      console.error('Failed to download compliance PDF:', err);
+      console.error('Failed to download portfolio PDF:', err);
       setExportState('idle');
     }
   };
