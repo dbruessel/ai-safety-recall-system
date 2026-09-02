@@ -5,14 +5,21 @@ from supabase import create_client, Client
 
 router = APIRouter(prefix="/api/stripe", tags=["stripe"])
 
-# Initialize Stripe & Supabase Admin Client
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
-SUPABASE_URL = os.getenv("VITE_SUPABASE_URL") or os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+def get_supabase_admin() -> Client:
+    """Helper to lazily initialize Supabase Admin Client."""
+    url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+    if not url or not key:
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase credentials missing from backend environment variables."
+        )
+
+    return create_client(url, key)
 
 
 @router.post("/create-checkout-session")
@@ -23,7 +30,6 @@ async def create_checkout_session(data: dict):
         success_url = data.get("success_url")
         cancel_url = data.get("cancel_url")
 
-        # Map tier names to your Stripe Price IDs
         price_map = {
             "standard": os.getenv("VITE_STRIPE_PRICE_STANDARD"),
             "professional": os.getenv("VITE_STRIPE_PRICE_PRO"),
@@ -51,18 +57,18 @@ async def create_checkout_session(data: dict):
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     payload = await request.body()
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, stripe_signature, STRIPE_WEBHOOK_SECRET
+            payload, stripe_signature, webhook_secret
         )
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Handle Checkout Completion
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         
@@ -75,6 +81,8 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         company_name = metadata.get("company_name", "My Fleet Co.")
 
         if customer_email:
+            supabase_admin = get_supabase_admin()
+
             # 1. Upsert Organization
             org_res = supabase_admin.table("organizations").upsert(
                 {"name": company_name, "subscription_tier": tier},
@@ -83,7 +91,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             
             org_id = org_res.data[0]["id"] if org_res.data else None
 
-            # 2. Update Profile directly in Supabase using Admin Service Key
+            # 2. Update Profile
             supabase_admin.table("profiles").update({
                 "stripe_customer_id": stripe_customer_id,
                 "stripe_subscription_id": stripe_subscription_id,
