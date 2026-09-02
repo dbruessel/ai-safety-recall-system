@@ -37,7 +37,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   const [newOrgName, setNewOrgName] = useState(orgName);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync internal state when parent props change
+  // Dynamic feedback states for menu quick tools
+  const [copiedState, setCopiedState] = useState(false);
+  const [downloadingState, setDownloadingState] = useState(false);
+
   useEffect(() => {
     if (orgName) {
       setCurrentOrgName(orgName);
@@ -95,6 +98,24 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
     }
   };
 
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCopyUnderwriterLink();
+    setCopiedState(true);
+    setTimeout(() => {
+      setCopiedState(false);
+      setIsOpen(false);
+    }, 1500);
+  };
+
+  const handleDownloadClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloadingState(true);
+    await onDownloadRiskCard();
+    setDownloadingState(false);
+    setIsOpen(false);
+  };
+
   return (
     <div className="relative inline-block text-left font-sans">
       {/* TRIGGER BUTTON */}
@@ -136,7 +157,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             </div>
 
-            {/* ADMINISTRATION (Hidden when viewing Broker Command) */}
+            {/* ADMINISTRATION */}
             {isAdmin && !isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
@@ -188,26 +209,41 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               
               <button
                 type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  onCopyUnderwriterLink();
-                }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+                onClick={handleShareClick}
+                className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                  copiedState
+                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
+                    : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                }`}
               >
-                <span>{isBrokerPortal ? '🔗 Share Onboarding Link' : '🔗 Copy Underwriter Share Link'}</span>
-                <span className="text-slate-500">📋</span>
+                <span>
+                  {copiedState
+                    ? '✓ Link Copied!'
+                    : isBrokerPortal
+                    ? '🔗 Share Onboarding Link'
+                    : '🔗 Copy Underwriter Share Link'}
+                </span>
+                <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  onDownloadRiskCard();
-                }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+                onClick={handleDownloadClick}
+                disabled={downloadingState}
+                className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                  downloadingState
+                    ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/50 font-bold animate-pulse'
+                    : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                }`}
               >
-                <span>{isBrokerPortal ? '📄 Export Portfolio Audit (PDF)' : '📄 Download Risk Certificate'}</span>
-                <span className="text-slate-500">⬇️</span>
+                <span>
+                  {downloadingState
+                    ? '⏳ Exporting PDF...'
+                    : isBrokerPortal
+                    ? '📄 Export Portfolio Audit (PDF)'
+                    : '📄 Download Risk Certificate'}
+                </span>
+                <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
               </button>
             </div>
 
