@@ -62,7 +62,10 @@ export const BrokerPortal: React.FC = () => {
   const [fleets, setFleets] = useState<ClientFleetSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDemoData, setIsDemoData] = useState<boolean>(false);
+  
+  // Interactive UI Button States
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [exportState, setExportState] = useState<'idle' | 'generating' | 'done'>('idle');
 
   useEffect(() => {
     async function fetchBrokerFleets() {
@@ -95,6 +98,15 @@ export const BrokerPortal: React.FC = () => {
 
     fetchBrokerFleets();
   }, [userProfile?.brokerage_id]);
+
+  // Handle PDF Generation Simulation
+  const handleExportPDF = () => {
+    setExportState('generating');
+    setTimeout(() => {
+      setExportState('done');
+      setTimeout(() => setExportState('idle'), 3000);
+    }, 1200);
+  };
 
   // Aggregate Portfolio Metrics
   const totalVehicles = fleets.reduce((acc, f) => acc + f.total_vins, 0);
@@ -163,12 +175,22 @@ export const BrokerPortal: React.FC = () => {
           </p>
         </div>
         
+        {/* CLEAN PDF EXPORT BUTTON */}
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => alert('Generating & exporting consolidated Portfolio Underwriter Audit (PDF)...')}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white rounded-xl cursor-pointer transition-all"
+            onClick={handleExportPDF}
+            disabled={exportState === 'generating'}
+            className={`px-4 py-2 border text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 ${
+              exportState === 'generating'
+                ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
+                : exportState === 'done'
+                ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
+            }`}
           >
-            📄 Export Underwriter Audit (PDF)
+            {exportState === 'generating' && <span>⏳ Generating Portfolio Audit...</span>}
+            {exportState === 'done' && <span>✓ Audit Report Exported!</span>}
+            {exportState === 'idle' && <span>📄 Export Underwriter Audit (PDF)</span>}
           </button>
         </div>
       </div>
@@ -235,7 +257,14 @@ export const BrokerPortal: React.FC = () => {
             </div>
 
             <button 
-              onClick={() => alert(`Opening client risk audit workspace for ${fleet.fleet_name}...`)}
+              onClick={() => {
+                const path = window.location.pathname.toLowerCase();
+                if (path.includes('/demo')) {
+                  window.location.href = '/audit/demo';
+                } else {
+                  window.location.href = `/?org=${fleet.organization_id}`;
+                }
+              }}
               className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold rounded-lg transition-all cursor-pointer"
             >
               Audit Client Workspace →
