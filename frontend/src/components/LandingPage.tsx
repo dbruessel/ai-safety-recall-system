@@ -44,9 +44,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
 
-  // AUTH MODAL STATES (SIGN IN VS SIGN UP TOGGLE)
+  // AUTH MODAL STATES (SIGN IN VS SIGN UP TOGGLE & SELECTED TIER)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
+  const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
@@ -91,7 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // REAL SUPABASE SIGN IN / SIGN UP AUTH HANDLER
+  // REAL SUPABASE SIGN IN / SIGN UP AUTH HANDLER (WITH METADATA PASS & CHECKOUT ROUTING)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -101,20 +102,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       if (isSignUp) {
         const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-        // 1. Create User in Supabase auth.users passing company_name in options metadata
+        // 1. Create User in Supabase auth.users passing company_name AND selected_tier into metadata
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
           options: {
             data: {
               company_name: finalCompanyName,
+              selected_tier: selectedTier,
             },
           },
         });
 
         if (error) throw error;
 
-        // 2. Ensure explicit sync on matching profile row
+        // 2. Explicit profile row upsert
         if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
@@ -125,7 +127,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         }
 
         setIsAuthModalOpen(false);
-        onSignIn();
+
+        // 3. If a paid tier was selected, route directly to Stripe Checkout
+        if (selectedTier !== 'standard' && onSelectTier) {
+          onSelectTier(selectedTier);
+        } else {
+          onSignIn();
+        }
       } else {
         // Sign In Flow
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -255,29 +263,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  // PRICING TIER CLICK HANDLER — TRACKS TIER & PROMPTS SIGN UP
   const handleTierCheckout = async (tier: PricingTier) => {
-    if (typeof onSelectTier === 'function') {
-      try {
-        onSelectTier(tier.id);
-        return;
-      } catch (err) {
-        console.error('Error invoking onSelectTier callback:', err);
-      }
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { tier: tier.id },
-      });
-
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        console.warn('No Stripe checkout URL returned from Supabase Edge Function.', error);
-      }
-    } catch (err) {
-      console.error('Error triggering Stripe checkout session:', err);
-    }
+    setSelectedTier(tier.id);
+    setIsSignUp(true);
+    setAuthError('');
+    setIsAuthModalOpen(true);
   };
 
   const pricingTiers: PricingTier[] = [
@@ -394,6 +385,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={() => {
                 setIsSignUp(false);
+                setSelectedTier('standard');
                 setIsAuthModalOpen(true);
               }}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
@@ -610,7 +602,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                {isSignUp ? 'Create Your Account' : 'Sign In to RecallLogic'}
+                {isSignUp ? `Create Account (${selectedTier.toUpperCase()} TIER)` : 'Sign In to RecallLogic'}
               </h3>
               <button
                 type="button"
@@ -672,7 +664,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   disabled={isSubmittingAuth}
                   className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
                 >
-                  {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+                  {isSubmittingAuth ? 'Processing...' : isSignUp ? (selectedTier === 'standard' ? 'Sign Up' : 'Continue to Checkout') : 'Sign In'}
                 </button>
               </div>
             </form>
