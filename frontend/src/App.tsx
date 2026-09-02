@@ -215,6 +215,7 @@ const MainApp: React.FC = () => {
                   orgName={getUserOrgName()}
                   userRole={(userRole || 'admin') as any}
                   subscriptionTier={effectiveTier as any}
+                  isBrokerPortal={activeView === 'broker_portal' || isDemoPath}
                   onOpenTeamModal={() => setActiveAdminModal('team')}
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
