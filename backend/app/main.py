@@ -24,7 +24,8 @@ from app.routers import (
     webhook_router,
     dashboard_router,
     sandbox,
-    payment_router
+    payment_router,
+    stripe_router,
 )
 
 # Initialize Vertex AI before application construction if configured
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router.router, prefix="/api")
     app.include_router(sandbox.router, prefix="/api")
     app.include_router(payment_router.router, prefix="/api")
+    app.include_router(stripe_router.router)
     app.include_router(pdf_router)
     app.include_router(audit_router.router)
 
