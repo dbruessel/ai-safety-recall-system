@@ -99,13 +99,46 @@ export const BrokerPortal: React.FC = () => {
     fetchBrokerFleets();
   }, [userProfile?.brokerage_id]);
 
-  // Handle PDF Generation Simulation
-  const handleExportPDF = () => {
+  // Handle PDF Generation via FastAPI ReportLab Backend Engine
+  const handleExportPDF = async () => {
     setExportState('generating');
-    setTimeout(() => {
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      // Use selected fleet ID or fallback to demo fleet ID
+      const fleetId = fleets[0]?.organization_id || 'demo-fleet-001';
+      
+      // Call your backend ReportLab PDF endpoint
+      const response = await fetch(
+        `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=RecallLogic%20Partner%20Brokerage`,
+        {
+          method: 'GET',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+
+      // Convert response to PDF Blob and trigger immediate browser download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `RecallLogic_Risk_Certificate_${fleetId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup DOM
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       setExportState('done');
       setTimeout(() => setExportState('idle'), 3000);
-    }, 1200);
+    } catch (err) {
+      console.error('Failed to download compliance PDF:', err);
+      setExportState('idle');
+    }
   };
 
   // Aggregate Portfolio Metrics
