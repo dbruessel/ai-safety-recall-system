@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient'; // or '../lib/supabaseClient'
-import { useAuth } from '../context/AuthContext'; // or '../AuthContext'
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 interface TaskBoardProps {
   userTier?: string;
@@ -44,6 +44,17 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const [singleVinInput, setSingleVinInput] = useState<string>('');
   const [bulkCsvText, setBulkCsvText] = useState<string>('');
 
+  // --- DYNAMIC TIER VIN LIMIT COMPUTATION ---
+  const displayLimit = useMemo(() => {
+    if (userProfile?.vehicle_limit) {
+      return userProfile.vehicle_limit.toLocaleString();
+    }
+    const normalizedTier = userTier.toLowerCase();
+    if (normalizedTier === 'enterprise') return '1,000';
+    if (normalizedTier === 'professional') return '250';
+    return '50';
+  }, [userProfile?.vehicle_limit, userTier]);
+
   // --- FETCH REAL FLEET DATA FROM SUPABASE ---
   const fetchFleetData = useCallback(async () => {
     if (!userProfile?.organization_id) {
@@ -55,7 +66,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('vins') // Queries real VIN safety recalls in Supabase
+        .from('vins')
         .select('*')
         .eq('organization_id', userProfile.organization_id)
         .order('created_at', { ascending: false });
@@ -63,7 +74,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       if (error) {
         console.error('Error fetching organization VINs:', error);
       } else if (data) {
-        // Map database columns to component properties cleanly
         const mappedUnits: RecallItem[] = data.map((item: any) => ({
           id: item.id,
           unit: item.unit_number || item.unit || `UNIT-${item.vin?.slice(-4)}`,
@@ -127,8 +137,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
     const vinToScan = singleVinInput.trim().toUpperCase();
 
-    // Insert new VIN scan directly into Supabase
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('vins')
       .insert([
         {
@@ -151,7 +160,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     } else {
       setSingleVinInput('');
       setIsSingleScanOpen(false);
-      fetchFleetData(); // Refresh UI with newly saved vehicle
+      fetchFleetData();
       alert(`✅ VIN ${vinToScan} scanned and saved to database!`);
     }
   };
@@ -184,7 +193,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     } else {
       setBulkCsvText('');
       setIsBulkImportOpen(false);
-      fetchFleetData(); // Refresh list from Supabase
+      fetchFleetData();
       alert(`🚀 Imported and audited ${recordsToInsert.length} fleet units!`);
     }
   };
@@ -206,7 +215,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const handleUpdateStatus = async (id: string, newStatus: 'OPEN' | 'SCHEDULED' | 'CLEARED') => {
     const remedy = newStatus === 'CLEARED' ? 'Completed' : newStatus === 'SCHEDULED' ? 'Scheduled' : 'Unassigned';
 
-    // Update state locally for quick responsiveness
     setRecallUnits((prev) =>
       prev.map((unit) =>
         unit.id === id
@@ -215,7 +223,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       )
     );
 
-    // Persist status update to Supabase
     const { error } = await supabase
       .from('vins')
       .update({
@@ -247,7 +254,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
                   : 'bg-slate-800 border-slate-700 text-slate-300'
               }`}
             >
-              {userTier.toUpperCase()} TIER ({recallUnits.length} / {isPro ? 'UNLIMITED' : '50'} VINS)
+              {userTier.toUpperCase()} TIER ({recallUnits.length} / {displayLimit} VINS)
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
