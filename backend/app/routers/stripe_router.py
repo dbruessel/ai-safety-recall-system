@@ -25,18 +25,21 @@ def get_supabase_admin() -> Client:
 @router.post("/create-checkout-session")
 async def create_checkout_session(data: dict):
     try:
-        tier = data.get("tier", "professional")
+        tier = data.get("tier", "professional").lower()
         company_name = data.get("company_name", "My Fleet Co.")
         success_url = data.get("success_url")
         cancel_url = data.get("cancel_url")
 
         price_map = {
-            "standard": os.getenv("VITE_STRIPE_PRICE_STANDARD"),
-            "professional": os.getenv("VITE_STRIPE_PRICE_PRO"),
-            "enterprise": os.getenv("VITE_STRIPE_PRICE_ENTERPRISE"),
+            "standard": os.getenv("VITE_STRIPE_PRICE_STANDARD") or os.getenv("STRIPE_PRICE_STANDARD"),
+            "professional": os.getenv("VITE_STRIPE_PRICE_PRO") or os.getenv("STRIPE_PRICE_PRO"),
+            "enterprise": os.getenv("VITE_STRIPE_PRICE_ENTERPRISE") or os.getenv("STRIPE_PRICE_ENTERPRISE"),
         }
 
-        price_id = price_map.get(tier, price_map["professional"])
+        price_id = price_map.get(tier, price_map.get("professional"))
+
+        if not price_id:
+            raise HTTPException(status_code=400, detail=f"No Stripe Price ID configured for tier '{tier}'.")
 
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -69,6 +72,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+    # Handle successful subscription purchases
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         
@@ -77,8 +81,16 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         stripe_subscription_id = session.get("subscription")
         
         metadata = session.get("metadata", {})
-        tier = metadata.get("tier", "professional")
+        tier = metadata.get("tier", "professional").lower()
         company_name = metadata.get("company_name", "My Fleet Co.")
+
+        # Define vehicle capacity limits per paid tier
+        tier_vehicle_limits = {
+            "standard": 50,
+            "professional": 250,
+            "enterprise": 10000,
+        }
+        vehicle_limit = tier_vehicle_limits.get(tier, 50)
 
         if customer_email:
             supabase_admin = get_supabase_admin()
@@ -91,16 +103,18 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             
             org_id = org_res.data[0]["id"] if org_res.data else None
 
-            # 2. Update Profile
+            # 2. Update Profile to ACTIVE (clears 'trial' and default limits)
             supabase_admin.table("profiles").update({
                 "stripe_customer_id": stripe_customer_id,
                 "stripe_subscription_id": stripe_subscription_id,
-                "subscription_status": "active",
+                "subscription_status": "active",  # Explicitly replaces 'trial'
+                "status": "active",               # Marks account active
                 "subscription_tier": tier,
+                "vehicle_limit": vehicle_limit,   # Sets 50 for standard, 250 for pro, etc.
                 "company_name": company_name,
                 "organization_id": org_id,
             }).eq("email", customer_email).execute()
 
-            print(f"✅ Webhook provisioned {tier} tier for {customer_email}")
+            print(f"✅ Webhook successfully provisioned active {tier} tier ({vehicle_limit} VINs) for {customer_email}")
 
     return {"status": "success"}
