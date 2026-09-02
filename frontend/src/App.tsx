@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
 import BrokerPortal from './components/BrokerPortal';
+import BrokerSignup from './components/BrokerSignup';
 import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
@@ -16,6 +17,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
+
+  // Route check for signup subpath
+  const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
 
   // Navigation state for active workspace view (defaults to broker_portal if on /audit/demo path)
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
@@ -83,6 +87,11 @@ const MainApp: React.FC = () => {
 
     handlePostCheckoutSync();
   }, [user, companyName]);
+
+  // Handle direct signup route prior to auth evaluation
+  if (isSignupPath) {
+    return <BrokerSignup />;
+  }
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 

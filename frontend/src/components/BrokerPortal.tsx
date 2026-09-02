@@ -82,7 +82,7 @@ export const BrokerPortal: React.FC = () => {
         .eq('parent_brokerage_id', userProfile.brokerage_id);
 
       if (error || !data || data.length === 0) {
-        // Fallback to sample portfolio so broker cold leads see a active command dashboard
+        // Fallback to sample portfolio so broker cold leads see an active command dashboard
         setFleets(DEMO_PORTFOLIO);
         setIsDemoData(true);
       } else {
@@ -124,8 +124,10 @@ export const BrokerPortal: React.FC = () => {
           </div>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Broker onboarding link copied to clipboard!');
+              const brokerId = userProfile?.brokerage_id || 'demo-broker';
+              const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
+              navigator.clipboard.writeText(inviteUrl);
+              alert(`Fleet invite link copied!\n\n${inviteUrl}`);
             }}
             className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap text-[11px]"
           >
