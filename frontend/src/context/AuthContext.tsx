@@ -3,9 +3,22 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 import { Tier } from '../lib/tierPermissions';
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+  organization_id?: string;
+  company_name?: string;
+  vehicle_limit?: number;
+  is_broker?: boolean;
+  brokerage_id?: string;
+  subscription_tier?: string;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  userProfile: UserProfile | null;
   userTier: Tier;
   userRole: string;
   companyName: string;
@@ -22,21 +35,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userTier, setUserTier] = useState<Tier>('standard');
   const [userRole, setUserRole] = useState<string>('admin');
   const [companyName, setCompanyName] = useState<string>('');
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [demoAuthenticated, setDemoAuthenticated] = useState<boolean>(false);
 
-  // Helper to fetch user profile, company_name, and joined organization tier
+  // Helper to fetch user profile, broker flags, company_name, and joined organization tier
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select(`
+          id,
+          email,
+          role,
+          organization_id,
           company_name,
           subscription_tier,
-          role,
+          is_broker,
+          brokerage_id,
           organizations (
             name,
             subscription_tier
@@ -50,27 +69,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (data?.role) {
-        setUserRole(data.role);
+      if (data) {
+        // Construct full profile object
+        const profileObj: UserProfile = {
+          id: data.id,
+          email: data.email,
+          role: data.role || 'admin',
+          organization_id: data.organization_id,
+          company_name: data.company_name,
+          subscription_tier: data.subscription_tier,
+          is_broker: Boolean(data.is_broker),
+          brokerage_id: data.brokerage_id,
+        };
+
+        setUserProfile(profileObj);
+
+        if (data.role) {
+          setUserRole(data.role);
+        }
+
+        // Check profiles company_name first, then organization name
+        const rawOrgName = Array.isArray(data?.organizations)
+          ? data?.organizations[0]?.name
+          : (data?.organizations as any)?.name;
+
+        const activeCompanyName = data?.company_name || rawOrgName || '';
+        if (activeCompanyName) {
+          setCompanyName(activeCompanyName);
+        }
+
+        // Check organization tier first, fallback to profile tier
+        const rawOrgTier = Array.isArray(data?.organizations)
+          ? data?.organizations[0]?.subscription_tier
+          : (data?.organizations as any)?.subscription_tier;
+
+        const activeTier = (rawOrgTier || data?.subscription_tier || 'standard').toLowerCase() as Tier;
+        setUserTier(activeTier);
       }
-
-      // Check profiles company_name first, then organization name
-      const rawOrgName = Array.isArray(data?.organizations)
-        ? data?.organizations[0]?.name
-        : (data?.organizations as any)?.name;
-
-      const activeCompanyName = data?.company_name || rawOrgName || '';
-      if (activeCompanyName) {
-        setCompanyName(activeCompanyName);
-      }
-
-      // Check organization tier first, fallback to profile tier
-      const rawOrgTier = Array.isArray(data?.organizations)
-        ? data?.organizations[0]?.subscription_tier
-        : (data?.organizations as any)?.subscription_tier;
-
-      const activeTier = (rawOrgTier || data?.subscription_tier || 'standard').toLowerCase() as Tier;
-      setUserTier(activeTier);
     } catch (err) {
       console.error('Failed to resolve user profile:', err);
       setUserTier('standard');
@@ -99,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         fetchUserProfile(session.user.id);
       } else {
+        setUserProfile(null);
         setUserTier('standard');
         setCompanyName('');
       }
@@ -127,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: data.user.email,
         company_name: finalCompanyName,
         role: 'admin',
+        is_broker: false
       });
 
       setCompanyName(finalCompanyName);
@@ -154,12 +191,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setDemoAuthenticated(true);
     setUserTier('professional');
     setUserRole('admin');
+    setUserProfile({
+      id: 'demo-broker-user-id',
+      email: 'dennis+broker@recalllogic.ai',
+      role: 'admin',
+      is_broker: true,
+      company_name: 'Demo Fleet Operations'
+    });
     setCompanyName((prevName) => (prevName && prevName.trim() !== '' ? prevName : 'Demo Fleet Operations'));
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+    setUserProfile(null);
     setDemoAuthenticated(false);
     setUserTier('standard');
     setCompanyName('');
@@ -170,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         session,
         user: session?.user ?? null,
+        userProfile,
         userTier,
         userRole,
         companyName,
@@ -194,3 +240,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthProvider;
