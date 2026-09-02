@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { FleetVinScanner } from './fleetscanner'; // Adjust path if fleetscanner sits in another folder
 
 interface TaskBoardProps {
   userTier?: string;
@@ -42,7 +43,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
   // Form Inputs
   const [singleVinInput, setSingleVinInput] = useState<string>('');
-  const [bulkCsvText, setBulkCsvText] = useState<string>('');
 
   // --- DYNAMIC TIER VIN LIMIT COMPUTATION ---
   const displayLimit = useMemo(() => {
@@ -162,39 +162,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       setIsSingleScanOpen(false);
       fetchFleetData();
       alert(`✅ VIN ${vinToScan} scanned and saved to database!`);
-    }
-  };
-
-  const handleBulkImportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkCsvText.trim() || !userProfile?.organization_id) return;
-
-    const lines = bulkCsvText.trim().split('\n');
-    const recordsToInsert = lines.map((line, idx) => {
-      const [unit, vin] = line.split(',');
-      return {
-        unit_number: unit?.trim().toUpperCase() || `TRK-BULK-${idx + 1}`,
-        vin: vin?.trim().toUpperCase() || '1FUJGLDR5MLKE9999',
-        organization_id: userProfile.organization_id,
-        make_model: 'FREIGHTLINER Cascadia 2023',
-        nhtsa_campaign: '24V-410',
-        recall_details: 'ECM WIRING HARNESS SHORT',
-        description: 'Chafing along frame rail harness can result in engine shutdown.',
-        remedy_status: 'Unassigned',
-        compliance_status: 'OPEN',
-        severity: 'CRITICAL'
-      };
-    });
-
-    const { error } = await supabase.from('vins').insert(recordsToInsert);
-
-    if (error) {
-      alert(`Bulk import error: ${error.message}`);
-    } else {
-      setBulkCsvText('');
-      setIsBulkImportOpen(false);
-      fetchFleetData();
-      alert(`🚀 Imported and audited ${recordsToInsert.length} fleet units!`);
     }
   };
 
@@ -495,31 +462,24 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       )}
 
-      {/* BULK CSV IMPORT MODAL */}
+      {/* BULK CSV IMPORT MODAL REUSING FLEETVINSCANNER */}
       {isBulkImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">⚡ Bulk CSV Fleet Import</h3>
-              <button onClick={() => setIsBulkImportOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+          <div className="max-w-4xl w-full bg-[#0D1322] border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
+            <div className="flex justify-between items-center mb-4 font-mono text-xs">
+              <span className="font-bold text-white uppercase tracking-wider">⚡ Bulk Fleet Safety Sync</span>
+              <button 
+                onClick={() => {
+                  setIsBulkImportOpen(false);
+                  fetchFleetData(); // Refresh list upon closing modal
+                }} 
+                className="text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 border border-slate-700 cursor-pointer"
+              >
+                ✕ Close
+              </button>
             </div>
-            <form onSubmit={handleBulkImportSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Paste CSV Lines (Format: UnitName,VIN)</label>
-                <textarea
-                  rows={5}
-                  value={bulkCsvText}
-                  onChange={(e) => setBulkCsvText(e.target.value)}
-                  placeholder={"TRK-201,1FUJGLDR5MLKE1111\nTRK-202,1FTBW1Y85PKA2222"}
-                  className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-lg p-2.5 font-mono focus:outline-none focus:border-cyan-500"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button type="button" onClick={() => setIsBulkImportOpen(false)} className="px-4 py-2 bg-slate-800 text-xs rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg">Import &amp; Audit Fleet</button>
-              </div>
-            </form>
+
+            <FleetVinScanner />
           </div>
         </div>
       )}
