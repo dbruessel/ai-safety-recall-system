@@ -147,7 +147,9 @@ const MainApp: React.FC = () => {
     if (isBroker) {
       const brokerId = userProfile?.brokerage_id || 'demo-broker';
       const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
-      navigator.clipboard.writeText(inviteUrl);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(inviteUrl);
+      }
     } else {
       setIsShareModalOpen(true);
     }
