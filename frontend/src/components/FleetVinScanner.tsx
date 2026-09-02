@@ -14,7 +14,11 @@ interface AuditResult {
   status_label: string;
 }
 
-export function FleetVinScanner() {
+interface FleetVinScannerProps {
+  isWorkspace?: boolean;
+}
+
+export function FleetVinScanner({ isWorkspace = false }: FleetVinScannerProps) {
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
   const [pastedText, setPastedText] = useState<string>('');
   const [scansLeft, setScansLeft] = useState<number>(10);
@@ -53,9 +57,13 @@ export function FleetVinScanner() {
       if (!response.ok) throw new Error(data.detail || 'Failed to audit VIN.');
 
       setAuditResult(data);
-      const nextScans = Math.max(0, scansLeft - 1);
-      setScansLeft(nextScans);
-      sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
+      
+      // Only deduct trial scans if not in workspace
+      if (!isWorkspace) {
+        const nextScans = Math.max(0, scansLeft - 1);
+        setScansLeft(nextScans);
+        sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
+      }
 
     } catch (err: any) {
       setScanError(err.message || 'Error connecting to NHTSA recall engine.');
@@ -66,7 +74,7 @@ export function FleetVinScanner() {
 
   const extractAndAuditVins = async (rawInput: string) => {
     setScanError('');
-    if (scansLeft <= 0) {
+    if (!isWorkspace && scansLeft <= 0) {
       setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited monitoring.');
       return;
     }
@@ -120,9 +128,17 @@ export function FleetVinScanner() {
             Real-Time VIN Safety Sync Active
           </span>
         </div>
-        <div className="px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs font-mono text-emerald-400 font-bold">
-          {scansLeft} FREE VIN LOOKUPS REMAINING
-        </div>
+
+        {/* CONDITIONAL WORKSPACE BADGE */}
+        {isWorkspace ? (
+          <div className="px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-xs font-mono text-cyan-400 font-bold uppercase tracking-wider">
+            ACTIVE WORKSPACE SYNC
+          </div>
+        ) : (
+          <div className="px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs font-mono text-emerald-400 font-bold">
+            {scansLeft} FREE VIN LOOKUPS REMAINING
+          </div>
+        )}
       </div>
 
       <div>
@@ -130,7 +146,9 @@ export function FleetVinScanner() {
           Instant Fleet VIN Safety &amp; Recall Control
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Paste your VINs directly or drop a fleet file to test our Real-Time Safety Sync engine with 10 free lookups.
+          {isWorkspace 
+            ? "Paste your fleet VINs directly or upload a batch file to audit recalls across your active workspace." 
+            : "Paste your VINs directly or drop a fleet file to test our Real-Time Safety Sync engine with 10 free lookups."}
         </p>
       </div>
 
@@ -168,16 +186,16 @@ export function FleetVinScanner() {
             placeholder={`FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nTESLA / MODEL 3 / 5YJ3E1EA7MF987654`}
             value={pastedText}
             onChange={(e) => setPastedText(e.target.value.toUpperCase())}
-            disabled={scansLeft <= 0 || isAuditing}
+            disabled={!isWorkspace && (scansLeft <= 0 || isAuditing)}
             className="w-full bg-[#070B14] border border-slate-800 rounded-xl p-3 font-mono text-xs uppercase text-white placeholder-slate-600 focus:outline-none focus:border-[#06B6D4] transition"
           />
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <span className="text-[10px] text-slate-400 font-mono">
-              Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> or <strong className="text-cyan-300">Make, Model, VIN</strong> (up to 10 entries).
+              Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> or <strong className="text-cyan-300">Make, Model, VIN</strong>.
             </span>
             <button
               type="submit"
-              disabled={scansLeft <= 0 || isAuditing}
+              disabled={!isWorkspace && (scansLeft <= 0 || isAuditing)}
               className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap"
             >
               {isAuditing ? 'AUDITING...' : 'RUN VIN AUDIT'}
