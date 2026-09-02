@@ -21,7 +21,7 @@ const MainApp: React.FC = () => {
   // Route check for signup subpath
   const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
 
-  // Navigation state for active workspace view (defaults to broker_portal if on /audit/demo path)
+  // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
     const path = window.location.pathname.toLowerCase();
     return (path.includes('/audit/demo') || path.includes('/broker')) ? 'broker_portal' : 'workspace';
@@ -79,7 +79,6 @@ const MainApp: React.FC = () => {
         } catch (err) {
           console.error('⚠️ Post-checkout Supabase sync failed:', err);
         } finally {
-          // Clean up URL query param without refreshing the page
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -95,7 +94,6 @@ const MainApp: React.FC = () => {
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
 
-  // Resolve active organization name: checks database-backed context state first
   const getUserOrgName = (): string => {
     if (companyName && companyName.trim() !== '') {
       return companyName;
@@ -107,10 +105,8 @@ const MainApp: React.FC = () => {
     return 'My Fleet Co.';
   };
 
-  // Force Professional tier when viewing broker demo routes
   const effectiveTier = isDemoPath ? 'professional' : (userTier || 'standard');
 
-  // Direct Stripe Checkout Backend Handler
   const handleCheckout = async (tierId: string) => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
@@ -145,18 +141,77 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Handlers for AccountMenu quick tools (No alerts)
+  // Handlers for AccountMenu quick tools (Context Aware)
   const handleCopyUnderwriterLink = () => {
-    setIsShareModalOpen(true);
+    const isBroker = activeView === 'broker_portal' || isDemoPath;
+    if (isBroker) {
+      const brokerId = userProfile?.brokerage_id || 'demo-broker';
+      const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
+      navigator.clipboard.writeText(inviteUrl);
+    } else {
+      setIsShareModalOpen(true);
+    }
   };
 
-  const handleDownloadRiskCard = () => {
-    console.log('Exporting Underwriter Risk Certificate...');
+  const handleDownloadRiskCard = async () => {
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const isBroker = activeView === 'broker_portal' || isDemoPath;
+
+      if (isBroker) {
+        // 🏢 Export Multi-Fleet Portfolio Audit PDF
+        const response = await fetch(`${apiBaseUrl}/api/broker/portfolio-audit/pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            broker_name: userProfile?.company_name || companyName || 'RecallLogic Partner Brokerage',
+            fleets: [
+              { organization_id: 'demo-org-1', fleet_name: 'Apex Logistics & Freight', subscription_tier: 'Enterprise', total_vins: 142, open_recalls: 3, scheduled_recalls: 5, cleared_recalls: 134, safety_score: 82 },
+              { organization_id: 'demo-org-2', fleet_name: 'Summit Regional Transport', subscription_tier: 'Professional', total_vins: 68, open_recalls: 0, scheduled_recalls: 2, cleared_recalls: 66, safety_score: 98 },
+              { organization_id: 'demo-org-3', fleet_name: 'Titan Heavy Hauling Co.', subscription_tier: 'Professional', total_vins: 210, open_recalls: 14, scheduled_recalls: 8, cleared_recalls: 188, safety_score: 58 },
+              { organization_id: 'demo-org-4', fleet_name: 'Metro Last-Mile Delivery', subscription_tier: 'Standard', total_vins: 45, open_recalls: 1, scheduled_recalls: 1, cleared_recalls: 43, safety_score: 90 },
+            ],
+          }),
+        });
+
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `RecallLogic_Portfolio_Audit_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        // 🚚 Export Single-Fleet Compliance Risk Certificate PDF
+        const fleetId = userProfile?.organization_id || 'demo-fleet-001';
+        const response = await fetch(
+          `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
+          { method: 'GET' }
+        );
+
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `RecallLogic_Risk_Certificate_${fleetId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Failed to export compliance PDF from account menu:', err);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between font-sans">
-      {/* MAIN WORKSPACE & PAGE ROUTING CONTENT */}
       <main className="flex-1">
         {!isAuthenticated ? (
           <LandingPage
@@ -165,7 +220,6 @@ const MainApp: React.FC = () => {
           />
         ) : (
           <div className="py-6">
-            {/* WORKSPACE NAVIGATION HEADER */}
             <header className="px-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/80 pb-4 gap-4">
               <div className="flex items-center gap-3">
                 <img 
@@ -182,9 +236,7 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
 
-              {/* NAVIGATION VIEWS & ACCOUNT MENU */}
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {/* VIEW TOGGLE SWITCH (Visible if user is a Broker or viewing demo) */}
                 {(userProfile?.is_broker || isDemoPath) && (
                   <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
                     <button
@@ -225,7 +277,6 @@ const MainApp: React.FC = () => {
               </div>
             </header>
 
-            {/* MAIN WORKSPACE ROUTING */}
             {activeView === 'broker_portal' || (isDemoPath && !window.location.pathname.includes('/audit/share')) ? (
               <BrokerPortal />
             ) : (
@@ -235,13 +286,11 @@ const MainApp: React.FC = () => {
         )}
       </main>
 
-      {/* TEAM & PERMISSIONS MANAGEMENT MODAL */}
       <TeamManagementModal
         isOpen={activeAdminModal === 'team'}
         onClose={() => setActiveAdminModal(null)}
       />
 
-      {/* PLAN & BILLING SURCHARGE MODAL */}
       {activeAdminModal === 'billing' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
@@ -276,7 +325,6 @@ const MainApp: React.FC = () => {
         </div>
       )}
 
-      {/* BROKER SHARE LINK MODAL */}
       <BrokerShareModal
         isOpen={isShareModalOpen}
         userTier={effectiveTier}
@@ -284,7 +332,6 @@ const MainApp: React.FC = () => {
         onClose={() => setIsShareModalOpen(false)}
       />
 
-      {/* PERSISTENT GLOBAL FOOTER WITH DIRECT SUPPORT ACCESS */}
       <Footer />
     </div>
   );

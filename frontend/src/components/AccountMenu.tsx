@@ -56,7 +56,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
     setIsSaving(true);
     try {
-      // 1. Fetch current profile to get organization_id or old company_name
       const { data: profile } = await supabase
         .from('profiles')
         .select('organization_id, company_name')
@@ -65,7 +64,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
       const oldName = profile?.company_name || currentOrgName;
 
-      // 2. Update profiles table
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ company_name: trimmedName })
@@ -73,7 +71,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
       if (profileError) throw profileError;
 
-      // 3. Update organizations table (by foreign key ID first, fallback to name)
       if (profile?.organization_id) {
         await supabase
           .from('organizations')
@@ -86,7 +83,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
           .eq('name', oldName);
       }
 
-      // 4. Sync state & refresh global auth context
       setCurrentOrgName(trimmedName);
       setIsOrgModalOpen(false);
       if (refreshProfile) {
@@ -101,7 +97,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
   return (
     <div className="relative inline-block text-left font-sans">
-      {/* 🏢 TRIGGER BUTTON */}
+      {/* TRIGGER BUTTON */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -140,7 +136,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             </div>
 
-            {/* ADMINISTRATION (Hidden when viewing Broker Portal) */}
+            {/* ADMINISTRATION (Hidden when viewing Broker Command) */}
             {isAdmin && !isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
@@ -186,7 +182,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
             {/* UNDERWRITER QUICK TOOLS */}
             <div className="space-y-1 border-t border-slate-800/80 pt-2">
-              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Underwriter Quick Tools</p>
+              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">
+                Underwriter Quick Tools
+              </p>
+              
               <button
                 type="button"
                 onClick={() => {
@@ -195,9 +194,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
               >
-                <span>🔗 Copy Broker Share Link</span>
+                <span>{isBrokerPortal ? '🔗 Share Onboarding Link' : '🔗 Copy Underwriter Share Link'}</span>
                 <span className="text-slate-500">📋</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -206,7 +206,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
               >
-                <span>📄 Download Compliance Card</span>
+                <span>{isBrokerPortal ? '📄 Export Portfolio Audit (PDF)' : '📄 Download Risk Certificate'}</span>
                 <span className="text-slate-500">⬇️</span>
               </button>
             </div>
