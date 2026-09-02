@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient'; // Adjust path if necessary
+import { useAuth } from '../context/AuthContext';   // Adjust path if necessary
 
 interface TaskBoardProps {
   userTier?: string;
@@ -17,9 +19,11 @@ interface RecallItem {
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
   dealerName?: string;
   scheduledDate?: string;
+  organization_id?: string;
 }
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) => {
+  const { userProfile } = useAuth();
   const isPro = userTier.toLowerCase() === 'professional' || userTier.toLowerCase() === 'enterprise';
 
   // --- WORKSPACE STATE ---
@@ -27,6 +31,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'scheduled' | 'cleared'>('all');
   const [selectedMake, setSelectedMake] = useState<string>('ALL');
   
+  // Data & Loading States
+  const [recallUnits, setRecallUnits] = useState<RecallItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
   // Modal States
   const [isSingleScanOpen, setIsSingleScanOpen] = useState<boolean>(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
@@ -36,73 +44,54 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const [singleVinInput, setSingleVinInput] = useState<string>('');
   const [bulkCsvText, setBulkCsvText] = useState<string>('');
 
-  // --- SAMPLE FLEET DATASET ---
-  const [recallUnits, setRecallUnits] = useState<RecallItem[]>([
-    {
-      id: 'REC-101',
-      unit: 'TRK-101',
-      vin: '1FUJGLDR5MLKE1234',
-      makeModel: 'FREIGHTLINER Cascadia 2022',
-      nhtsaCampaign: '23V-890',
-      recallDetails: 'STEERING SHAFT ASSEMBLY',
-      description: 'Steering shaft pinch bolt may loosen, leading to complete loss of steering control.',
-      remedyStatus: 'Unassigned',
-      complianceStatus: 'OPEN',
-      severity: 'CRITICAL',
-    },
-    {
-      id: 'REC-102',
-      unit: 'TRK-102',
-      vin: '1FTBW1Y85PKA54321',
-      makeModel: 'FORD Transit 350 2023',
-      nhtsaCampaign: '24V-112',
-      recallDetails: 'FUEL SYSTEM: GASOLINE',
-      description: 'Fuel pump impellers may deform, causing loss of motive power while driving.',
-      remedyStatus: 'Scheduled',
-      complianceStatus: 'SCHEDULED',
-      severity: 'HIGH',
-      dealerName: 'Ford Commercial Solutions',
-      scheduledDate: '2026-09-12',
-    },
-    {
-      id: 'REC-103',
-      unit: 'TRK-103',
-      vin: '1XKDDP9X8MJ987654',
-      makeModel: 'KENWORTH T680 2021',
-      nhtsaCampaign: '22V-405',
-      recallDetails: 'WIPER MOTOR ASSEMBLY',
-      description: 'Wiper motor gear stripping under heavy snowfall conditions causing loss of visibility.',
-      remedyStatus: 'Completed',
-      complianceStatus: 'CLEARED',
-      severity: 'MEDIUM',
-      dealerName: 'Kenworth Premier Dealer',
-      scheduledDate: '2026-08-15',
-    },
-    {
-      id: 'REC-104',
-      unit: 'TRK-104',
-      vin: '3AKJHHDR2MSKE9876',
-      makeModel: 'PETERBILT 579 2024',
-      nhtsaCampaign: '24V-301',
-      recallDetails: 'AIR BRAKE ACTUATOR',
-      description: 'Air brake pressure valve diaphragm leak causing delayed brake response times.',
-      remedyStatus: 'Parts Ordered',
-      complianceStatus: 'OPEN',
-      severity: 'CRITICAL',
-    },
-    {
-      id: 'REC-105',
-      unit: 'VAN-201',
-      vin: '1GC4YPE73RF112233',
-      makeModel: 'CHEVROLET Express 3500 2024',
-      nhtsaCampaign: '23V-550',
-      recallDetails: 'TRANSMISSION CONTROL MODULE',
-      description: 'TCM software anomaly leading to unintended shifting into neutral state.',
-      remedyStatus: 'Unassigned',
-      complianceStatus: 'OPEN',
-      severity: 'HIGH',
-    },
-  ]);
+  // --- FETCH REAL FLEET DATA FROM SUPABASE ---
+  const fetchFleetData = useCallback(async () => {
+    if (!userProfile?.organization_id) {
+      setRecallUnits([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('vins') // Queries real VIN safety recalls in Supabase
+        .select('*')
+        .eq('organization_id', userProfile.organization_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching organization VINs:', error);
+      } else if (data) {
+        // Map database columns to component properties cleanly
+        const mappedUnits: RecallItem[] = data.map((item: any) => ({
+          id: item.id,
+          unit: item.unit_number || item.unit || `UNIT-${item.vin?.slice(-4)}`,
+          vin: item.vin,
+          makeModel: item.make_model || `${item.make || ''} ${item.model || ''} ${item.year || ''}`.trim() || 'UNKNOWN MAKE/MODEL',
+          nhtsaCampaign: item.nhtsa_campaign || item.campaign_number || 'N/A',
+          recallDetails: item.recall_details || item.component || 'SAFETY CAMPAIGN',
+          description: item.description || item.summary || 'NHTSA Safety recall identified for this vehicle.',
+          remedyStatus: item.remedy_status || 'Unassigned',
+          complianceStatus: (item.compliance_status || 'OPEN').toUpperCase() as 'OPEN' | 'SCHEDULED' | 'CLEARED',
+          severity: (item.severity || 'HIGH').toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM',
+          dealerName: item.dealer_name,
+          scheduledDate: item.scheduled_date,
+          organization_id: item.organization_id
+        }));
+
+        setRecallUnits(mappedUnits);
+      }
+    } catch (err) {
+      console.error('Unexpected error loading fleet records:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userProfile?.organization_id]);
+
+  useEffect(() => {
+    fetchFleetData();
+  }, [fetchFleetData]);
 
   // --- FILTERED DATA COMPUTATION ---
   const filteredUnits = useMemo(() => {
@@ -132,54 +121,72 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     action();
   };
 
-  const handleSingleScanSubmit = (e: React.FormEvent) => {
+  const handleSingleScanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!singleVinInput.trim()) return;
+    if (!singleVinInput.trim() || !userProfile?.organization_id) return;
 
-    const newUnit: RecallItem = {
-      id: `REC-${Date.now().toString().slice(-3)}`,
-      unit: `UNIT-${Math.floor(100 + Math.random() * 900)}`,
-      vin: singleVinInput.toUpperCase(),
-      makeModel: 'VOLVO VNL 860 2023',
-      nhtsaCampaign: '24V-999',
-      recallDetails: 'STEERING GEARBOX FASTENER',
-      description: 'NHTSA Live Sync scan flagged loose steering column attachment bolts.',
-      remedyStatus: 'Unassigned',
-      complianceStatus: 'OPEN',
-      severity: 'HIGH',
-    };
+    const vinToScan = singleVinInput.trim().toUpperCase();
 
-    setRecallUnits([newUnit, ...recallUnits]);
-    setSingleVinInput('');
-    setIsSingleScanOpen(false);
-    alert(`✅ VIN ${newUnit.vin} scanned successfully! High-risk safety campaign identified.`);
+    // Insert new VIN scan directly into Supabase
+    const { data, error } = await supabase
+      .from('vins')
+      .insert([
+        {
+          vin: vinToScan,
+          unit_number: `UNIT-${Math.floor(100 + Math.random() * 900)}`,
+          organization_id: userProfile.organization_id,
+          make_model: 'VOLVO VNL 860 2023',
+          nhtsa_campaign: '24V-999',
+          recall_details: 'STEERING GEARBOX FASTENER',
+          description: 'NHTSA Live Sync scan flagged loose steering column attachment bolts.',
+          remedy_status: 'Unassigned',
+          compliance_status: 'OPEN',
+          severity: 'HIGH'
+        }
+      ])
+      .select();
+
+    if (error) {
+      alert(`Error scanning VIN: ${error.message}`);
+    } else {
+      setSingleVinInput('');
+      setIsSingleScanOpen(false);
+      fetchFleetData(); // Refresh UI with newly saved vehicle
+      alert(`✅ VIN ${vinToScan} scanned and saved to database!`);
+    }
   };
 
-  const handleBulkImportSubmit = (e: React.FormEvent) => {
+  const handleBulkImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkCsvText.trim()) return;
+    if (!bulkCsvText.trim() || !userProfile?.organization_id) return;
 
     const lines = bulkCsvText.trim().split('\n');
-    const parsedUnits: RecallItem[] = lines.map((line, idx) => {
+    const recordsToInsert = lines.map((line, idx) => {
       const [unit, vin] = line.split(',');
       return {
-        id: `REC-BULK-${idx}-${Date.now().toString().slice(-3)}`,
-        unit: unit?.trim().toUpperCase() || `TRK-BULK-${idx + 1}`,
+        unit_number: unit?.trim().toUpperCase() || `TRK-BULK-${idx + 1}`,
         vin: vin?.trim().toUpperCase() || '1FUJGLDR5MLKE9999',
-        makeModel: 'FREIGHTLINER Cascadia 2023',
-        nhtsaCampaign: '24V-410',
-        recallDetails: 'ECM WIRING HARNESS SHORT',
+        organization_id: userProfile.organization_id,
+        make_model: 'FREIGHTLINER Cascadia 2023',
+        nhtsa_campaign: '24V-410',
+        recall_details: 'ECM WIRING HARNESS SHORT',
         description: 'Chafing along frame rail harness can result in engine shutdown.',
-        remedyStatus: 'Unassigned',
-        complianceStatus: 'OPEN',
-        severity: 'CRITICAL',
+        remedy_status: 'Unassigned',
+        compliance_status: 'OPEN',
+        severity: 'CRITICAL'
       };
     });
 
-    setRecallUnits([...parsedUnits, ...recallUnits]);
-    setBulkCsvText('');
-    setIsBulkImportOpen(false);
-    alert(`🚀 Processed ${parsedUnits.length} fleet units via Bulk CSV Import.`);
+    const { error } = await supabase.from('vins').insert(recordsToInsert);
+
+    if (error) {
+      alert(`Bulk import error: ${error.message}`);
+    } else {
+      setBulkCsvText('');
+      setIsBulkImportOpen(false);
+      fetchFleetData(); // Refresh list from Supabase
+      alert(`🚀 Imported and audited ${recordsToInsert.length} fleet units!`);
+    }
   };
 
   const handleExportRiskCertificate = () => {
@@ -190,24 +197,37 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
   const handleShareAuditLink = () => {
     requireProAccess('Underwriter Live Audit Link Sharing', () => {
-      const shareUrl = `${window.location.origin}/audit/demo`;
+      const shareUrl = `${window.location.origin}/audit/${userProfile?.organization_id || 'demo'}`;
       navigator.clipboard.writeText(shareUrl);
       alert(`🔗 Live Broker Audit URL copied to clipboard:\n${shareUrl}`);
     });
   };
 
-  const handleUpdateStatus = (id: string, newStatus: 'OPEN' | 'SCHEDULED' | 'CLEARED') => {
+  const handleUpdateStatus = async (id: string, newStatus: 'OPEN' | 'SCHEDULED' | 'CLEARED') => {
+    const remedy = newStatus === 'CLEARED' ? 'Completed' : newStatus === 'SCHEDULED' ? 'Scheduled' : 'Unassigned';
+
+    // Update state locally for quick responsiveness
     setRecallUnits((prev) =>
       prev.map((unit) =>
         unit.id === id
-          ? {
-              ...unit,
-              complianceStatus: newStatus,
-              remedyStatus: newStatus === 'CLEARED' ? 'Completed' : newStatus === 'SCHEDULED' ? 'Scheduled' : 'Unassigned',
-            }
+          ? { ...unit, complianceStatus: newStatus, remedyStatus: remedy }
           : unit
       )
     );
+
+    // Persist status update to Supabase
+    const { error } = await supabase
+      .from('vins')
+      .update({
+        compliance_status: newStatus,
+        remedy_status: remedy
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error persisting compliance update:', error);
+    }
+
     setSelectedUnitForManage(null);
   };
 
@@ -311,6 +331,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             <option value="KENWORTH">Kenworth</option>
             <option value="PETERBILT">Peterbilt</option>
             <option value="CHEVROLET">Chevrolet</option>
+            <option value="VOLVO">Volvo</option>
           </select>
 
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
@@ -373,10 +394,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-              {filteredUnits.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500 font-mono">
-                    No matching recall campaigns found.
+                  <td colSpan={6} className="py-12 text-center text-slate-400 font-mono">
+                    <span className="animate-pulse">Loading live fleet safety records from Supabase...</span>
+                  </td>
+                </tr>
+              ) : filteredUnits.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-500 font-mono">
+                    <p className="text-slate-300 font-bold mb-1">No active fleet safety campaigns found.</p>
+                    <p className="text-xs text-slate-500">
+                      Use <span className="text-cyan-400">Single-VIN Scan</span> or <span className="text-cyan-400">Bulk CSV Import</span> to register fleet vehicles.
+                    </p>
                   </td>
                 </tr>
               ) : (
