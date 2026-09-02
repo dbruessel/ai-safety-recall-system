@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { FleetVinScanner } from './fleetscanner'; // Adjust path if fleetscanner sits in another folder
+import { FleetVinScanner } from './FleetVinScanner'; // Adjust path if fleetscanner sits in another folder
 
 interface TaskBoardProps {
   userTier?: string;
