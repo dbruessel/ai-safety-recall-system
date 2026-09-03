@@ -220,7 +220,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   {copiedState
                     ? '✓ Link Copied!'
                     : isBrokerPortal
-                    ? '🔗 Share Fleet Onboarding Link'
+                    ? '🔗 Share Client Onboarding Link'
                     : '🔗 Share Live Underwriter Link'}
                 </span>
                 <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
@@ -240,7 +240,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   {downloadingState
                     ? '⏳ Exporting PDF...'
                     : isBrokerPortal
-                    ? '📄 Export Portfolio Audit (PDF)'
+                    ? '📄 Export Portfolio Audit PDF'
                     : '📄 Export Loss Control PDF'}
                 </span>
                 <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
