@@ -201,10 +201,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             )}
 
-            {/* UNDERWRITER QUICK TOOLS */}
+            {/* UNDERWRITER & INSURANCE QUICK TOOLS */}
             <div className="space-y-1 border-t border-slate-800/80 pt-2">
               <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">
-                Underwriter Quick Tools
+                Underwriter &amp; Insurance Quick Tools
               </p>
               
               <button
@@ -220,8 +220,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   {copiedState
                     ? '✓ Link Copied!'
                     : isBrokerPortal
-                    ? '🔗 Share Onboarding Link'
-                    : '🔗 Copy Underwriter Share Link'}
+                    ? '🔗 Share Fleet Onboarding Link'
+                    : '🔗 Share Live Underwriter Link'}
                 </span>
                 <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
               </button>
@@ -241,7 +241,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                     ? '⏳ Exporting PDF...'
                     : isBrokerPortal
                     ? '📄 Export Portfolio Audit (PDF)'
-                    : '📄 Download Risk Certificate'}
+                    : '📄 Export Loss Control PDF'}
                 </span>
                 <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
               </button>
