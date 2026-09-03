@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 export interface BrokerShareModalProps {
   isOpen: boolean;
-  userTier: string;
+  userTier?: string;
   shareUrl: string;
   onClose: () => void;
   onUpgrade?: () => void;
@@ -19,7 +19,9 @@ export const BrokerShareModal: React.FC<BrokerShareModalProps> = ({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
@@ -29,67 +31,62 @@ export const BrokerShareModal: React.FC<BrokerShareModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#0B101D] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 text-slate-100 font-sans relative">
+      <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 font-mono text-slate-100 relative">
         
         {/* MODAL HEADER */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#06B6D4]/10 border border-[#06B6D4]/30 flex items-center justify-center text-[#06B6D4]">
-              🛡️
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white font-mono tracking-tight">
-                Underwriter Audit Link
-              </h3>
-              <p className="text-xs text-slate-400">
-                Share verifiable recall compliance with insurance carriers.
-              </p>
-            </div>
+        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-cyan-400 text-base">🔗</span>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+              Share Live Underwriter Audit Portal
+            </h3>
           </div>
-          <button
+          <button 
             type="button"
-            onClick={onClose}
+            onClick={onClose} 
             className="text-slate-400 hover:text-white transition p-1 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
+        {/* BENEFIT-DRIVEN SUBTEXT */}
+        <p className="text-xs text-slate-300 leading-relaxed font-sans">
+          Send this live link to your commercial insurance broker or underwriter to verify active recall resolution and qualify for loss-control premium discounts.
+        </p>
+
         {/* LINK COPY CONTAINER */}
-        <div className="space-y-2">
-          <label className="block text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
-            Read-Only Audit URL
+        <div className="p-3 bg-[#070B14] border border-slate-800 rounded-xl space-y-2">
+          <label className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+            Live Read-Only Audit URL
           </label>
           <div className="flex items-center gap-2">
             <input
               type="text"
               readOnly
               value={shareUrl}
-              className="flex-1 bg-[#070B14] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-300 font-mono focus:outline-none select-all overflow-hidden text-ellipsis whitespace-nowrap"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-cyan-400 focus:outline-none font-mono truncate select-all"
             />
             <button
               type="button"
               onClick={handleCopy}
-              className={`px-4 py-2.5 text-xs font-bold font-mono rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 copied
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/10'
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                  : 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950'
               }`}
             >
-              {copied ? '✓ Copied!' : '📋 Copy'}
+              {copied ? '✓ Copied!' : '📋 Copy Link'}
             </button>
           </div>
-          <p className="text-[11px] text-slate-500 font-mono mt-1">
-            Anyone with this secure link can view your real-time compliance status without logging in.
-          </p>
         </div>
 
         {/* FOOTER CLOSE ACTION */}
-        <div className="pt-2 border-t border-slate-800/80 flex justify-end">
+        <div className="flex justify-end pt-2 border-t border-slate-800">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg cursor-pointer border border-slate-700"
           >
             Done
           </button>
