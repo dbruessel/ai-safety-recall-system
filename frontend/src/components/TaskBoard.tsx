@@ -41,8 +41,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
   const [selectedUnitForManage, setSelectedUnitForManage] = useState<RecallItem | null>(null);
 
-  // Form Inputs
+  // Form Inputs & UI State Feedback Controls
   const [singleVinInput, setSingleVinInput] = useState<string>('');
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [exportState, setExportState] = useState<'idle' | 'generating' | 'done'>('idle');
 
   // --- DYNAMIC TIER VIN LIMIT COMPUTATION ---
   const displayLimit = useMemo(() => {
@@ -94,7 +96,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       }
     } catch (err) {
       console.error('Unexpected error loading fleet records:', err);
-    } finally {
+    } font-mono finally {
       setLoading(false);
     }
   }, [userProfile?.organization_id]);
@@ -156,26 +158,63 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       .select();
 
     if (error) {
-      alert(`Error scanning VIN: ${error.message}`);
+      console.error('Error scanning VIN:', error.message);
     } else {
       setSingleVinInput('');
       setIsSingleScanOpen(false);
       fetchFleetData();
-      alert(`✅ VIN ${vinToScan} scanned and saved to database!`);
     }
   };
 
+  // Sleek Non-Blocking PDF Export via FastAPI Backend Engine
   const handleExportRiskCertificate = () => {
-    requireProAccess('Underwriter Risk Certificate Export', () => {
-      alert('📄 Generating Official Underwriter Risk Certificate (PDF)...\n\nDocument details verified: Compliance cleared, active campaign liability status logged.');
+    requireProAccess('Underwriter Risk Certificate Export', async () => {
+      setExportState('generating');
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+        const targetFleetId = userProfile?.organization_id || 'demo-fleet-001';
+
+        const response = await fetch(
+          `${apiBaseUrl}/api/broker/compliance-report/${targetFleetId}/pdf?broker_name=RecallLogic%20Partner%20Brokerage`,
+          { method: 'GET' }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Server returned status ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `RecallLogic_Risk_Certificate_${targetFleetId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        setExportState('done');
+        setTimeout(() => setExportState('idle'), 3000);
+      } catch (err) {
+        console.error('Failed to download fleet risk certificate:', err);
+        setExportState('idle');
+      }
     });
   };
 
+  // Clean Non-Blocking Inline Clipboard Handler
   const handleShareAuditLink = () => {
     requireProAccess('Underwriter Live Audit Link Sharing', () => {
-      const shareUrl = `${window.location.origin}/audit/${userProfile?.organization_id || 'demo'}`;
-      navigator.clipboard.writeText(shareUrl);
-      alert(`🔗 Live Broker Audit URL copied to clipboard:\n${shareUrl}`);
+      const fleetId = userProfile?.organization_id || 'demo-fleet-001';
+      const auditUrl = `${window.location.origin}/audit/${fleetId}`;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(auditUrl);
+      }
+
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
     });
   };
 
@@ -232,6 +271,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         {/* TOP TOOLBAR BUTTONS */}
         <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={() => requireProAccess('Single-VIN Scan', () => setIsSingleScanOpen(true))}
             className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
               isPro
@@ -244,6 +284,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           </button>
 
           <button
+            type="button"
             onClick={() => requireProAccess('Bulk CSV Import', () => setIsBulkImportOpen(true))}
             className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
               isPro
@@ -255,28 +296,49 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             ⚡ Bulk CSV Import
           </button>
 
+          {/* INLINE SHARE AUDIT LINK BUTTON */}
           <button
+            type="button"
             onClick={handleShareAuditLink}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all border ${
               isPro
-                ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer'
-                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                ? copiedLink
+                  ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 cursor-pointer'
+                  : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700 cursor-pointer'
+                : 'bg-slate-900 text-slate-500 border-slate-800 cursor-not-allowed'
             }`}
           >
             {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            ⚡ Share Audit Link
+            {copiedLink ? (
+              <>
+                <span>✓</span> Link Copied!
+              </>
+            ) : (
+              <>
+                <span className="text-cyan-400">⚡</span> Share Audit Link
+              </>
+            )}
           </button>
 
+          {/* EXPORT RISK CERTIFICATE BUTTON */}
           <button
+            type="button"
             onClick={handleExportRiskCertificate}
+            disabled={exportState === 'generating'}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
               isPro
-                ? 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 cursor-pointer shadow-lg shadow-cyan-950/50'
+                ? exportState === 'generating'
+                  ? 'bg-cyan-950 border border-cyan-500/50 text-cyan-400 animate-pulse'
+                  : exportState === 'done'
+                  ? 'bg-emerald-500 border border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
+                  : 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 cursor-pointer shadow-lg shadow-cyan-950/50'
                 : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
             }`}
           >
             {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            📄 Export Risk Certificate
+            {exportState === 'generating' && <span>⏳ Generating Certificate...</span>}
+            {exportState === 'done' && <span>✓ Certificate Exported!</span>}
+            {exportState === 'idle' && <span>📄 Export Risk Certificate</span>}
           </button>
         </div>
       </div>
@@ -297,7 +359,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           <select
             value={selectedMake}
             onChange={(e) => setSelectedMake(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-cyan-500"
+            className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
           >
             <option value="ALL">All Makes</option>
             <option value="FREIGHTLINER">Freightliner</option>
@@ -311,7 +373,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all ${
+              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
                 activeTab === 'all'
                   ? 'bg-cyan-950 border border-cyan-500/50 text-[#06B6D4] font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -321,7 +383,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             </button>
             <button
               onClick={() => setActiveTab('open')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all ${
+              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
                 activeTab === 'open'
                   ? 'bg-red-950 border border-red-500/50 text-red-400 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -331,7 +393,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             </button>
             <button
               onClick={() => setActiveTab('scheduled')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all ${
+              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
                 activeTab === 'scheduled'
                   ? 'bg-amber-950 border border-amber-500/50 text-amber-400 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -341,7 +403,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             </button>
             <button
               onClick={() => setActiveTab('cleared')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all ${
+              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
                 activeTab === 'cleared'
                   ? 'bg-emerald-950 border border-emerald-500/50 text-emerald-400 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -438,7 +500,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">⚡ Single-VIN Scan</h3>
-              <button onClick={() => setIsSingleScanOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setIsSingleScanOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleSingleScanSubmit} className="space-y-4">
               <div>
@@ -454,8 +516,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button type="button" onClick={() => setIsSingleScanOpen(false)} className="px-4 py-2 bg-slate-800 text-xs rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg">Run NHTSA Audit</button>
+                <button type="button" onClick={() => setIsSingleScanOpen(false)} className="px-4 py-2 bg-slate-800 text-xs rounded-lg cursor-pointer">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg cursor-pointer">Run NHTSA Audit</button>
               </div>
             </form>
           </div>
@@ -492,7 +554,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                 Manage Remedy — {selectedUnitForManage.unit}
               </h3>
-              <button onClick={() => setSelectedUnitForManage(null)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setSelectedUnitForManage(null)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
             </div>
             <div className="space-y-2 text-xs text-slate-300">
               <p><span className="text-slate-500">VIN:</span> {selectedUnitForManage.vin}</p>
@@ -504,19 +566,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'OPEN')}
-                  className="py-2 bg-red-950 border border-red-800 text-red-400 text-xs font-bold rounded"
+                  className="py-2 bg-red-950 border border-red-800 text-red-400 text-xs font-bold rounded cursor-pointer"
                 >
                   Mark OPEN
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'SCHEDULED')}
-                  className="py-2 bg-amber-950 border border-amber-800 text-amber-400 text-xs font-bold rounded"
+                  className="py-2 bg-amber-950 border border-amber-800 text-amber-400 text-xs font-bold rounded cursor-pointer"
                 >
                   SCHEDULED
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'CLEARED')}
-                  className="py-2 bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold rounded"
+                  className="py-2 bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold rounded cursor-pointer"
                 >
                   CLEARED
                 </button>
