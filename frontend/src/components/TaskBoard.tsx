@@ -96,7 +96,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       }
     } catch (err) {
       console.error('Unexpected error loading fleet records:', err);
-    } font-mono finally {
+    } finally {
       setLoading(false);
     }
   }, [userProfile?.organization_id]);
