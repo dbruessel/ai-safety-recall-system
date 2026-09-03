@@ -168,7 +168,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
   // Sleek Non-Blocking PDF Export via FastAPI Backend Engine
   const handleExportRiskCertificate = () => {
-    requireProAccess('Underwriter Risk Certificate Export', async () => {
+    requireProAccess('Export Loss Control PDF', async () => {
       setExportState('generating');
       try {
         const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
@@ -187,7 +187,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `RecallLogic_Risk_Certificate_${targetFleetId}.pdf`;
+        link.download = `RecallLogic_Loss_Control_Certificate_${targetFleetId}.pdf`;
         document.body.appendChild(link);
         link.click();
 
@@ -197,7 +197,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         setExportState('done');
         setTimeout(() => setExportState('idle'), 3000);
       } catch (err) {
-        console.error('Failed to download fleet risk certificate:', err);
+        console.error('Failed to download fleet loss control certificate:', err);
         setExportState('idle');
       }
     });
@@ -205,7 +205,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
   // Clean Non-Blocking Inline Clipboard Handler
   const handleShareAuditLink = () => {
-    requireProAccess('Underwriter Live Audit Link Sharing', () => {
+    requireProAccess('Share Live Underwriter Link', () => {
       const fleetId = userProfile?.organization_id || 'demo-fleet-001';
       const auditUrl = `${window.location.origin}/audit/${fleetId}`;
 
@@ -268,7 +268,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           </p>
         </div>
 
-        {/* TOP TOOLBAR BUTTONS */}
+        {/* TOP TOOLBAR BUTTONS WITH UNIFIED MESSAGING */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -300,6 +300,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           <button
             type="button"
             onClick={handleShareAuditLink}
+            title="Copy a read-only live safety audit link for your insurance broker or underwriter"
             className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all border ${
               isPro
                 ? copiedLink
@@ -311,11 +312,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
             {copiedLink ? (
               <>
-                <span>✓</span> Link Copied!
+                <span>✓</span> Live Link Copied!
               </>
             ) : (
               <>
-                <span className="text-cyan-400">⚡</span> Share Audit Link
+                <span className="text-cyan-400">⚡</span> Share Live Underwriter Link
               </>
             )}
           </button>
@@ -325,6 +326,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             type="button"
             onClick={handleExportRiskCertificate}
             disabled={exportState === 'generating'}
+            title="Download official PDF Risk Audit Certificate for policy renewal discount verification"
             className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
               isPro
                 ? exportState === 'generating'
@@ -336,9 +338,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             }`}
           >
             {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            {exportState === 'generating' && <span>⏳ Generating Certificate...</span>}
-            {exportState === 'done' && <span>✓ Certificate Exported!</span>}
-            {exportState === 'idle' && <span>📄 Export Risk Certificate</span>}
+            {exportState === 'generating' && <span>⏳ Generating PDF...</span>}
+            {exportState === 'done' && <span>✓ Loss Control PDF Exported!</span>}
+            {exportState === 'idle' && <span>📄 Export Loss Control PDF</span>}
           </button>
         </div>
       </div>
