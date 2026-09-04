@@ -37,7 +37,8 @@ const MainApp: React.FC = () => {
   // Track direct URL subpaths for broker/demo views
   const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
 
-  const isBrokerUser = userProfile?.is_broker || userRole === 'broker' || isDemoPath;
+  // Robust broker check: rely on userProfile.is_broker boolean or role/path
+  const isBrokerUser = Boolean(userProfile?.is_broker) || userRole === 'broker' || isDemoPath;
 
   // Handle URL parameter inspection for client audits (?org=demo-org-1) or broker route
   useEffect(() => {
