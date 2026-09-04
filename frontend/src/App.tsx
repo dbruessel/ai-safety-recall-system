@@ -252,10 +252,10 @@ const MainApp: React.FC = () => {
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                 {/* ROLE-BASED HEADER INDICATOR */}
                 {isBrokerUser ? (
-                  /* BROKER PERSONA: Clean dedicated indicator badge */
+                  /* PURE BROKER PERSONA: Clean single badge without confusing dual toggle */
                   <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
                     <span>🏛️</span>
-                    <span>Brokerage Command Center</span>
+                    <span>Brokerage Portfolio</span>
                   </div>
                 ) : (
                   /* FLEET PERSONA: Standard Workspace Toggle */
@@ -284,12 +284,13 @@ const MainApp: React.FC = () => {
               </div>
             </header>
 
-            {/* CLIENT AUDIT READ-ONLY BREADCRUMB BANNER */}
+            {/* ACTIVE CLIENT AUDIT BREADCRUMB BANNER */}
             {auditingFleetId && (
               <div className="bg-cyan-950/90 border-b border-cyan-500/40 px-6 py-2.5 flex justify-between items-center text-xs font-mono text-cyan-300 font-bold">
                 <div className="flex items-center gap-2">
-                  <span>🛡️</span>
-                  <span>Auditing Client Fleet: <strong className="text-white uppercase">{auditingFleetId}</strong> [Read-Only Mode]</span>
+                  <span>🏛️ Portfolio Command</span>
+                  <span className="text-slate-500">&gt;</span>
+                  <span>🚚 Auditing: <strong className="text-white uppercase">{auditingFleetId}</strong> [Read-Only Mode]</span>
                 </div>
                 <button
                   onClick={() => {
@@ -299,7 +300,7 @@ const MainApp: React.FC = () => {
                   }}
                   className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
                 >
-                  ← Back to Broker Command
+                  ← Back to Portfolio Command
                 </button>
               </div>
             )}
