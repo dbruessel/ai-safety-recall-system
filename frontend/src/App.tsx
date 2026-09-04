@@ -154,70 +154,32 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Handlers for AccountMenu quick tools (Context Aware)
+  // Handlers for Fleet AccountMenu quick tools
   const handleCopyUnderwriterLink = () => {
-    if (isBrokerUser && !auditingFleetId) {
-      const brokerId = userProfile?.brokerage_id || 'demo-broker';
-      const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(inviteUrl);
-      }
-    } else {
-      setIsShareModalOpen(true);
-    }
+    setIsShareModalOpen(true);
   };
 
   const handleDownloadRiskCard = async () => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const fleetId = auditingFleetId || userProfile?.organization_id || 'demo-fleet-001';
 
-      if (isBrokerUser && !auditingFleetId) {
-        // 🏢 Export Multi-Fleet Portfolio Audit PDF
-        const response = await fetch(`${apiBaseUrl}/api/broker/portfolio-audit/pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            broker_name: userProfile?.company_name || companyName || 'RecallLogic Partner Brokerage',
-            fleets: [
-              { organization_id: 'demo-org-1', fleet_name: 'Apex Logistics & Freight', subscription_tier: 'Enterprise', total_vins: 142, open_recalls: 3, scheduled_recalls: 5, cleared_recalls: 134, safety_score: 82 },
-              { organization_id: 'demo-org-2', fleet_name: 'Summit Regional Transport', subscription_tier: 'Professional', total_vins: 68, open_recalls: 0, scheduled_recalls: 2, cleared_recalls: 66, safety_score: 98 },
-              { organization_id: 'demo-org-3', fleet_name: 'Titan Heavy Hauling Co.', subscription_tier: 'Professional', total_vins: 210, open_recalls: 14, scheduled_recalls: 8, cleared_recalls: 188, safety_score: 58 },
-              { organization_id: 'demo-org-4', fleet_name: 'Metro Last-Mile Delivery', subscription_tier: 'Standard', total_vins: 45, open_recalls: 1, scheduled_recalls: 1, cleared_recalls: 43, safety_score: 90 },
-            ],
-          }),
-        });
+      const response = await fetch(
+        `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
+        { method: 'GET' }
+      );
 
-        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
 
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `RecallLogic_Portfolio_Audit_${new Date().toISOString().slice(0, 10)}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else {
-        // 🚚 Export Single-Fleet Compliance Risk Certificate PDF
-        const fleetId = auditingFleetId || userProfile?.organization_id || 'demo-fleet-001';
-        const response = await fetch(
-          `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
-          { method: 'GET' }
-        );
-
-        if (!response.ok) throw new Error(`Server returned ${response.status}`);
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `RecallLogic_Loss_Control_Certificate_${fleetId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `RecallLogic_Loss_Control_Certificate_${fleetId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to export compliance PDF from account menu:', err);
     }
@@ -251,37 +213,60 @@ const MainApp: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {/* ROLE-BASED HEADER INDICATOR */}
+                {/* ROLE-BASED HEADER INDICATOR & SESSION CONTROL */}
                 {isBrokerUser ? (
-                  /* PURE BROKER PERSONA: Clean single badge without confusing dual toggle */
-                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
-                    <span>🏛️</span>
-                    <span>Brokerage Portfolio</span>
-                  </div>
-                ) : (
-                  /* FLEET PERSONA: Standard Workspace Toggle */
-                  <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
+                  /* STREAMLINED BROKER PERSONA: Single Portfolio Badge + Direct Sign Out */
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
+                      <span>🏛️</span>
+                      <span>Brokerage Portfolio</span>
+                    </div>
+
+                    <div className="hidden sm:block bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 font-mono text-xs text-right">
+                      <p className="font-bold text-white truncate max-w-[160px]">
+                        {companyName || userProfile?.company_name || 'Apex Risk Brokers'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate max-w-[160px]">
+                        {user?.email || 'broker_demo@recalllogic.ai'}
+                      </p>
+                    </div>
+
                     <button
-                      onClick={() => setActiveView('workspace')}
-                      className="px-3 py-1 rounded bg-slate-800 text-white font-bold transition-all cursor-pointer"
+                      type="button"
+                      onClick={signOut}
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-rose-500/10 text-slate-300 hover:text-rose-400 border border-slate-800 hover:border-rose-500/30 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1"
+                      title="Sign Out"
                     >
-                      Fleet Workspace
+                      <span>Sign Out</span>
+                      <span>🚪</span>
                     </button>
                   </div>
-                )}
+                ) : (
+                  /* STANDARD FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
+                  <>
+                    <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
+                      <button
+                        onClick={() => setActiveView('workspace')}
+                        className="px-3 py-1 rounded bg-slate-800 text-white font-bold transition-all cursor-pointer"
+                      >
+                        Fleet Workspace
+                      </button>
+                    </div>
 
-                <AccountMenu
-                  userEmail={user?.email || 'broker_demo@recalllogic.ai'}
-                  orgName={getUserOrgName()}
-                  userRole={(userRole || 'admin') as any}
-                  subscriptionTier={effectiveTier as any}
-                  isBrokerPortal={isBrokerUser && activeView === 'broker_portal' && !auditingFleetId}
-                  onOpenTeamModal={() => setActiveAdminModal('team')}
-                  onOpenUpgradeModal={() => setActiveAdminModal('billing')}
-                  onCopyUnderwriterLink={handleCopyUnderwriterLink}
-                  onDownloadRiskCard={handleDownloadRiskCard}
-                  onSignOut={signOut}
-                />
+                    <AccountMenu
+                      userEmail={user?.email || 'admin@fleet.com'}
+                      orgName={getUserOrgName()}
+                      userRole={(userRole || 'admin') as any}
+                      subscriptionTier={effectiveTier as any}
+                      isBrokerPortal={false}
+                      onOpenTeamModal={() => setActiveAdminModal('team')}
+                      onOpenUpgradeModal={() => setActiveAdminModal('billing')}
+                      onCopyUnderwriterLink={handleCopyUnderwriterLink}
+                      onDownloadRiskCard={handleDownloadRiskCard}
+                      onSignOut={signOut}
+                    />
+                  </>
+                )}
               </div>
             </header>
 
