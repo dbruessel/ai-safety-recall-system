@@ -90,8 +90,7 @@ const MainApp: React.FC = () => {
           }
         } catch (err) {
           console.error('⚠️ Post-checkout Supabase sync failed:', err);
-        } font
-        finally {
+        } finally {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -253,7 +252,7 @@ const MainApp: React.FC = () => {
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                 {/* ROLE-BASED HEADER INDICATOR */}
                 {isBrokerUser ? (
-                  /* BROKER PERSONA: Clean dedicated indicator badge (No confusing Fleet toggle) */
+                  /* BROKER PERSONA: Clean dedicated indicator badge */
                   <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
                     <span>🏛️</span>
                     <span>Brokerage Command Center</span>
