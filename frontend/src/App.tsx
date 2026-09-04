@@ -27,6 +27,9 @@ const MainApp: React.FC = () => {
     return (path.includes('/audit/demo') || path.includes('/broker')) ? 'broker_portal' : 'workspace';
   });
 
+  // Track client fleet auditing drill-down
+  const [auditingFleetId, setAuditingFleetId] = useState<string | null>(null);
+
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
@@ -34,15 +37,24 @@ const MainApp: React.FC = () => {
   // Track direct URL subpaths for broker/demo views
   const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
 
+  const isBrokerUser = userProfile?.is_broker || userRole === 'broker' || isDemoPath;
+
+  // Handle URL parameter inspection for client audits (?org=demo-org-1) or broker route
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
-    if (path.includes('/audit/demo') || path.includes('/audit/share') || path.includes('/broker')) {
+    const params = new URLSearchParams(window.location.search);
+    const auditedOrg = params.get('org');
+
+    if (auditedOrg) {
+      setAuditingFleetId(auditedOrg);
+      setActiveView('workspace');
+    } else if (path.includes('/audit/demo') || path.includes('/audit/share') || path.includes('/broker')) {
       setIsDemoPath(true);
-      if (path.includes('/audit/demo') || path.includes('/broker')) {
-        setActiveView('broker_portal');
-      }
+      setActiveView('broker_portal');
+    } else if (isBrokerUser) {
+      setActiveView('broker_portal');
     }
-  }, []);
+  }, [isBrokerUser]);
 
   // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
   useEffect(() => {
@@ -78,7 +90,8 @@ const MainApp: React.FC = () => {
           }
         } catch (err) {
           console.error('⚠️ Post-checkout Supabase sync failed:', err);
-        } finally {
+        } font
+        finally {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -143,8 +156,7 @@ const MainApp: React.FC = () => {
 
   // Handlers for AccountMenu quick tools (Context Aware)
   const handleCopyUnderwriterLink = () => {
-    const isBroker = activeView === 'broker_portal' || isDemoPath;
-    if (isBroker) {
+    if (isBrokerUser && !auditingFleetId) {
       const brokerId = userProfile?.brokerage_id || 'demo-broker';
       const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerId}`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -158,9 +170,8 @@ const MainApp: React.FC = () => {
   const handleDownloadRiskCard = async () => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-      const isBroker = activeView === 'broker_portal' || isDemoPath;
 
-      if (isBroker) {
+      if (isBrokerUser && !auditingFleetId) {
         // 🏢 Export Multi-Fleet Portfolio Audit PDF
         const response = await fetch(`${apiBaseUrl}/api/broker/portfolio-audit/pdf`, {
           method: 'POST',
@@ -189,7 +200,7 @@ const MainApp: React.FC = () => {
         window.URL.revokeObjectURL(url);
       } else {
         // 🚚 Export Single-Fleet Compliance Risk Certificate PDF
-        const fleetId = userProfile?.organization_id || 'demo-fleet-001';
+        const fleetId = auditingFleetId || userProfile?.organization_id || 'demo-fleet-001';
         const response = await fetch(
           `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
           { method: 'GET' }
@@ -201,7 +212,7 @@ const MainApp: React.FC = () => {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `RecallLogic_Risk_Certificate_${fleetId}.pdf`;
+        link.download = `RecallLogic_Loss_Control_Certificate_${fleetId}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -221,8 +232,9 @@ const MainApp: React.FC = () => {
             onSelectTier={(tierId) => handleCheckout(tierId)}
           />
         ) : (
-          <div className="py-6">
-            <header className="px-6 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/80 pb-4 gap-4">
+          <div>
+            {/* TOP GLOBAL HEADER */}
+            <header className="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/80 gap-4">
               <div className="flex items-center gap-3">
                 <img 
                   src="/recall-logo.png" 
@@ -239,27 +251,21 @@ const MainApp: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {(userProfile?.is_broker || isDemoPath) && (
+                {/* ROLE-BASED HEADER INDICATOR */}
+                {isBrokerUser ? (
+                  /* BROKER PERSONA: Clean dedicated indicator badge (No confusing Fleet toggle) */
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
+                    <span>🏛️</span>
+                    <span>Brokerage Command Center</span>
+                  </div>
+                ) : (
+                  /* FLEET PERSONA: Standard Workspace Toggle */
                   <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
                     <button
                       onClick={() => setActiveView('workspace')}
-                      className={`px-3 py-1 rounded transition-all cursor-pointer ${
-                        activeView === 'workspace'
-                          ? 'bg-slate-800 text-white font-bold'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
+                      className="px-3 py-1 rounded bg-slate-800 text-white font-bold transition-all cursor-pointer"
                     >
                       Fleet Workspace
-                    </button>
-                    <button
-                      onClick={() => setActiveView('broker_portal')}
-                      className={`px-3 py-1 rounded transition-all cursor-pointer flex items-center gap-1 ${
-                        activeView === 'broker_portal'
-                          ? 'bg-cyan-950 border border-cyan-500/50 text-[#06B6D4] font-bold'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      🏢 Broker Command
                     </button>
                   </div>
                 )}
@@ -269,7 +275,7 @@ const MainApp: React.FC = () => {
                   orgName={getUserOrgName()}
                   userRole={(userRole || 'admin') as any}
                   subscriptionTier={effectiveTier as any}
-                  isBrokerPortal={activeView === 'broker_portal' || isDemoPath}
+                  isBrokerPortal={isBrokerUser && activeView === 'broker_portal' && !auditingFleetId}
                   onOpenTeamModal={() => setActiveAdminModal('team')}
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
@@ -279,11 +285,34 @@ const MainApp: React.FC = () => {
               </div>
             </header>
 
-            {activeView === 'broker_portal' || (isDemoPath && !window.location.pathname.includes('/audit/share')) ? (
-              <BrokerPortal />
-            ) : (
-              <TaskBoard userTier={effectiveTier} />
+            {/* CLIENT AUDIT READ-ONLY BREADCRUMB BANNER */}
+            {auditingFleetId && (
+              <div className="bg-cyan-950/90 border-b border-cyan-500/40 px-6 py-2.5 flex justify-between items-center text-xs font-mono text-cyan-300 font-bold">
+                <div className="flex items-center gap-2">
+                  <span>🛡️</span>
+                  <span>Auditing Client Fleet: <strong className="text-white uppercase">{auditingFleetId}</strong> [Read-Only Mode]</span>
+                </div>
+                <button
+                  onClick={() => {
+                    window.history.pushState({}, '', window.location.pathname);
+                    setAuditingFleetId(null);
+                    setActiveView('broker_portal');
+                  }}
+                  className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
+                >
+                  ← Back to Broker Command
+                </button>
+              </div>
             )}
+
+            {/* MAIN CONTENT ROUTER */}
+            <div className="py-6">
+              {activeView === 'broker_portal' && !auditingFleetId ? (
+                <BrokerPortal />
+              ) : (
+                <TaskBoard userTier={effectiveTier} />
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -330,7 +359,7 @@ const MainApp: React.FC = () => {
       <BrokerShareModal
         isOpen={isShareModalOpen}
         userTier={effectiveTier}
-        shareUrl={`${window.location.origin}/audit/demo`}
+        shareUrl={`${window.location.origin}/audit/${userProfile?.organization_id || 'demo-fleet-001'}`}
         onClose={() => setIsShareModalOpen(false)}
       />
 
