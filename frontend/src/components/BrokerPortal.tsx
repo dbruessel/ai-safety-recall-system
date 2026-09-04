@@ -20,6 +20,9 @@ export const BrokerPortal: React.FC = () => {
   const [copiedInvite, setCopiedInvite] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  // Dynamic Brokerage Brand Name
+  const brokerBrandName = userProfile?.company_name || companyName || 'Partner Brokerage';
+
   // FETCH MANAGED FLEETS FOR BROKER BOOK-OF-BUSINESS
   useEffect(() => {
     async function fetchBrokerFleets() {
@@ -86,7 +89,7 @@ export const BrokerPortal: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          broker_name: userProfile?.company_name || companyName || 'RecallLogic Partner Brokerage',
+          broker_name: brokerBrandName,
           fleets: fleets,
         }),
       });
@@ -97,7 +100,7 @@ export const BrokerPortal: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RecallLogic_Portfolio_Audit_${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.download = `${brokerBrandName.replace(/\s+/g, '_')}_Portfolio_Audit_${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(link);
       link.click();
 
@@ -122,7 +125,7 @@ export const BrokerPortal: React.FC = () => {
       <div className="bg-[#0D1322] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="text-xs text-slate-300 flex items-center gap-2">
           <span className="text-amber-400">⚡</span>
-          <span>Interactive Demo View: Displaying sample commercial fleet accounts &amp; live loss metrics.</span>
+          <span>Interactive Demo View: Displaying sample commercial fleet accounts &amp; live loss metrics for <strong className="text-white">{brokerBrandName}</strong>.</span>
         </div>
 
         <button
@@ -133,33 +136,43 @@ export const BrokerPortal: React.FC = () => {
               ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
               : 'bg-[#06B6D4] hover:bg-cyan-400 border-cyan-500 text-slate-950 shadow-lg shadow-cyan-950/50'
           }`}
-          title="Copy co-branded referral URL to onboard new commercial fleet clients"
+          title={`Copy co-branded ${brokerBrandName} referral URL to onboard new commercial fleet clients`}
         >
           {copiedInvite ? <span>✓ Link Copied!</span> : <span>🔗 Share Client Onboarding Link</span>}
         </button>
       </div>
 
-      {/* PORTFOLIO COMMAND HEADER & PDF EXPORT */}
-      <div className="bg-[#0D1322] p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-xl font-extrabold text-white tracking-wide flex items-center gap-2">
-            <span>🏢</span> Broker Portfolio Command
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Book-of-business loss control tracking, risk scoring, and underwriter compliance audits.
-          </p>
+      {/* CO-BRANDED PORTFOLIO COMMAND HEADER */}
+      <div className="bg-[#0D1322] p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-cyan-950/80 border border-cyan-500/30 rounded-xl text-cyan-400 text-xl">
+            🏛️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-extrabold text-white tracking-wide">
+                {brokerBrandName}
+              </h1>
+              <span className="bg-cyan-950 text-cyan-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-cyan-500/30">
+                PORTFOLIO COMMAND
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Co-branded book-of-business loss control tracking, risk scoring, and underwriter compliance audits managed by <strong className="text-slate-300">{brokerBrandName}</strong>.
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={handleExportPortfolioPDF}
           disabled={isExporting}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border ${
+          className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
             isExporting
               ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
           }`}
-          title="Export consolidated book-of-business audit PDF for carrier underwriters"
+          title={`Export consolidated ${brokerBrandName} loss-control audit PDF for carrier underwriters`}
         >
           {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
         </button>
@@ -190,11 +203,18 @@ export const BrokerPortal: React.FC = () => {
 
       {/* MANAGED FLEET GRID */}
       <div className="space-y-3">
-        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commercial Fleet Accounts</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            {brokerBrandName} — Client Accounts
+          </h2>
+          <span className="text-[11px] text-slate-500">
+            Click any account to audit client workspace
+          </span>
+        </div>
 
         {loading ? (
           <div className="p-12 text-center text-slate-400 animate-pulse bg-[#0D1322] rounded-2xl border border-slate-800">
-            Loading book-of-business fleet accounts...
+            Loading {brokerBrandName} portfolio accounts...
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -236,7 +256,10 @@ export const BrokerPortal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-1 flex justify-end">
+                <div className="pt-1 flex justify-between items-center text-xs">
+                  <span className="text-[10px] text-slate-500 italic">
+                    Partnered via {brokerBrandName}
+                  </span>
                   <a
                     href={`/?org=${fleet.organization_id}`}
                     className="text-xs text-cyan-400 hover:text-cyan-300 font-bold transition flex items-center gap-1"
