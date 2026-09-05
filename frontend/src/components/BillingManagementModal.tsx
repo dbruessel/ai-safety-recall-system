@@ -36,13 +36,16 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   const currentLimit = capacityLimits[subscriptionTier] || 10;
   const usagePercentage = Math.min(Math.round((currentFleetCount / currentLimit) * 100), 100);
 
-  // 1. STRIPE CUSTOMER PORTAL REDIRECT (For existing subscribers managing payment methods)
+  // 1. STRIPE CUSTOMER PORTAL REDIRECT (Opens in New Tab)
   const handleOpenStripePortal = async () => {
+    // Synchronously open a target tab to prevent popup blocker suppression
+    const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+
     try {
       setLoadingPortal(true);
       setFeedbackMsg(null);
 
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const response = await fetch(`${baseUrl}/api/stripe/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,12 +57,14 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       }
 
       const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (data?.url && newTab) {
+        newTab.location.href = data.url;
       } else {
+        if (newTab) newTab.close();
         throw new Error('No portal URL returned.');
       }
     } catch (err: any) {
+      if (newTab) newTab.close();
       console.error('Stripe Portal Error:', err);
       setFeedbackMsg('Stripe Portal is running in demo mode. Contact support for direct invoice changes.');
     } finally {
@@ -67,20 +72,23 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
     }
   };
 
-  // 2. STRIPE CHECKOUT REDIRECT (For switching/purchasing new plans)
+  // 2. STRIPE CHECKOUT REDIRECT (Opens in New Tab)
   const handleInitiateStripeCheckout = async (targetTier: SubscriptionTier) => {
+    // Synchronously open a target tab to prevent popup blocker suppression
+    const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+
     try {
       setLoadingTier(targetTier);
       setFeedbackMsg(null);
 
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const response = await fetch(`${baseUrl}/api/stripe/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: userEmail,
           tier: targetTier,
-          success_url: `${window.location.origin}?session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `${window.location.origin}?checkout=success`,
           cancel_url: window.location.href,
         }),
       });
@@ -90,20 +98,26 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       }
 
       const data = await response.json();
-      if (data.url) {
-        // Redirect directly to hosted Stripe Checkout Page
-        window.location.href = data.url;
+      if (data?.url && newTab) {
+        newTab.location.href = data.url;
+      } else if (data?.sessionId && newTab) {
+        newTab.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
       } else {
+        if (newTab) newTab.close();
         throw new Error('No Checkout URL returned.');
       }
     } catch (err: any) {
+      if (newTab) newTab.close();
       console.error('Stripe Checkout Error:', err);
       setFeedbackMsg('Stripe Checkout is running in demo mode or offline. Updating tier locally.');
-      // Local fallback for dev/testing when Stripe backend isn't live
+      
+      // Fallback local state toggle for testing
       setTimeout(() => {
         onSelectTier(targetTier);
         setLoadingTier(null);
       }, 1000);
+    } finally {
+      setLoadingTier(null);
     }
   };
 
@@ -113,7 +127,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
         
         {/* HEADER */}
         <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-          <h2 className="text-xl font-bold text-white font-sans">Plan & Billing Management</h2>
+          <h2 className="text-xl font-bold text-white font-sans">Plan &amp; Billing Management</h2>
           <button
             type="button"
             onClick={onClose}
@@ -208,7 +222,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'standard'
                   ? 'Active Plan'
                   : loadingTier === 'standard'
-                  ? 'Redirecting...'
+                  ? 'Opening Checkout...'
                   : 'Switch to Standard'}
               </button>
             </div>
@@ -234,7 +248,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'professional'
                   ? 'Active Plan'
                   : loadingTier === 'professional'
-                  ? 'Redirecting...'
+                  ? 'Opening Checkout...'
                   : 'Switch to Pro'}
               </button>
             </div>
@@ -260,7 +274,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'enterprise'
                   ? 'Active Plan'
                   : loadingTier === 'enterprise'
-                  ? 'Redirecting...'
+                  ? 'Opening Checkout...'
                   : 'Switch to Enterprise'}
               </button>
             </div>
