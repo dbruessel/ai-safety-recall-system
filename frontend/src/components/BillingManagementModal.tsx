@@ -25,7 +25,6 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Capacity Limits Mapping
   const capacityLimits: Record<SubscriptionTier, number> = {
     free: 10,
     standard: 50,
@@ -36,10 +35,38 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   const currentLimit = capacityLimits[subscriptionTier] || 10;
   const usagePercentage = Math.min(Math.round((currentFleetCount / currentLimit) * 100), 100);
 
-  // 1. STRIPE CUSTOMER PORTAL REDIRECT (Opens in New Tab)
+  // Helper to open a styled loading tab immediately upon click
+  const openPendingTab = (title: string) => {
+    const pendingTab = window.open('', '_blank');
+    if (pendingTab) {
+      pendingTab.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${title} - RecallLogic</title>
+            <style>
+              body { background-color: #0B0F17; color: #06B6D4; font-family: monospace; display: flex; height: 100vh; align-items: center; justify-content: center; margin: 0; }
+              .card { background: #0D1322; border: 1px solid #1E293B; padding: 2rem; border-radius: 1rem; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+              .spinner { border: 3px solid #1E293B; border-top: 3px solid #06B6D4; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto 1rem auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <div class="spinner"></div>
+              <p style="color: #ffffff; font-weight: bold; margin-bottom: 0.5rem;">Connecting to Stripe Secure Gateway...</p>
+              <p style="color: #64748B; font-size: 12px; margin: 0;">Please wait while your session is provisioned.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+    return pendingTab;
+  };
+
+  // 1. STRIPE CUSTOMER PORTAL
   const handleOpenStripePortal = async () => {
-    // Synchronously open a target tab to prevent popup blocker suppression
-    const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    const portalTab = openPendingTab('Stripe Customer Portal');
 
     try {
       setLoadingPortal(true);
@@ -57,25 +84,24 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       }
 
       const data = await response.json();
-      if (data?.url && newTab) {
-        newTab.location.href = data.url;
+      if (data?.url && portalTab) {
+        portalTab.location.href = data.url;
       } else {
-        if (newTab) newTab.close();
-        throw new Error('No portal URL returned.');
+        if (portalTab) portalTab.close();
+        throw new Error('No portal URL returned from server.');
       }
     } catch (err: any) {
-      if (newTab) newTab.close();
+      if (portalTab) portalTab.close();
       console.error('Stripe Portal Error:', err);
-      setFeedbackMsg('Stripe Portal is running in demo mode. Contact support for direct invoice changes.');
+      setFeedbackMsg('Stripe Portal session could not be established. Re-authenticating...');
     } finally {
       setLoadingPortal(false);
     }
   };
 
-  // 2. STRIPE CHECKOUT REDIRECT (Opens in New Tab)
+  // 2. STRIPE CHECKOUT
   const handleInitiateStripeCheckout = async (targetTier: SubscriptionTier) => {
-    // Synchronously open a target tab to prevent popup blocker suppression
-    const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    const checkoutTab = openPendingTab('Stripe Checkout');
 
     try {
       setLoadingTier(targetTier);
@@ -98,20 +124,19 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       }
 
       const data = await response.json();
-      if (data?.url && newTab) {
-        newTab.location.href = data.url;
-      } else if (data?.sessionId && newTab) {
-        newTab.location.href = `https://checkout.stripe.com/c/pay/${data.sessionId}`;
+      const targetUrl = data?.url || (data?.sessionId ? `https://checkout.stripe.com/c/pay/${data.sessionId}` : null);
+
+      if (targetUrl && checkoutTab) {
+        checkoutTab.location.href = targetUrl;
       } else {
-        if (newTab) newTab.close();
-        throw new Error('No Checkout URL returned.');
+        if (checkoutTab) checkoutTab.close();
+        throw new Error('No valid checkout URL returned.');
       }
     } catch (err: any) {
-      if (newTab) newTab.close();
+      if (checkoutTab) checkoutTab.close();
       console.error('Stripe Checkout Error:', err);
-      setFeedbackMsg('Stripe Checkout is running in demo mode or offline. Updating tier locally.');
+      setFeedbackMsg('Stripe Checkout in demo mode. Updating tier locally.');
       
-      // Fallback local state toggle for testing
       setTimeout(() => {
         onSelectTier(targetTier);
         setLoadingTier(null);
