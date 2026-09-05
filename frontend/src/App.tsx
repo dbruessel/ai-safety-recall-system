@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import TeamManagementModal from './components/TeamManagementModal';
+import BillingManagementModal from './components/BillingManagementModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
@@ -314,39 +315,14 @@ const MainApp: React.FC = () => {
         onClose={() => setActiveAdminModal(null)}
       />
 
-      {activeAdminModal === 'billing' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                💳 Plan &amp; Billing Portal
-              </h3>
-              <button 
-                onClick={() => setActiveAdminModal(null)} 
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4 bg-[#070B14] border border-slate-800 rounded-xl space-y-2">
-              <p className="text-xs text-slate-400">ACTIVE SUBSCRIPTION</p>
-              <p className="text-lg font-bold text-[#06B6D4] uppercase">{effectiveTier.toUpperCase()} TIER</p>
-              <p className="text-[11px] text-emerald-400">Status: Active</p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => handleCheckout('professional')}
-                className="px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
-              >
-                Manage / Upgrade Subscription
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BillingManagementModal
+        isOpen={activeAdminModal === 'billing'}
+        subscriptionTier={(effectiveTier as any) || 'standard'}
+        currentFleetCount={18}
+        userEmail={user?.email || 'admin@fleet.com'}
+        onClose={() => setActiveAdminModal(null)}
+        onSelectTier={(tier) => handleCheckout(tier)}
+      />
 
       <BrokerShareModal
         isOpen={isShareModalOpen}
