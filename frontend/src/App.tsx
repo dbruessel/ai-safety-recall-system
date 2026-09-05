@@ -3,6 +3,7 @@ import LandingPage from './components/LandingPage';
 import TaskBoard from './components/TaskBoard';
 import BrokerPortal from './components/BrokerPortal';
 import BrokerSignup from './components/BrokerSignup';
+import AcceptInvite from './components/AcceptInvite';
 import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
@@ -18,8 +19,9 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
 
-  // Route check for signup subpath
+  // Standalone Subpath Route Checks
   const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
+  const isAcceptInvitePath = window.location.pathname.toLowerCase().startsWith('/accept-invite');
 
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
@@ -100,9 +102,13 @@ const MainApp: React.FC = () => {
     handlePostCheckoutSync();
   }, [user, companyName]);
 
-  // Handle direct signup route prior to auth evaluation
+  // Handle direct standalone subpath routes prior to auth evaluation
   if (isSignupPath) {
     return <BrokerSignup />;
+  }
+
+  if (isAcceptInvitePath) {
+    return <AcceptInvite />;
   }
 
   const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
