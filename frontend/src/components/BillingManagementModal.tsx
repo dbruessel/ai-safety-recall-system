@@ -35,43 +35,12 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   const currentLimit = capacityLimits[subscriptionTier] || 10;
   const usagePercentage = Math.min(Math.round((currentFleetCount / currentLimit) * 100), 100);
 
-  // Helper to open a styled loading tab immediately upon click
-  const openPendingTab = (title: string) => {
-    const pendingTab = window.open('', '_blank');
-    if (pendingTab) {
-      pendingTab.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${title} - RecallLogic</title>
-            <style>
-              body { background-color: #0B0F17; color: #06B6D4; font-family: monospace; display: flex; height: 100vh; align-items: center; justify-content: center; margin: 0; }
-              .card { background: #0D1322; border: 1px solid #1E293B; padding: 2rem; border-radius: 1rem; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-              .spinner { border: 3px solid #1E293B; border-top: 3px solid #06B6D4; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto 1rem auto; }
-              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <div class="spinner"></div>
-              <p style="color: #ffffff; font-weight: bold; margin-bottom: 0.5rem;">Connecting to Stripe Secure Gateway...</p>
-              <p style="color: #64748B; font-size: 12px; margin: 0;">Please wait while your session is provisioned.</p>
-            </div>
-          </body>
-        </html>
-      `);
-    }
-    return pendingTab;
-  };
-
   // 1. STRIPE CUSTOMER PORTAL
   const handleOpenStripePortal = async () => {
-    const portalTab = openPendingTab('Stripe Customer Portal');
+    setLoadingPortal(true);
+    setFeedbackMsg(null);
 
     try {
-      setLoadingPortal(true);
-      setFeedbackMsg(null);
-
       const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const response = await fetch(`${baseUrl}/api/stripe/create-portal-session`, {
         method: 'POST',
@@ -80,20 +49,21 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       });
 
       if (!response.ok) {
+        if (response.status === 400) {
+          throw new Error('No active billing record found for this email. Please subscribe to a plan first.');
+        }
         throw new Error('Failed to create billing portal session.');
       }
 
       const data = await response.json();
-      if (data?.url && portalTab) {
-        portalTab.location.href = data.url;
+      if (data?.url) {
+        window.location.href = data.url; // Direct redirection prevents popup blocker interference
       } else {
-        if (portalTab) portalTab.close();
         throw new Error('No portal URL returned from server.');
       }
     } catch (err: any) {
-      if (portalTab) portalTab.close();
       console.error('Stripe Portal Error:', err);
-      setFeedbackMsg('Stripe Portal session could not be established. Re-authenticating...');
+      setFeedbackMsg(err.message || 'Unable to open billing portal.');
     } finally {
       setLoadingPortal(false);
     }
@@ -101,12 +71,10 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
 
   // 2. STRIPE CHECKOUT
   const handleInitiateStripeCheckout = async (targetTier: SubscriptionTier) => {
-    const checkoutTab = openPendingTab('Stripe Checkout');
+    setLoadingTier(targetTier);
+    setFeedbackMsg(null);
 
     try {
-      setLoadingTier(targetTier);
-      setFeedbackMsg(null);
-
       const baseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const response = await fetch(`${baseUrl}/api/stripe/create-checkout-session`, {
         method: 'POST',
@@ -120,27 +88,25 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Checkout session creation failed.');
+        throw new Error(`Server returned status ${response.status}. Verify Stripe price keys in Render env.`);
       }
 
       const data = await response.json();
       const targetUrl = data?.url || (data?.sessionId ? `https://checkout.stripe.com/c/pay/${data.sessionId}` : null);
 
-      if (targetUrl && checkoutTab) {
-        checkoutTab.location.href = targetUrl;
+      if (targetUrl) {
+        window.location.href = targetUrl;
       } else {
-        if (checkoutTab) checkoutTab.close();
-        throw new Error('No valid checkout URL returned.');
+        throw new Error('No valid Stripe Checkout URL returned.');
       }
     } catch (err: any) {
-      if (checkoutTab) checkoutTab.close();
       console.error('Stripe Checkout Error:', err);
-      setFeedbackMsg('Stripe Checkout in demo mode. Updating tier locally.');
+      setFeedbackMsg(`Checkout Error: ${err.message}. Updating tier in demo state...`);
       
       setTimeout(() => {
         onSelectTier(targetTier);
         setLoadingTier(null);
-      }, 1000);
+      }, 1200);
     } finally {
       setLoadingTier(null);
     }
@@ -177,7 +143,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
               disabled={loadingPortal}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold rounded-lg border border-cyan-500/30 transition cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
             >
-              <span>🧾</span> {loadingPortal ? 'Opening Portal...' : 'Manage Invoices & Cards ↗'}
+              <span>🧾</span> {loadingPortal ? 'Connecting...' : 'Manage Invoices & Cards ↗'}
             </button>
           </div>
 
@@ -247,7 +213,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'standard'
                   ? 'Active Plan'
                   : loadingTier === 'standard'
-                  ? 'Opening Checkout...'
+                  ? 'Connecting...'
                   : 'Switch to Standard'}
               </button>
             </div>
@@ -273,7 +239,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'professional'
                   ? 'Active Plan'
                   : loadingTier === 'professional'
-                  ? 'Opening Checkout...'
+                  ? 'Connecting...'
                   : 'Switch to Pro'}
               </button>
             </div>
@@ -299,7 +265,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
                 {subscriptionTier === 'enterprise'
                   ? 'Active Plan'
                   : loadingTier === 'enterprise'
-                  ? 'Opening Checkout...'
+                  ? 'Connecting...'
                   : 'Switch to Enterprise'}
               </button>
             </div>
