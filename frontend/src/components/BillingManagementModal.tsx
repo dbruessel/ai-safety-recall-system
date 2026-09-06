@@ -25,6 +25,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Capacity Limits Mapping
   const capacityLimits: Record<SubscriptionTier, number> = {
     free: 10,
     standard: 50,
@@ -35,8 +36,13 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
   const currentLimit = capacityLimits[subscriptionTier] || 10;
   const usagePercentage = Math.min(Math.round((currentFleetCount / currentLimit) * 100), 100);
 
-  // 1. STRIPE CUSTOMER PORTAL
+  // 1. STRIPE CUSTOMER PORTAL HANDLER
   const handleOpenStripePortal = async () => {
+    if (!userEmail) {
+      setFeedbackMsg('Session error: No active user email found. Please sign in again.');
+      return;
+    }
+
     setLoadingPortal(true);
     setFeedbackMsg(null);
 
@@ -45,32 +51,40 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
       const response = await fetch(`${baseUrl}/api/stripe/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail }),
+        body: JSON.stringify({ 
+          email: userEmail,
+          customer_email: userEmail,
+          return_url: window.location.href 
+        }),
       });
 
-      if (!response.ok) {
-        if (response.status === 400) {
-          throw new Error('No active billing record found for this email. Please subscribe to a plan first.');
-        }
-        throw new Error('Failed to create billing portal session.');
-      }
-
       const data = await response.json();
-      if (data?.url) {
-        window.location.href = data.url; // Direct redirection prevents popup blocker interference
+
+      if (response.ok && data?.url) {
+        window.location.href = data.url;
       } else {
-        throw new Error('No portal URL returned from server.');
+        // If no payment method exists yet, guide user seamlessly into Checkout setup
+        setFeedbackMsg('No active payment method found on file. Launching secure checkout...');
+        setTimeout(() => {
+          handleInitiateStripeCheckout(subscriptionTier === 'free' ? 'standard' : subscriptionTier);
+        }, 1000);
       }
     } catch (err: any) {
       console.error('Stripe Portal Error:', err);
-      setFeedbackMsg(err.message || 'Unable to open billing portal.');
+      // Fallback directly to checkout session to establish payment method
+      handleInitiateStripeCheckout(subscriptionTier === 'free' ? 'standard' : subscriptionTier);
     } finally {
       setLoadingPortal(false);
     }
   };
 
-  // 2. STRIPE CHECKOUT
+  // 2. STRIPE CHECKOUT HANDLER
   const handleInitiateStripeCheckout = async (targetTier: SubscriptionTier) => {
+    if (!userEmail) {
+      setFeedbackMsg('Session error: No active user email found. Please sign in again.');
+      return;
+    }
+
     setLoadingTier(targetTier);
     setFeedbackMsg(null);
 
@@ -81,27 +95,24 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: userEmail,
+          customer_email: userEmail,
           tier: targetTier,
           success_url: `${window.location.origin}?checkout=success`,
           cancel_url: window.location.href,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}. Verify Stripe price keys in Render env.`);
-      }
-
       const data = await response.json();
       const targetUrl = data?.url || (data?.sessionId ? `https://checkout.stripe.com/c/pay/${data.sessionId}` : null);
 
-      if (targetUrl) {
+      if (response.ok && targetUrl) {
         window.location.href = targetUrl;
       } else {
-        throw new Error('No valid Stripe Checkout URL returned.');
+        throw new Error(data?.detail || 'No valid Stripe checkout URL returned.');
       }
     } catch (err: any) {
       console.error('Stripe Checkout Error:', err);
-      setFeedbackMsg(`Checkout Error: ${err.message}. Updating tier in demo state...`);
+      setFeedbackMsg(`Checkout notice: ${err.message || 'Updating tier locally for preview mode.'}`);
       
       setTimeout(() => {
         onSelectTier(targetTier);
@@ -141,7 +152,7 @@ export const BillingManagementModal: React.FC<BillingManagementModalProps> = ({
               type="button"
               onClick={handleOpenStripePortal}
               disabled={loadingPortal}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold rounded-lg border border-cyan-500/30 transition cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold rounded-lg border border-cyan-500/30 transition cursor-pointer flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50"
             >
               <span>🧾</span> {loadingPortal ? 'Connecting...' : 'Manage Invoices & Cards ↗'}
             </button>
