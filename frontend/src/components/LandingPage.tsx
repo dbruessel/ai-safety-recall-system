@@ -92,7 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // REAL SUPABASE SIGN IN / SIGN UP AUTH HANDLER (WITH METADATA PASS & CHECKOUT ROUTING)
+  // STRICT PAYWALL-ENFORCED SIGN UP & SIGN IN HANDLER
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -102,7 +102,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       if (isSignUp) {
         const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-        // 1. Create User in Supabase auth.users passing company_name AND selected_tier into metadata
+        // 1. Create User in Supabase auth
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
@@ -128,14 +128,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         setIsAuthModalOpen(false);
 
-        // 3. If a paid tier was selected, route directly to Stripe Checkout
-        if (selectedTier !== 'standard' && onSelectTier) {
+        // 3. ENFORCE PAYWALL: Sign out local session immediately before Stripe redirect
+        await supabase.auth.signOut();
+
+        // 4. Redirect ALL paid tiers to Stripe Checkout
+        if (onSelectTier) {
           onSelectTier(selectedTier);
         } else {
           onSignIn();
         }
       } else {
-        // Sign In Flow
+        // Standard Sign In Flow for existing accounts
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password,
@@ -664,7 +667,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   disabled={isSubmittingAuth}
                   className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
                 >
-                  {isSubmittingAuth ? 'Processing...' : isSignUp ? (selectedTier === 'standard' ? 'Sign Up' : 'Continue to Checkout') : 'Sign In'}
+                  {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Continue to Checkout' : 'Sign In'}
                 </button>
               </div>
             </form>
