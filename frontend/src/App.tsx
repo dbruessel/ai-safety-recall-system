@@ -143,10 +143,10 @@ const MainApp: React.FC = () => {
    * Accepts optional custom email/company name from registration modals
    * or falls back to active session values for in-app upgrades.
    */
-  const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
-    const targetEmail = (customEmail || currentEmail || '').trim();
-    const targetCompany = (customCompany || companyName || 'My Fleet Co.').strip ? (customCompany || companyName || 'My Fleet Co.').trim() : (customCompany || companyName || 'My Fleet Co.');
-
+  // ✅ CORRECT (JavaScript syntax):
+  const targetEmail = (customEmail || currentEmail || '').trim();
+  const rawCompany = customCompany || companyName || 'My Fleet Co.';
+  const targetCompany = typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
     if (!targetEmail) {
       console.error('Checkout blocked: User email missing.');
       return;
