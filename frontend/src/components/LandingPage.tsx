@@ -4,7 +4,7 @@ import BulkCsvImportModal from './BulkCsvImportModal';
 
 export interface LandingPageProps {
   onSignIn: () => void;
-  onSelectTier?: (tierId: 'standard' | 'professional' | 'enterprise') => void;
+  onSelectTier?: (tierId: 'standard' | 'professional' | 'enterprise', email?: string, companyName?: string) => void;
   totalGlobalRecalls?: number;
 }
 
@@ -131,9 +131,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         // 3. ENFORCE PAYWALL: Sign out local session immediately before Stripe redirect
         await supabase.auth.signOut();
 
-        // 4. Redirect ALL paid tiers to Stripe Checkout
+        // 4. Redirect ALL paid tiers to Stripe Checkout passing newly created email
         if (onSelectTier) {
-          onSelectTier(selectedTier);
+          onSelectTier(selectedTier, email.trim(), finalCompanyName);
         } else {
           onSignIn();
         }
@@ -182,7 +182,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setAuditResult(null);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
 
       const apiPromises = vinsToAudit.map(vin =>
         fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
@@ -277,7 +277,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const pricingTiers: PricingTier[] = [
     {
       id: 'standard',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || 'price_1TrIFTDXs4xycz0o1e9gfg9d',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
       name: 'Standard',
       subtitle: 'Fleet Operations Baseline',
       price: '$99',
@@ -295,7 +295,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     },
     {
       id: 'professional',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_1TrIFPRO',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
       name: 'Professional',
       subtitle: 'Underwriter & Risk Intelligence',
       price: '$249',
@@ -316,7 +316,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     },
     {
       id: 'enterprise',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || 'price_1TrIFENTERPRISE',
+      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
       name: 'Enterprise',
       subtitle: 'Automated Multi-Fleet Control',
       price: '$499',
