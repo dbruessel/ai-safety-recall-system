@@ -112,22 +112,33 @@ const MainApp: React.FC = () => {
     return <AcceptInvite />;
   }
 
-  const isAuthenticated = Boolean(user) || demoAuthenticated || isDemoPath;
+  // -------------------------------------------------------------
+  // STRICT AUTH & TIER RESOLUTION (NO SYNTHETIC FALLBACKS)
+  // -------------------------------------------------------------
+  const isAuthenticated = Boolean(user?.email) || demoAuthenticated || isDemoPath;
+  const currentEmail = user?.email || userProfile?.email || '';
+
+  const effectiveTier = isDemoPath 
+    ? 'professional' 
+    : (userTier || userProfile?.subscription_tier || 'free');
 
   const getUserOrgName = (): string => {
     if (companyName && companyName.trim() !== '') {
       return companyName;
     }
-    if (user?.email) {
-      const prefix = user.email.split('@')[0];
+    if (currentEmail) {
+      const prefix = currentEmail.split('@')[0];
       return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
     }
-    return 'My Fleet Co.';
+    return 'Fleet Command';
   };
 
-  const effectiveTier = isDemoPath ? 'professional' : (userTier || 'standard');
-
   const handleCheckout = async (tierId: string) => {
+    if (!currentEmail) {
+      console.error('Checkout blocked: User email missing.');
+      return;
+    }
+
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
 
@@ -137,6 +148,8 @@ const MainApp: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
+          email: currentEmail,
+          customer_email: currentEmail,
           tier: tierId,
           success_url: `${window.location.origin}?checkout=success`,
           cancel_url: `${window.location.origin}?checkout=cancel`
@@ -234,7 +247,7 @@ const MainApp: React.FC = () => {
                         {companyName || userProfile?.company_name || 'Apex Risk Brokers'}
                       </p>
                       <p className="text-[10px] text-slate-400 truncate max-w-[160px]">
-                        {user?.email || 'broker_demo@recalllogic.ai'}
+                        {currentEmail}
                       </p>
                     </div>
 
@@ -261,7 +274,7 @@ const MainApp: React.FC = () => {
                     </div>
 
                     <AccountMenu
-                      userEmail={user?.email || 'admin@fleet.com'}
+                      userEmail={currentEmail}
                       orgName={getUserOrgName()}
                       userRole={(userRole || 'admin') as any}
                       subscriptionTier={effectiveTier as any}
@@ -315,14 +328,17 @@ const MainApp: React.FC = () => {
         onClose={() => setActiveAdminModal(null)}
       />
 
-      <BillingManagementModal
-        isOpen={activeAdminModal === 'billing'}
-        subscriptionTier={(effectiveTier as any) || 'standard'}
-        currentFleetCount={18}
-        userEmail={user?.email || 'admin@fleet.com'}
-        onClose={() => setActiveAdminModal(null)}
-        onSelectTier={(tier) => handleCheckout(tier)}
-      />
+      {/* STRICTLY RENDERS BILLING MODAL ONLY FOR LOGGED IN USERS WITH VALID EMAIL */}
+      {activeAdminModal === 'billing' && isAuthenticated && currentEmail && (
+        <BillingManagementModal
+          isOpen={activeAdminModal === 'billing'}
+          subscriptionTier={(effectiveTier as any) || 'free'}
+          currentFleetCount={18}
+          userEmail={currentEmail}
+          onClose={() => setActiveAdminModal(null)}
+          onSelectTier={(tier) => handleCheckout(tier)}
+        />
+      )}
 
       <BrokerShareModal
         isOpen={isShareModalOpen}
