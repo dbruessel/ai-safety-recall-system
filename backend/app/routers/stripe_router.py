@@ -9,8 +9,8 @@ router = APIRouter(prefix="/api/stripe", tags=["stripe"])
 
 def get_supabase_admin() -> Client:
     """Helper to lazily initialize Supabase Admin Client."""
-    url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    url = (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or "").strip()
+    key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or "").strip()
 
     if not url or not key:
         raise HTTPException(
@@ -35,21 +35,21 @@ class StripePortalRequest(BaseModel):
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(payload: StripeCheckoutRequest):
-    # Dynamically fetch API Key inside request to avoid cached module state
-    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    # Dynamically fetch & sanitize API Key inside request to avoid trailing spaces/quotes
+    secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     if not secret_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
     stripe.api_key = secret_key
 
-    target_email = payload.email or payload.customer_email or "admin@fleet.com"
-    tier = (payload.tier or "professional").lower()
-    company_name = payload.company_name or "My Fleet Co."
+    target_email = (payload.email or payload.customer_email or "admin@fleet.com").strip()
+    tier = (payload.tier or "professional").lower().strip()
+    company_name = (payload.company_name or "My Fleet Co.").strip()
 
-    # Look up environment price IDs (supports both PRO and PROFESSIONAL key naming)
+    # Look up environment price IDs and clean any surrounding whitespace
     price_map = {
-        "standard": os.getenv("STRIPE_PRICE_STANDARD") or os.getenv("VITE_STRIPE_PRICE_STANDARD"),
-        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or os.getenv("VITE_STRIPE_PRICE_PRO"),
-        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE") or os.getenv("VITE_STRIPE_PRICE_ENTERPRISE"),
+        "standard": (os.getenv("STRIPE_PRICE_STANDARD") or os.getenv("VITE_STRIPE_PRICE_STANDARD") or "").strip(),
+        "professional": (os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or os.getenv("VITE_STRIPE_PRICE_PRO") or "").strip(),
+        "enterprise": (os.getenv("STRIPE_PRICE_ENTERPRISE") or os.getenv("VITE_STRIPE_PRICE_ENTERPRISE") or "").strip(),
     }
 
     price_id = price_map.get(tier)
@@ -97,12 +97,12 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
 
 @router.post("/create-portal-session")
 async def create_portal_session(payload: StripePortalRequest):
-    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     if not secret_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
     stripe.api_key = secret_key
 
-    target_email = payload.email or payload.customer_email
+    target_email = (payload.email or payload.customer_email or "").strip()
     if not target_email:
         raise HTTPException(status_code=400, detail="Customer email is required for billing portal.")
 
@@ -125,11 +125,11 @@ async def create_portal_session(payload: StripePortalRequest):
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
-    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     if secret_key:
         stripe.api_key = secret_key
 
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    webhook_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip()
     payload = await request.body()
 
     try:
@@ -149,8 +149,8 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         stripe_subscription_id = session.get("subscription")
         
         metadata = session.get("metadata", {})
-        tier = metadata.get("tier", "professional").lower()
-        company_name = metadata.get("company_name", "My Fleet Co.")
+        tier = metadata.get("tier", "professional").lower().strip()
+        company_name = metadata.get("company_name", "My Fleet Co.").strip()
 
         tier_vehicle_limits = {
             "standard": 50,
@@ -178,7 +178,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "vehicle_limit": vehicle_limit,
                 "company_name": company_name,
                 "organization_id": org_id,
-            }).eq("email", customer_email).execute()
+            }).eq("email", customer_email.strip()).execute()
 
             print(f"✅ Webhook successfully provisioned active {tier} tier ({vehicle_limit} VINs) for {customer_email}")
 
