@@ -5,10 +5,11 @@ from dotenv import load_dotenv
 # Load environment variables from .env immediately before app configs are initialized
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import resend
+import stripe
 
 from app.config import init_vertex, get_settings
 from app.services.pdf_report import router as pdf_router
@@ -31,8 +32,16 @@ from app.routers import (
 # Initialize Vertex AI before application construction if configured
 init_vertex()
 
-# Configure Resend API Key
+# Configure API Keys
 resend.api_key = os.getenv("RESEND_API_KEY")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+# Price ID Mapping (Falls back to standard/pro/enterprise keys or price aliases)
+STRIPE_PRICE_MAP = {
+    "standard": os.getenv("STRIPE_PRICE_STANDARD", "price_1P_standard_default"),
+    "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL", "price_1P_pro_default"),
+    "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", "price_1P_enterprise_default"),
+}
 
 # ==========================================
 # ALERT DIGEST DATA MODELS & ENDPOINT
@@ -48,6 +57,22 @@ class AlertDigestRequest(BaseModel):
     email: str
     userTier: Optional[str] = "standard"
     recalls: List[RecallItem]
+
+# ==========================================
+# STRIPE PAYLOAD MODELS
+# ==========================================
+class StripePortalRequest(BaseModel):
+    email: Optional[str] = None
+    customer_email: Optional[str] = None
+    return_url: Optional[str] = "https://recalllogic.ai"
+
+class StripeCheckoutRequest(BaseModel):
+    email: Optional[str] = None
+    customer_email: Optional[str] = None
+    tier: Optional[str] = "professional"
+    price_id: Optional[str] = None
+    success_url: Optional[str] = "https://recalllogic.ai?checkout=success"
+    cancel_url: Optional[str] = "https://recalllogic.ai?checkout=cancel"
 
 def create_app() -> FastAPI:
     """
@@ -94,6 +119,80 @@ def create_app() -> FastAPI:
     app.include_router(stripe_router.router)
     app.include_router(pdf_router)
     app.include_router(audit_router.router)
+
+    # ==========================================
+    # ROBUST STRIPE BILLING PORTAL ENDPOINT
+    # Auto-creates/fetches customer to avoid 400 Bad Request
+    # ==========================================
+    @app.post("/api/stripe/create-portal-session")
+    async def create_portal_session(payload: StripePortalRequest):
+        target_email = payload.email or payload.customer_email or "admin@fleet.com"
+
+        try:
+            # 1. Search for existing Stripe customer by email
+            customers = stripe.Customer.list(email=target_email, limit=1)
+            
+            if customers.data:
+                customer_id = customers.data[0].id
+            else:
+                # 2. Auto-provision customer profile if absent
+                new_customer = stripe.Customer.create(
+                    email=target_email,
+                    description=f"Fleet Customer ({target_email})"
+                )
+                customer_id = new_customer.id
+
+            # 3. Create Stripe Billing Portal Session
+            return_link = payload.return_url or "https://recalllogic.ai"
+            session = stripe.billingPortal.Session.create(
+                customer=customer_id,
+                return_url=return_link
+            )
+            return {"url": session.url, "status": "success"}
+
+        except Exception as e:
+            print(f"⚠️ Stripe Portal Error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Stripe Portal Generation Failed: {str(e)}")
+
+    # ==========================================
+    # ROBUST STRIPE CHECKOUT SESSION ENDPOINT
+    # Handles tier mapping and pre-filled customer emails
+    # ==========================================
+    @app.post("/api/stripe/create-checkout-session")
+    async def create_checkout_session(payload: StripeCheckoutRequest):
+        target_email = payload.email or payload.customer_email or "admin@fleet.com"
+        target_tier = (payload.tier or "professional").lower()
+
+        # Determine Price ID
+        price_id = payload.price_id or STRIPE_PRICE_MAP.get(target_tier, STRIPE_PRICE_MAP["professional"])
+
+        try:
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                customer_email=target_email,
+                line_items=[
+                    {
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {
+                                "name": f"RecallLogic Fleet Safety ({target_tier.title()} Tier)",
+                                "description": "Automated NHTSA recall monitoring & underwriter compliance certification.",
+                            },
+                            "unit_amount": 24900 if target_tier == "professional" else 9900 if target_tier == "standard" else 49900,
+                            "recurring": {"interval": "month"},
+                        },
+                        "quantity": 1,
+                    },
+                ],
+                mode="subscription",
+                success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
+                cancel_url=payload.cancel_url or "https://recalllogic.ai?checkout=cancel",
+            )
+            return {"url": checkout_session.url, "sessionId": checkout_session.id}
+
+        except Exception as e:
+            print(f"⚠️ Stripe Checkout Error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Stripe Checkout Session Failed: {str(e)}")
 
     # ==========================================
     # RECALL RISK ALERT DIGEST ROUTE
