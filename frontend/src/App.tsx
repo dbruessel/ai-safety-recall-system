@@ -138,8 +138,16 @@ const MainApp: React.FC = () => {
     return 'Fleet Command';
   };
 
-  const handleCheckout = async (tierId: string) => {
-    if (!currentEmail) {
+  /**
+   * FLEXIBLE CHECKOUT HANDLER
+   * Accepts optional custom email/company name from registration modals
+   * or falls back to active session values for in-app upgrades.
+   */
+  const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
+    const targetEmail = (customEmail || currentEmail || '').trim();
+    const targetCompany = (customCompany || companyName || 'My Fleet Co.').strip ? (customCompany || companyName || 'My Fleet Co.').trim() : (customCompany || companyName || 'My Fleet Co.');
+
+    if (!targetEmail) {
       console.error('Checkout blocked: User email missing.');
       return;
     }
@@ -153,9 +161,10 @@ const MainApp: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          email: currentEmail,
-          customer_email: currentEmail,
+          email: targetEmail,
+          customer_email: targetEmail,
           tier: tierId,
+          company_name: targetCompany,
           success_url: `${window.location.origin}?checkout=success`,
           cancel_url: `${window.location.origin}?checkout=cancel`
         }),
@@ -216,7 +225,7 @@ const MainApp: React.FC = () => {
         {!isAuthenticated ? (
           <LandingPage
             onSignIn={signInDemo}
-            onSelectTier={(tierId) => handleCheckout(tierId)}
+            onSelectTier={(tierId, email, company) => handleCheckout(tierId, email, company)}
           />
         ) : (
           <div>
