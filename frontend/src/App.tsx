@@ -24,10 +24,19 @@ const MainApp: React.FC = () => {
   const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
   const isAcceptInvitePath = window.location.pathname.toLowerCase().startsWith('/accept-invite');
 
+  // Track direct URL subpaths for explicit broker or audit share views
+  const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
+
+  // STRICT BROKER CHECK: Require explicit boolean or role, avoiding email string matches
+  const isBrokerUser = Boolean(userProfile?.is_broker === true || userProfile?.role === 'broker');
+
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
     const path = window.location.pathname.toLowerCase();
-    return (path.includes('/audit/demo') || path.includes('/broker')) ? 'broker_portal' : 'workspace';
+    if (path.includes('/audit/demo') || path.includes('/broker')) {
+      return 'broker_portal';
+    }
+    return isBrokerUser ? 'broker_portal' : 'workspace';
   });
 
   // Track client fleet auditing drill-down
@@ -37,13 +46,7 @@ const MainApp: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
-  // Track direct URL subpaths for broker/demo views
-  const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
-
-  // Robust broker check: rely on userProfile.is_broker boolean or role/path
-  const isBrokerUser = Boolean(userProfile?.is_broker) || userRole === 'broker' || isDemoPath;
-
-  // Handle URL parameter inspection for client audits (?org=demo-org-1) or broker route
+  // Handle URL parameter inspection and strict view routing
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
@@ -57,6 +60,8 @@ const MainApp: React.FC = () => {
       setActiveView('broker_portal');
     } else if (isBrokerUser) {
       setActiveView('broker_portal');
+    } else {
+      setActiveView('workspace');
     }
   }, [isBrokerUser]);
 
