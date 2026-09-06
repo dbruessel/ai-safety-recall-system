@@ -38,9 +38,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 # Price ID Mapping (Falls back to standard/pro/enterprise keys or price aliases)
 STRIPE_PRICE_MAP = {
-    "standard": os.getenv("STRIPE_PRICE_STANDARD", "price_1P_standard_default"),
-    "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL", "price_1P_pro_default"),
-    "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", "price_1P_enterprise_default"),
+    "standard": os.getenv("STRIPE_PRICE_STANDARD"),
+    "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL"),
+    "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE"),
 }
 
 # ==========================================
@@ -156,38 +156,56 @@ def create_app() -> FastAPI:
 
     # ==========================================
     # ROBUST STRIPE CHECKOUT SESSION ENDPOINT
-    # Handles tier mapping and pre-filled customer emails
+    # Ensures zero 400 rejection from Stripe API
     # ==========================================
     @app.post("/api/stripe/create-checkout-session")
     async def create_checkout_session(payload: StripeCheckoutRequest):
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
         target_tier = (payload.tier or "professional").lower()
 
-        # Determine Price ID
-        price_id = payload.price_id or STRIPE_PRICE_MAP.get(target_tier, STRIPE_PRICE_MAP["professional"])
+        # Set monthly price tiers ($99 / $249 / $499)
+        tier_pricing = {
+            "standard": {"amount": 9900, "name": "RecallLogic Standard Tier"},
+            "professional": {"amount": 24900, "name": "RecallLogic Professional Tier"},
+            "enterprise": {"amount": 49900, "name": "RecallLogic Enterprise Tier"},
+        }
+        
+        tier_data = tier_pricing.get(target_tier, tier_pricing["professional"])
 
         try:
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=["card"],
-                customer_email=target_email,
-                line_items=[
-                    {
-                        "price_data": {
-                            "currency": "usd",
-                            "product_data": {
-                                "name": f"RecallLogic Fleet Safety ({target_tier.title()} Tier)",
-                                "description": "Automated NHTSA recall monitoring & underwriter compliance certification.",
-                            },
-                            "unit_amount": 24900 if target_tier == "professional" else 9900 if target_tier == "standard" else 49900,
-                            "recurring": {"interval": "month"},
+            # 1. Search or create customer to ensure session attaches cleanly
+            customers = stripe.Customer.list(email=target_email, limit=1)
+            customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
+
+            # 2. Check if a direct price ID exists in env, otherwise fallback to price_data
+            env_price_id = STRIPE_PRICE_MAP.get(target_tier)
+            
+            if env_price_id and env_price_id.startswith("price_"):
+                line_items = [{"price": env_price_id, "quantity": 1}]
+            else:
+                line_items = [{
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": tier_data["name"],
+                            "description": "Automated NHTSA recall monitoring & loss-control portal.",
                         },
-                        "quantity": 1,
+                        "unit_amount": tier_data["amount"],
+                        "recurring": {"interval": "month"},
                     },
-                ],
+                    "quantity": 1,
+                }]
+
+            # 3. Create Checkout Session
+            checkout_session = stripe.checkout.Session.create(
+                customer=customer_id,
+                payment_method_types=["card"],
+                line_items=line_items,
                 mode="subscription",
                 success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
                 cancel_url=payload.cancel_url or "https://recalllogic.ai?checkout=cancel",
             )
+            
             return {"url": checkout_session.url, "sessionId": checkout_session.id}
 
         except Exception as e:
