@@ -1,12 +1,11 @@
 import os
 import stripe
 from fastapi import APIRouter, Request, HTTPException, Header
+from pydantic import BaseModel
+from typing import Optional
 from supabase import create_client, Client
 
 router = APIRouter(prefix="/api/stripe", tags=["stripe"])
-
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-
 
 def get_supabase_admin() -> Client:
     """Helper to lazily initialize Supabase Admin Client."""
@@ -21,45 +20,115 @@ def get_supabase_admin() -> Client:
 
     return create_client(url, key)
 
+class StripeCheckoutRequest(BaseModel):
+    email: Optional[str] = None
+    customer_email: Optional[str] = None
+    tier: Optional[str] = "professional"
+    company_name: Optional[str] = "My Fleet Co."
+    success_url: Optional[str] = "https://recalllogic.ai?checkout=success"
+    cancel_url: Optional[str] = "https://recalllogic.ai?checkout=cancel"
+
+class StripePortalRequest(BaseModel):
+    email: Optional[str] = None
+    customer_email: Optional[str] = None
+    return_url: Optional[str] = "https://recalllogic.ai"
 
 @router.post("/create-checkout-session")
-async def create_checkout_session(data: dict):
+async def create_checkout_session(payload: StripeCheckoutRequest):
+    # Dynamically fetch API Key inside request to avoid cached module state
+    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    if not secret_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
+    stripe.api_key = secret_key
+
+    target_email = payload.email or payload.customer_email or "admin@fleet.com"
+    tier = (payload.tier or "professional").lower()
+    company_name = payload.company_name or "My Fleet Co."
+
+    # Look up environment price IDs (supports both PRO and PROFESSIONAL key naming)
+    price_map = {
+        "standard": os.getenv("STRIPE_PRICE_STANDARD") or os.getenv("VITE_STRIPE_PRICE_STANDARD"),
+        "professional": os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or os.getenv("VITE_STRIPE_PRICE_PRO"),
+        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE") or os.getenv("VITE_STRIPE_PRICE_ENTERPRISE"),
+    }
+
+    price_id = price_map.get(tier)
+
     try:
-        tier = data.get("tier", "professional").lower()
-        company_name = data.get("company_name", "My Fleet Co.")
-        success_url = data.get("success_url")
-        cancel_url = data.get("cancel_url")
+        # Search or create customer to ensure session links cleanly
+        customers = stripe.Customer.list(email=target_email, limit=1)
+        customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
 
-        price_map = {
-            "standard": os.getenv("VITE_STRIPE_PRICE_STANDARD") or os.getenv("STRIPE_PRICE_STANDARD"),
-            "professional": os.getenv("VITE_STRIPE_PRICE_PRO") or os.getenv("STRIPE_PRICE_PRO"),
-            "enterprise": os.getenv("VITE_STRIPE_PRICE_ENTERPRISE") or os.getenv("STRIPE_PRICE_ENTERPRISE"),
-        }
-
-        price_id = price_map.get(tier, price_map.get("professional"))
-
-        if not price_id:
-            raise HTTPException(status_code=400, detail=f"No Stripe Price ID configured for tier '{tier}'.")
+        if price_id and price_id.startswith("price_"):
+            line_items = [{"price": price_id, "quantity": 1}]
+        else:
+            # Inline price fallback if explicit price_... ID is missing
+            tier_amounts = {"standard": 9900, "professional": 24900, "enterprise": 49900}
+            line_items = [{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": f"RecallLogic Fleet Safety ({tier.title()} Tier)",
+                        "description": "Automated NHTSA recall monitoring & loss-control portal.",
+                    },
+                    "unit_amount": tier_amounts.get(tier, 24900),
+                    "recurring": {"interval": "month"},
+                },
+                "quantity": 1,
+            }]
 
         session = stripe.checkout.Session.create(
+            customer=customer_id,
             payment_method_types=["card"],
             mode="subscription",
-            line_items=[{"price": price_id, "quantity": 1}],
+            line_items=line_items,
             metadata={
                 "tier": tier,
                 "company_name": company_name,
             },
-            success_url=success_url,
-            cancel_url=cancel_url,
+            success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
+            cancel_url=payload.cancel_url or "https://recalllogic.ai?checkout=cancel",
         )
 
         return {"url": session.url, "sessionId": session.id}
     except Exception as e:
+        print(f"⚠️ Stripe Checkout Error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/create-portal-session")
+async def create_portal_session(payload: StripePortalRequest):
+    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    if not secret_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
+    stripe.api_key = secret_key
+
+    target_email = payload.email or payload.customer_email
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Customer email is required for billing portal.")
+
+    try:
+        customers = stripe.Customer.list(email=target_email, limit=1)
+        if customers.data:
+            customer_id = customers.data[0].id
+        else:
+            new_customer = stripe.Customer.create(email=target_email)
+            customer_id = new_customer.id
+
+        session = stripe.billingPortal.Session.create(
+            customer=customer_id,
+            return_url=payload.return_url or "https://recalllogic.ai",
+        )
+        return {"url": session.url}
+    except Exception as e:
+        print(f"⚠️ Stripe Portal Error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    secret_key = os.getenv("STRIPE_SECRET_KEY")
+    if secret_key:
+        stripe.api_key = secret_key
+
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     payload = await request.body()
 
@@ -72,7 +141,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Handle successful subscription purchases
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         
@@ -84,7 +152,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         tier = metadata.get("tier", "professional").lower()
         company_name = metadata.get("company_name", "My Fleet Co.")
 
-        # Define vehicle capacity limits per paid tier
         tier_vehicle_limits = {
             "standard": 50,
             "professional": 250,
@@ -95,7 +162,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         if customer_email:
             supabase_admin = get_supabase_admin()
 
-            # 1. Upsert Organization
             org_res = supabase_admin.table("organizations").upsert(
                 {"name": company_name, "subscription_tier": tier},
                 on_conflict="name"
@@ -103,14 +169,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             
             org_id = org_res.data[0]["id"] if org_res.data else None
 
-            # 2. Update Profile to ACTIVE (clears 'trial' and default limits)
             supabase_admin.table("profiles").update({
                 "stripe_customer_id": stripe_customer_id,
                 "stripe_subscription_id": stripe_subscription_id,
-                "subscription_status": "active",  # Explicitly replaces 'trial'
-                "status": "active",               # Marks account active
+                "subscription_status": "active",
+                "status": "active",
                 "subscription_tier": tier,
-                "vehicle_limit": vehicle_limit,   # Sets 50 for standard, 250 for pro, etc.
+                "vehicle_limit": vehicle_limit,
                 "company_name": company_name,
                 "organization_id": org_id,
             }).eq("email", customer_email).execute()
