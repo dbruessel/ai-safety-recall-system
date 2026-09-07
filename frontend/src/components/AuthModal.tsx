@@ -33,26 +33,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
 
+    // Retrieve stored broker referral metadata if available
+    const referredBrokerId = sessionStorage.getItem('recalllogic_referred_broker_id') || 'direct';
+    const referredBrokerName = sessionStorage.getItem('recalllogic_referred_broker_name') || '';
+
     try {
-      // 1. Create Supabase Auth Account & Profile
+      // 1. Create Supabase Auth Account & Profile linked to Broker Metadata
       const { error } = await supabase.auth.signUp({
-        email,
-        password,
+        email: email.trim(),
+        password: password,
         options: {
           data: {
-            company_name: companyName,
-            subscription_tier: selectedTier || 'standard',
+            company_name: companyName.trim(),
+            subscription_tier: selectedTier || 'professional',
+            referred_by_broker: referredBrokerId,
+            broker_name: referredBrokerName,
           },
         },
       });
 
       if (error) throw error;
 
-      // 2. Immediately sign out to enforce paywall
+      // 2. Immediately sign out session to enforce Stripe paywall
       await supabase.auth.signOut();
 
       // 3. Trigger Stripe Checkout creation via parent callback
-      await onSuccessCheckout(selectedTier || 'standard', email, companyName);
+      await onSuccessCheckout(selectedTier || 'professional', email.trim(), companyName.trim());
     } catch (err: any) {
       console.error('Registration error:', err);
       setErrorMsg(err.message || 'Registration failed. Please try again.');
@@ -77,8 +83,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* HEADER */}
         <div>
           <h2 className="text-sm font-bold tracking-wider text-white uppercase">
-            Create Account ({selectedTier.toUpperCase()} TIER)
+            Create Account ({selectedTier ? selectedTier.toUpperCase() : 'PROFESSIONAL'} TIER)
           </h2>
+          {sessionStorage.getItem('recalllogic_referred_broker_name') && (
+            <p className="text-[11px] text-cyan-400 mt-1">
+              🛡️ Linked to Broker: {sessionStorage.getItem('recalllogic_referred_broker_name')}
+            </p>
+          )}
         </div>
 
         {errorMsg && (
