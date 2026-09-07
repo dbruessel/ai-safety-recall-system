@@ -1,74 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
 
 export const BrokerSignup: React.FC = () => {
-  const { signUp } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [brokerageName, setBrokerageName] = useState('your insurance broker');
-  const [brokerId, setBrokerId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [brokerageName, setBrokerageName] = useState('RecallLogic Partner Brokerage');
+  const [brokerId, setBrokerId] = useState<string>('demo-broker');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('broker_id');
+    const id = params.get('broker_id') || params.get('broker') || 'demo-broker';
     
-    if (id) {
-      setBrokerId(id);
-      if (id !== 'demo-broker') {
-        // Fetch official brokerage name if it's a real brokerage ID
-        supabase
-          .from('brokerages')
-          .select('name')
-          .eq('id', id)
-          .single()
-          .then(({ data }) => {
-            if (data?.name) {
-              setBrokerageName(data.name);
-            }
-          });
-      } else {
-        setBrokerageName('RecallLogic Partner Brokerage');
-      }
+    setBrokerId(id);
+    sessionStorage.setItem('recalllogic_referred_broker_id', id);
+
+    if (id !== 'demo-broker') {
+      const formattedName = id
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+      const fullBrokerName = `${formattedName} Risk Management`;
+      
+      setBrokerageName(fullBrokerName);
+      sessionStorage.setItem('recalllogic_referred_broker_name', fullBrokerName);
+    } else {
+      setBrokerageName('RecallLogic Partner Brokerage');
+      sessionStorage.setItem('recalllogic_referred_broker_name', 'RecallLogic Partner Brokerage');
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStartFreeTrial = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorMsg(null);
-
-    try {
-      // 1. Sign up user via AuthContext
-      const authRes = await signUp(email, password, companyName);
-      
-      // 2. Link created profile / org to parent brokerage if broker_id exists
-      if (authRes?.user && brokerId && brokerId !== 'demo-broker') {
-        // Fetch user profile to get org ID or update company profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', authRes.user.id)
-          .single();
-
-        if (profile?.organization_id) {
-          await supabase
-            .from('organizations')
-            .update({ parent_brokerage_id: brokerId })
-            .eq('id', profile.organization_id);
-        }
-      }
-
-      // Redirect to workspace after registration
-      window.location.href = '/';
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Smooth transition to interactive 10-VIN trial on the main landing page
+    window.location.href = '/';
   };
 
   return (
@@ -78,79 +38,45 @@ export const BrokerSignup: React.FC = () => {
         {/* CO-BRANDED HEADER */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-xs font-bold uppercase">
-            <span>🛡️</span> Broker Invocation
+            <span>🛡️</span> Broker Invitation
           </div>
           <h1 className="text-xl font-extrabold text-white tracking-tight">
-            Activate Safety Workspace
+            Activate Fleet Safety Audit
           </h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            You’ve been invited by <span className="text-cyan-400 font-bold">{brokerageName}</span> to activate your Fleet Safety &amp; Loss Control Audit Workspace.
+            You’ve been invited by <span className="text-cyan-400 font-bold">{brokerageName}</span> to run a complimentary 10-VIN safety &amp; recall audit on your power units.
           </p>
         </div>
 
         {/* SYNC NOTICE BANNER */}
-        <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl text-[11px] text-slate-300 flex items-start gap-2">
-          <span className="text-emerald-400 font-bold">✓</span>
-          <span>
-            Your live safety score will automatically sync with <strong>{brokerageName}</strong> to support your upcoming policy renewal.
-          </span>
+        <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl text-[11px] text-slate-300 space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="text-emerald-400 font-bold">✓</span>
+            <span>
+              <strong>10 Free Instant VIN Lookups</strong> provided courtesy of {brokerageName}.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-cyan-400 font-bold">✓</span>
+            <span>
+              Zero credit card required to inspect active NHTSA recall campaigns across your fleet.
+            </span>
+          </div>
         </div>
 
-        {errorMsg && (
-          <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl text-xs text-red-400 text-center">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* FORM FIELDS */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          <div>
-            <label className="block text-slate-400 mb-1">COMPANY / FLEET NAME</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Apex Logistics LLC"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1">WORK EMAIL</label>
-            <input
-              type="email"
-              required
-              placeholder="fleetmanager@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1">PASSWORD</label>
-            <input
-              type="password"
-              required
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 transition-all"
-            />
-          </div>
-
+        {/* ACTION BUTTON */}
+        <form onSubmit={handleStartFreeTrial} className="space-y-4">
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-cyan-950/50 mt-2"
+            className="w-full py-3.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2"
           >
-            {loading ? 'Setting up Workspace...' : 'Create Account & Link to Broker →'}
+            <span>Start 10 Free VIN Audit</span>
+            <span>→</span>
           </button>
         </form>
 
-        <p className="text-[10px] text-slate-500 text-center">
-          By registering, your recall statuses and compliance scores are shared securely with your broker's underwriter portal.
+        <p className="text-[10px] text-slate-500 text-center leading-normal">
+          Upon converting to a Professional workspace, your recall statuses and Loss Control Risk Certificates can be shared directly with {brokerageName} to support policy renewals.
         </p>
       </div>
     </div>
