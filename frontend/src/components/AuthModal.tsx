@@ -28,14 +28,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to retrieve broker referral values across both key formats
+  const getBrokerId = () => 
+    sessionStorage.getItem('broker_id') || 
+    sessionStorage.getItem('recalllogic_referred_broker_id') || 
+    'direct';
+
+  const getBrokerName = () => 
+    sessionStorage.getItem('broker_name') || 
+    sessionStorage.getItem('recalllogic_referred_broker_name') || 
+    '';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
 
-    // Retrieve stored broker referral metadata if available
-    const referredBrokerId = sessionStorage.getItem('recalllogic_referred_broker_id') || 'direct';
-    const referredBrokerName = sessionStorage.getItem('recalllogic_referred_broker_name') || '';
+    const referredBrokerId = getBrokerId();
+    const referredBrokerName = getBrokerName();
 
     try {
       // 1. Create Supabase Auth Account & Profile linked to Broker Metadata
@@ -46,6 +56,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           data: {
             company_name: companyName.trim(),
             subscription_tier: selectedTier || 'professional',
+            broker_id: referredBrokerId,
             referred_by_broker: referredBrokerId,
             broker_name: referredBrokerName,
           },
@@ -67,6 +78,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const activeBrokerLabel = getBrokerName() || (getBrokerId() !== 'direct' ? getBrokerId() : '');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-mono">
       <div className="relative w-full max-w-md bg-[#0D1322] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-slate-100">
@@ -75,7 +88,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white text-sm"
+          className="absolute top-4 right-4 text-slate-400 hover:text-white text-sm cursor-pointer"
         >
           ✕
         </button>
@@ -85,9 +98,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <h2 className="text-sm font-bold tracking-wider text-white uppercase">
             Create Account ({selectedTier ? selectedTier.toUpperCase() : 'PROFESSIONAL'} TIER)
           </h2>
-          {sessionStorage.getItem('recalllogic_referred_broker_name') && (
+          {activeBrokerLabel && (
             <p className="text-[11px] text-cyan-400 mt-1">
-              🛡️ Linked to Broker: {sessionStorage.getItem('recalllogic_referred_broker_name')}
+              🛡️ Linked to Broker: {activeBrokerLabel}
             </p>
           )}
         </div>
@@ -139,7 +152,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold rounded-lg transition-all cursor-pointer mt-2"
+            className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold rounded-lg transition-all cursor-pointer mt-2 disabled:opacity-50"
           >
             {loading ? 'Creating Account & Redirecting...' : 'Continue to Checkout'}
           </button>
@@ -151,7 +164,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="button"
               onClick={onSwitchToSignIn}
-              className="text-cyan-400 hover:underline font-bold"
+              className="text-cyan-400 hover:underline font-bold cursor-pointer"
             >
               Sign In
             </button>
