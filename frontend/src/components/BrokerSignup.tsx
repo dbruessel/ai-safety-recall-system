@@ -7,6 +7,7 @@ export const BrokerSignup: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('broker_id') || params.get('broker') || 'demo-broker';
+    const nameParam = params.get('broker_name') || '';
 
     setBrokerId(id);
 
@@ -14,26 +15,37 @@ export const BrokerSignup: React.FC = () => {
     sessionStorage.setItem('broker_id', id);
     sessionStorage.setItem('recalllogic_referred_broker_id', id);
 
-    if (id !== 'demo-broker') {
+    let calculatedName = 'RecallLogic Partner Brokerage';
+
+    if (nameParam) {
+      calculatedName = nameParam;
+    } else if (id !== 'demo-broker') {
       const formattedName = id
         .replace(/[-_]/g, ' ')
         .replace(/\b\w/g, (char) => char.toUpperCase());
-      const fullBrokerName = `${formattedName} Risk Management`;
-
-      setBrokerageName(fullBrokerName);
-      sessionStorage.setItem('broker_name', fullBrokerName);
-      sessionStorage.setItem('recalllogic_referred_broker_name', fullBrokerName);
-    } else {
-      setBrokerageName('RecallLogic Partner Brokerage');
-      sessionStorage.setItem('broker_name', 'RecallLogic Partner Brokerage');
-      sessionStorage.setItem('recalllogic_referred_broker_name', 'RecallLogic Partner Brokerage');
+      calculatedName = `${formattedName} Risk Management`;
     }
+
+    setBrokerageName(calculatedName);
+    sessionStorage.setItem('broker_name', calculatedName);
+    sessionStorage.setItem('recalllogic_referred_broker_name', calculatedName);
   }, []);
 
   const handleStartFreeTrial = (e: React.FormEvent) => {
     e.preventDefault();
-    // Redirect to main application page with stored broker referral params intact
-    window.location.href = `/?broker_id=${encodeURIComponent(brokerId)}`;
+
+    // Retrieve active broker parameters to pass forward
+    const currentBrokerId = sessionStorage.getItem('broker_id') || brokerId || 'demo-broker';
+    const currentBrokerName = sessionStorage.getItem('broker_name') || brokerageName || '';
+
+    // Construct URL preserving BOTH broker parameters across full-page redirect
+    const redirectUrl = new URL('/', window.location.origin);
+    redirectUrl.searchParams.set('broker_id', currentBrokerId);
+    if (currentBrokerName) {
+      redirectUrl.searchParams.set('broker_name', currentBrokerName);
+    }
+
+    window.location.href = redirectUrl.toString();
   };
 
   return (
