@@ -51,8 +51,9 @@ const MainApp: React.FC = () => {
     const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
 
-    // 1. CAPTURE & PERSIST BROKER ATTRIBUTION PARAMS TO SESSION STORAGE
-    const brokerId = params.get('broker_id');
+    // 1. SAFE BROKER ATTRIBUTION CAPTURE
+    // Only write to sessionStorage if URL params explicitly exist; NEVER overwrite valid session storage with null/empty
+    const brokerId = params.get('broker_id') || params.get('broker');
     const brokerName = params.get('broker_name');
 
     if (brokerId) {
