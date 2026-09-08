@@ -250,7 +250,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     } catch (err: any) {
       setScanError(err.message || 'Error connecting to NHTSA recall engine.');
-    } font-mono finally {
+    } finally {
       setIsAuditing(false);
     }
   };
