@@ -92,7 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // STRICT PAYWALL-ENFORCED SIGN UP & SIGN IN HANDLER
+  // STRICT PAYWALL-ENFORCED SIGN UP & SIGN IN HANDLER WITH BROKER ATTRIBUTION
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -102,14 +102,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       if (isSignUp) {
         const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-        // 1. Create User in Supabase auth
+        // Retrieve stored broker referral metadata across both key formats
+        const referredBrokerId = 
+          sessionStorage.getItem('broker_id') || 
+          sessionStorage.getItem('recalllogic_referred_broker_id') || 
+          'direct';
+
+        const referredBrokerName = 
+          sessionStorage.getItem('broker_name') || 
+          sessionStorage.getItem('recalllogic_referred_broker_name') || 
+          '';
+
+        // 1. Create User in Supabase auth including broker metadata
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
           options: {
             data: {
               company_name: finalCompanyName,
+              subscription_tier: selectedTier,
               selected_tier: selectedTier,
+              broker_id: referredBrokerId,
+              referred_by_broker: referredBrokerId,
+              broker_name: referredBrokerName,
             },
           },
         });
@@ -235,7 +250,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     } catch (err: any) {
       setScanError(err.message || 'Error connecting to NHTSA recall engine.');
-    } finally {
+    } font-mono finally {
       setIsAuditing(false);
     }
   };
@@ -273,6 +288,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setAuthError('');
     setIsAuthModalOpen(true);
   };
+
+  const activeBrokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
 
   const pricingTiers: PricingTier[] = [
     {
@@ -604,9 +621,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
             
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                {isSignUp ? `Create Account (${selectedTier.toUpperCase()} TIER)` : 'Sign In to RecallLogic'}
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  {isSignUp ? `Create Account (${selectedTier.toUpperCase()} TIER)` : 'Sign In to RecallLogic'}
+                </h3>
+                {isSignUp && activeBrokerName && (
+                  <p className="text-[11px] text-cyan-400 mt-1">
+                    🛡️ Linked to Broker: {activeBrokerName}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setIsAuthModalOpen(false)}
