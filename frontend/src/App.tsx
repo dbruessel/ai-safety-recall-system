@@ -46,10 +46,25 @@ const MainApp: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
-  // Handle URL parameter inspection and strict view routing
+  // Handle URL parameter inspection, broker attribution capture, and strict view routing
   useEffect(() => {
     const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
+
+    // 1. CAPTURE & PERSIST BROKER ATTRIBUTION PARAMS TO SESSION STORAGE
+    const brokerId = params.get('broker_id');
+    const brokerName = params.get('broker_name');
+
+    if (brokerId) {
+      sessionStorage.setItem('broker_id', brokerId);
+      sessionStorage.setItem('recalllogic_referred_broker_id', brokerId);
+    }
+    if (brokerName) {
+      sessionStorage.setItem('broker_name', brokerName);
+      sessionStorage.setItem('recalllogic_referred_broker_name', brokerName);
+    }
+
+    // 2. VIEW ROUTING LOGIC
     const auditedOrg = params.get('org');
 
     if (auditedOrg) {
