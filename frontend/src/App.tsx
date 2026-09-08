@@ -157,11 +157,23 @@ const MainApp: React.FC = () => {
    * FLEXIBLE CHECKOUT HANDLER
    * Accepts optional custom email/company name from registration modals
    * or falls back to active session values for in-app upgrades.
+   * Passes broker attribution metadata to backend / Stripe.
    */
   const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
     const targetEmail = (customEmail || currentEmail || '').trim();
     const rawCompany = customCompany || companyName || 'My Fleet Co.';
     const targetCompany = typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
+
+    // Retrieve stored broker referral parameters from sessionStorage
+    const brokerId = 
+      sessionStorage.getItem('broker_id') || 
+      sessionStorage.getItem('recalllogic_referred_broker_id') || 
+      'direct';
+
+    const brokerName = 
+      sessionStorage.getItem('broker_name') || 
+      sessionStorage.getItem('recalllogic_referred_broker_name') || 
+      '';
 
     if (!targetEmail) {
       console.error('Checkout blocked: User email missing.');
@@ -181,6 +193,8 @@ const MainApp: React.FC = () => {
           customer_email: targetEmail,
           tier: tierId,
           company_name: targetCompany,
+          broker_id: brokerId,
+          broker_name: brokerName,
           success_url: `${window.location.origin}?checkout=success`,
           cancel_url: `${window.location.origin}?checkout=cancel`
         }),
