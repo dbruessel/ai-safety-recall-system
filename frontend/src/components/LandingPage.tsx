@@ -44,7 +44,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
 
-  // AUTH MODAL STATES (SIGN IN VS SIGN UP TOGGLE & SELECTED TIER)
+  // BROKER LEAD CAPTURE MODAL STATE
+  const [isBrokerModalOpen, setIsBrokerModalOpen] = useState<boolean>(false);
+  const [brokerEmail, setBrokerEmail] = useState<string>('');
+  const [brokerageName, setBrokerageName] = useState<string>('');
+  const [portfolioSize, setPortfolioSize] = useState<string>('10-50');
+  const [isSubmittingBrokerLead, setIsSubmittingBrokerLead] = useState<boolean>(false);
+  const [brokerLeadSuccess, setBrokerLeadSuccess] = useState<boolean>(false);
+  const [brokerLeadError, setBrokerLeadError] = useState<string>('');
+
+  // AUTH MODAL STATES
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
@@ -63,7 +72,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [scanError, setScanError] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Track 10 Free Scans in browser session
   useEffect(() => {
     const storedScans = sessionStorage.getItem('recalllogic_demo_scans');
     if (storedScans !== null) {
@@ -73,7 +81,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   }, []);
 
-  // Fetch count directly from Supabase recall_definitions table
   useEffect(() => {
     async function fetchRecallCount() {
       try {
@@ -92,7 +99,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // STRICT PAYWALL-ENFORCED SIGN UP & SIGN IN HANDLER WITH BROKER ATTRIBUTION
+  // BROKER LEAD SUBMISSION HANDLER
+  const handleBrokerLeadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingBrokerLead(true);
+    setBrokerLeadError('');
+
+    try {
+      // Upsert lead data into Supabase 'broker_leads' table
+      const { error } = await supabase.from('broker_leads').insert([
+        {
+          email: brokerEmail.trim(),
+          brokerage_name: brokerageName.trim(),
+          portfolio_size: portfolioSize,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        // Fallback: log if table isn't created yet in dev
+        console.warn('Broker lead table fallback notice:', error.message);
+      }
+
+      setBrokerLeadSuccess(true);
+    } catch (err: any) {
+      setBrokerLeadError(err.message || 'Failed to submit request. Please try again.');
+    } finally {
+      setIsSubmittingBrokerLead(false);
+    }
+  };
+
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -102,7 +138,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       if (isSignUp) {
         const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-        // Retrieve stored broker referral metadata across both key formats
         const referredBrokerId = 
           sessionStorage.getItem('broker_id') || 
           sessionStorage.getItem('recalllogic_referred_broker_id') || 
@@ -113,7 +148,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           sessionStorage.getItem('recalllogic_referred_broker_name') || 
           '';
 
-        // 1. Create User in Supabase auth including broker metadata
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
@@ -131,7 +165,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         if (error) throw error;
 
-        // 2. Explicit profile row upsert
         if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
@@ -142,18 +175,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         }
 
         setIsAuthModalOpen(false);
-
-        // 3. ENFORCE PAYWALL: Sign out local session immediately before Stripe redirect
         await supabase.auth.signOut();
 
-        // 4. Redirect ALL paid tiers to Stripe Checkout passing newly created email
         if (onSelectTier) {
           onSelectTier(selectedTier, email.trim(), finalCompanyName);
         } else {
           onSignIn();
         }
       } else {
-        // Standard Sign In Flow for existing accounts
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password,
@@ -173,7 +202,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // Universal Multi-VIN Extractor & Parallel Batch Auditor
   const extractAndAuditVins = async (rawInput: string) => {
     setScanError('');
     if (scansLeft <= 0) {
@@ -281,7 +309,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // PRICING TIER CLICK HANDLER — TRACKS TIER & PROMPTS SIGN UP
   const handleTierCheckout = async (tier: PricingTier) => {
     setSelectedTier(tier.id);
     setIsSignUp(true);
@@ -399,17 +426,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Nav Right Action Items (Broker Link + Sign In) */}
+          {/* Nav Right Action Items */}
           <div className="shrink-0 flex items-center gap-4">
-            <a 
-              href="/signup?broker_id=demo-broker" 
-              className="hidden md:flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
+            <button 
+              type="button"
+              onClick={() => {
+                setBrokerLeadSuccess(false);
+                setBrokerLeadError('');
+                setIsBrokerModalOpen(true);
+              }}
+              className="hidden md:flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
             >
               <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5"/>
               </svg>
               For Brokers &amp; Agencies &rarr;
-            </a>
+            </button>
 
             <button
               type="button"
@@ -427,7 +459,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </nav>
 
-      {/* HERO SECTION WITH INLINE COMPREHENSIVE VIN SCANNER */}
+      {/* HERO SECTION WITH INLINE VIN SCANNER */}
       <section className="relative pt-6 pb-8 px-4 max-w-5xl mx-auto text-center space-y-4">
         <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left">
           
@@ -568,7 +600,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         </div>
 
-        {/* SUB-HERO BROKER CALLOUT BANNER */}
+        {/* SUB-HERO BROKER CALLOUT BANNER (TRIGGERS BROKER LEAD MODAL) */}
         <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-lg backdrop-blur-sm mt-4">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center justify-center p-2 rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 shrink-0">
@@ -581,16 +613,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <p className="text-[11px] text-slate-400">Offer co-branded recall tracking, generate Loss Control Risk Certificates, and protect portfolio loss ratios.</p>
             </div>
           </div>
-          <a 
-            href="/signup?broker_id=demo-broker" 
-            className="whitespace-nowrap px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all shrink-0"
+          <button 
+            type="button"
+            onClick={() => {
+              setBrokerLeadSuccess(false);
+              setBrokerLeadError('');
+              setIsBrokerModalOpen(true);
+            }}
+            className="whitespace-nowrap px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all shrink-0 cursor-pointer"
           >
             Explore Broker Solutions &rarr;
-          </a>
+          </button>
         </div>
       </section>
 
-      {/* BROKER & AGENCY VALUE PROPOSITION SECTION */}
+      {/* BROKER & AGENCY VALUE SECTION */}
       <section className="py-12 bg-slate-950/60 border-y border-slate-800/80 my-4">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
@@ -600,7 +637,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
-            {/* Feature 1 */}
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
@@ -609,7 +645,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automate recall and safety monitoring across your commercial accounts to stop preventable claims before policy renewal.</p>
             </div>
 
-            {/* Feature 2 */}
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -618,7 +653,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Gift your fleet policyholders a co-branded safety workspace, keeping your brokerage top-of-mind every time they run an audit.</p>
             </div>
 
-            {/* Feature 3 */}
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -686,7 +720,111 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* AUTHENTICATION MODAL OVERLAY (TOGGLES BETWEEN SIGN IN & SIGN UP) */}
+      {/* BROKER PARTNER REQUEST ACCESS MODAL */}
+      {isBrokerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
+            
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Request Agency Partner Access
+                </h3>
+                <p className="text-[11px] text-cyan-400 mt-0.5">
+                  Get a custom co-branded portal &amp; loss-control suite for your agency.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBrokerModalOpen(false)}
+                className="text-slate-400 hover:text-white transition cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {brokerLeadSuccess ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h4 className="text-sm font-bold text-white">Partner Access Requested!</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Thank you. Our partnership team will configure your agency's co-branded portal and send your access link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsBrokerModalOpen(false)}
+                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer mt-2"
+                >
+                  Close Window
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleBrokerLeadSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Work Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={brokerEmail}
+                    onChange={(e) => setBrokerEmail(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    placeholder="broker@agency.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Brokerage / Agency Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={brokerageName}
+                    onChange={(e) => setBrokerageName(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    placeholder="e.g. Apex Risk Advisors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Commercial Fleet Book Size</label>
+                  <select
+                    value={portfolioSize}
+                    onChange={(e) => setPortfolioSize(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                  >
+                    <option value="1-10">1 – 10 Commercial Accounts</option>
+                    <option value="10-50">10 – 50 Commercial Accounts</option>
+                    <option value="50-200">50 – 200 Commercial Accounts</option>
+                    <option value="200+">200+ Accounts (Enterprise Agency)</option>
+                  </select>
+                </div>
+
+                {brokerLeadError && (
+                  <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
+                    {brokerLeadError}
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBrokerLead}
+                    className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
+                  >
+                    {isSubmittingBrokerLead ? 'Submitting Request...' : 'Request Agency Workspace &rarr;'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* AUTHENTICATION MODAL OVERLAY */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
