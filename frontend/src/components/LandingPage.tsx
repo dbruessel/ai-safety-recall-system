@@ -99,14 +99,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // BROKER LEAD SUBMISSION HANDLER
+  // BROKER LEAD SUBMISSION HANDLER (FIXED FOR STRICT SUPABASE API ERROR HANDLING)
   const handleBrokerLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingBrokerLead(true);
     setBrokerLeadError('');
 
     try {
-      // Upsert lead data into Supabase 'broker_leads' table
       const { error } = await supabase.from('broker_leads').insert([
         {
           email: brokerEmail.trim(),
@@ -117,13 +116,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       ]);
 
       if (error) {
-        // Fallback: log if table isn't created yet in dev
-        console.warn('Broker lead table fallback notice:', error.message);
+        throw error;
       }
 
       setBrokerLeadSuccess(true);
     } catch (err: any) {
-      setBrokerLeadError(err.message || 'Failed to submit request. Please try again.');
+      console.error('Supabase broker lead submission error:', err);
+      setBrokerLeadError(err.message || 'Failed to submit request. Please check database permissions.');
     } finally {
       setIsSubmittingBrokerLead(false);
     }
@@ -600,7 +599,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         </div>
 
-        {/* SUB-HERO BROKER CALLOUT BANNER (TRIGGERS BROKER LEAD MODAL) */}
+        {/* SUB-HERO BROKER CALLOUT BANNER */}
         <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-lg backdrop-blur-sm mt-4">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center justify-center p-2 rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 shrink-0">
