@@ -399,8 +399,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Sign In / Sign Up Trigger */}
-          <div className="shrink-0 flex gap-2">
+          {/* Nav Right Action Items (Broker Link + Sign In) */}
+          <div className="shrink-0 flex items-center gap-4">
+            <a 
+              href="/signup?broker_id=demo-broker" 
+              className="hidden md:flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5"/>
+              </svg>
+              For Brokers &amp; Agencies &rarr;
+            </a>
+
             <button
               type="button"
               onClick={() => {
@@ -557,14 +567,75 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           )}
 
         </div>
+
+        {/* SUB-HERO BROKER CALLOUT BANNER */}
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-lg backdrop-blur-sm mt-4">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center p-2 rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-200 font-mono">Commercial Auto Broker or Risk Manager?</p>
+              <p className="text-[11px] text-slate-400">Offer co-branded recall tracking, generate Loss Control Risk Certificates, and protect portfolio loss ratios.</p>
+            </div>
+          </div>
+          <a 
+            href="/signup?broker_id=demo-broker" 
+            className="whitespace-nowrap px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all shrink-0"
+          >
+            Explore Broker Solutions &rarr;
+          </a>
+        </div>
+      </section>
+
+      {/* BROKER & AGENCY VALUE PROPOSITION SECTION */}
+      <section className="py-12 bg-slate-950/60 border-y border-slate-800/80 my-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
+            <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase">Broker &amp; Agency Partner Program</span>
+            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono">Co-Branded Risk Intelligence Solutions</h2>
+            <p className="text-slate-400 text-xs">Drive client retention, optimize policy renewals, and maintain low loss ratios across your portfolio.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {/* Feature 1 */}
+            <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+              </div>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Protect Book Loss Ratios</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automate recall and safety monitoring across your commercial accounts to stop preventable claims before policy renewal.</p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </div>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Turnkey Client Retention</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Gift your fleet policyholders a co-branded safety workspace, keeping your brokerage top-of-mind every time they run an audit.</p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Underwriter Compliance</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Export unified Book Safety Scores and underwriter-ready Loss Control Risk Certificates to leverage better rates.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* STRIPE PRICING GRID */}
       <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
-            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest">Transparent Pricing</h2>
-            <p className="text-xl sm:text-2xl font-extrabold text-white">Choose Your Safety Tier</p>
+            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Transparent Pricing</h2>
+            <p className="text-xl sm:text-2xl font-extrabold text-white font-mono">Choose Your Safety Tier</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5 items-stretch">
@@ -574,20 +645,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 className={`relative rounded-xl border p-5 flex flex-col justify-between ${tier.color}`}
               >
                 {tier.popular && (
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md">
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md font-mono">
                     {tier.badge}
                   </div>
                 )}
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-base font-bold text-white">{tier.name}</h3>
+                    <h3 className="text-base font-bold text-white font-mono">{tier.name}</h3>
                     <p className="text-[11px] text-slate-400 mt-0.5">{tier.subtitle}</p>
                   </div>
 
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
-                    <span className="text-[11px] text-slate-400">{tier.billing}</span>
+                    <span className="text-[11px] text-slate-400 font-mono">{tier.billing}</span>
                   </div>
 
                   <ul className="space-y-2 text-[11px] text-slate-300">
@@ -605,7 +676,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <button
                   type="button"
                   onClick={() => handleTierCheckout(tier)}
-                  className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer ${tier.buttonStyle}`}
+                  className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer font-mono ${tier.buttonStyle}`}
                 >
                   Subscribe to {tier.name}
                 </button>
