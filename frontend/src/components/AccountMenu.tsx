@@ -48,7 +48,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
     }
   }, [orgName]);
 
-  const displayTitle = currentOrgName || 'My Fleet Co.';
+  const displayTitle = currentOrgName || (isBrokerPortal ? 'Partner Brokerage' : 'My Fleet Co.');
   const normalizedRole = (userRole || 'admin').toString().toLowerCase();
   const isAdmin = normalizedRole === 'admin';
 
@@ -126,7 +126,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
       >
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
         <span className="font-bold text-white max-w-[200px] truncate">
-          🏢 {displayTitle}
+          {isBrokerPortal ? '🏛️' : '🏢'} {displayTitle}
         </span>
         <span className="text-slate-400 text-[10px]">▼</span>
       </button>
@@ -138,26 +138,28 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
           <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 space-y-3 font-mono text-xs text-white">
             
-            {/* ACTIVE WORKSPACE */}
+            {/* ACTIVE WORKSPACE HEADER */}
             <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5">
               <div className="flex justify-between items-center">
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Active Workspace</p>
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                  {isBrokerPortal ? 'Active Agency' : 'Active Workspace'}
+                </p>
                 <span className="bg-slate-800 text-cyan-400 text-[9px] px-2 py-0.5 rounded font-bold uppercase border border-cyan-500/20">
-                  {subscriptionTier} Plan
+                  {isBrokerPortal ? 'PORTFOLIO MODE' : `${subscriptionTier} Plan`}
                 </span>
               </div>
               <p className="text-sm font-extrabold text-white truncate flex items-center gap-1.5">
-                <span>🏢</span> {displayTitle}
+                <span>{isBrokerPortal ? '🏛️' : '🏢'}</span> {displayTitle}
               </p>
               <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400 truncate max-w-[160px]">{userEmail}</span>
                 <span className="bg-cyan-500/10 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-cyan-500/30">
-                  {normalizedRole}
+                  {isBrokerPortal ? 'BROKER' : normalizedRole}
                 </span>
               </div>
             </div>
 
-            {/* ADMINISTRATION */}
+            {/* SINGLE-FLEET ADMINISTRATION (HIDDEN IN BROKER PORTAL) */}
             {isAdmin && !isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
@@ -201,51 +203,90 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             )}
 
-            {/* UNDERWRITER & INSURANCE QUICK TOOLS */}
-            <div className="space-y-1 border-t border-slate-800/80 pt-2">
-              <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">
-                Underwriter &amp; Insurance Quick Tools
-              </p>
-              
-              <button
-                type="button"
-                onClick={handleShareClick}
-                className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                  copiedState
-                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
-                    : 'hover:bg-slate-800 text-slate-300 hover:text-white'
-                }`}
-              >
-                <span>
-                  {copiedState
-                    ? '✓ Link Copied!'
-                    : isBrokerPortal
-                    ? '🔗 Share Client Onboarding Link'
-                    : '🔗 Share Live Underwriter Link'}
-                </span>
-                <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
-              </button>
+            {/* BROKER / AGENCY SPECIFIC TOOLS */}
+            {isBrokerPortal && (
+              <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                <p className="text-[9px] text-cyan-400 uppercase font-bold px-1 tracking-wider">
+                  Agency Command &amp; Tools
+                </p>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setNewOrgName(currentOrgName);
+                    setIsOrgModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
+                >
+                  <span>🛡️ Agency Co-Branding Settings</span>
+                  <span className="text-slate-500">→</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={handleDownloadClick}
-                disabled={downloadingState}
-                className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                  downloadingState
-                    ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/50 font-bold animate-pulse'
-                    : 'hover:bg-slate-800 text-slate-300 hover:text-white'
-                }`}
-              >
-                <span>
-                  {downloadingState
-                    ? '⏳ Exporting PDF...'
-                    : isBrokerPortal
-                    ? '📄 Export Portfolio Audit PDF'
-                    : '📄 Export Loss Control PDF'}
-                </span>
-                <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={handleShareClick}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    copiedState
+                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <span>{copiedState ? '✓ Onboarding Link Copied!' : '🔗 Share Client Onboarding Link'}</span>
+                  <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadClick}
+                  disabled={downloadingState}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    downloadingState
+                      ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/50 font-bold animate-pulse'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <span>{downloadingState ? '⏳ Exporting Portfolio PDF...' : '📄 Export Portfolio Audit PDF'}</span>
+                  <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* STANDARD FLEET QUICK TOOLS (ONLY SHOWN TO DIRECT FLEETS) */}
+            {!isBrokerPortal && (
+              <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">
+                  Underwriter Quick Tools
+                </p>
+                
+                <button
+                  type="button"
+                  onClick={handleShareClick}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    copiedState
+                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <span>{copiedState ? '✓ Link Copied!' : '🔗 Share Live Underwriter Link'}</span>
+                  <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadClick}
+                  disabled={downloadingState}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    downloadingState
+                      ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/50 font-bold animate-pulse'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <span>{downloadingState ? '⏳ Exporting PDF...' : '📄 Export Loss Control PDF'}</span>
+                  <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
+                </button>
+              </div>
+            )}
 
             {/* SESSION CONTROL */}
             <div className="border-t border-slate-800 pt-2">
@@ -265,13 +306,13 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
         </>
       )}
 
-      {/* EDIT ORGANIZATION NAME MODAL */}
+      {/* EDIT AGENCY / FLEET NAME MODAL */}
       {isOrgModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                ⚙️ Organization Settings
+                ⚙️ {isBrokerPortal ? 'Agency Settings' : 'Organization Settings'}
               </h3>
               <button onClick={() => setIsOrgModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 ✕
@@ -280,14 +321,16 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
 
             <form onSubmit={handleSaveOrgName} className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Company / Fleet Name</label>
+                <label className="block text-xs text-slate-400 mb-1">
+                  {isBrokerPortal ? 'Brokerage / Agency Name' : 'Company / Fleet Name'}
+                </label>
                 <input
                   type="text"
                   required
                   value={newOrgName}
                   onChange={(e) => setNewOrgName(e.target.value)}
                   className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                  placeholder="e.g. Apex Logistics Corp."
+                  placeholder={isBrokerPortal ? 'e.g. Partner Brokerage' : 'e.g. Apex Logistics Corp.'}
                 />
               </div>
 
