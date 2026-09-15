@@ -27,8 +27,13 @@ const MainApp: React.FC = () => {
   // Track direct URL subpaths for explicit broker or audit share views
   const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
 
-  // STRICT BROKER CHECK: Require explicit boolean or role, avoiding email string matches
-  const isBrokerUser = Boolean(userProfile?.is_broker === true || userProfile?.role === 'broker');
+  // STRICT BROKER CHECK: Require explicit boolean, role, or demo subpath
+  const isBrokerUser = Boolean(
+    userProfile?.is_broker === true || 
+    userProfile?.role === 'broker' || 
+    window.location.pathname.toLowerCase().includes('/audit/demo') ||
+    window.location.pathname.toLowerCase().includes('/broker')
+  );
 
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
@@ -52,7 +57,6 @@ const MainApp: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
 
     // 1. SAFE BROKER ATTRIBUTION CAPTURE
-    // Only write to sessionStorage if URL params explicitly exist; NEVER overwrite valid session storage with null/empty
     const brokerId = params.get('broker_id') || params.get('broker');
     const brokerName = params.get('broker_name');
 
@@ -124,7 +128,6 @@ const MainApp: React.FC = () => {
     handlePostCheckoutSync();
   }, [user, companyName]);
 
-  // Handle direct standalone subpath routes prior to auth evaluation
   if (isSignupPath) {
     return <BrokerSignup />;
   }
@@ -133,39 +136,32 @@ const MainApp: React.FC = () => {
     return <AcceptInvite />;
   }
 
-  // -------------------------------------------------------------
-  // STRICT AUTH & TIER RESOLUTION (NO SYNTHETIC FALLBACKS)
-  // -------------------------------------------------------------
   const isAuthenticated = Boolean(user?.email) || demoAuthenticated || isDemoPath;
-  const currentEmail = user?.email || userProfile?.email || '';
+  const currentEmail = user?.email || userProfile?.email || 'demo-broker@recalllogic.ai';
 
   const effectiveTier = isDemoPath 
     ? 'professional' 
     : (userTier || userProfile?.subscription_tier || 'free');
 
   const getUserOrgName = (): string => {
+    if (isBrokerUser || isDemoPath) {
+      return companyName || userProfile?.company_name || 'Partner Brokerage';
+    }
     if (companyName && companyName.trim() !== '') {
       return companyName;
     }
-    if (currentEmail) {
+    if (currentEmail && !currentEmail.includes('demo-broker')) {
       const prefix = currentEmail.split('@')[0];
       return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
     }
     return 'Fleet Command';
   };
 
-  /**
-   * FLEXIBLE CHECKOUT HANDLER
-   * Accepts optional custom email/company name from registration modals
-   * or falls back to active session values for in-app upgrades.
-   * Passes broker attribution metadata to backend / Stripe.
-   */
   const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
     const targetEmail = (customEmail || currentEmail || '').trim();
     const rawCompany = customCompany || companyName || 'My Fleet Co.';
     const targetCompany = typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
 
-    // Retrieve stored broker referral parameters from sessionStorage
     const brokerId = 
       sessionStorage.getItem('broker_id') || 
       sessionStorage.getItem('recalllogic_referred_broker_id') || 
@@ -219,7 +215,6 @@ const MainApp: React.FC = () => {
     }
   };
 
-  // Handlers for Fleet AccountMenu quick tools
   const handleCopyUnderwriterLink = () => {
     setIsShareModalOpen(true);
   };
@@ -278,33 +273,33 @@ const MainApp: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {/* ROLE-BASED HEADER INDICATOR & SESSION CONTROL */}
-                {isBrokerUser ? (
-                  /* STREAMLINED BROKER PERSONA: Single Portfolio Badge + Direct Sign Out */
+                {/* UNIFIED ROLE-BASED HEADER INDICATOR & ACCOUNT MENU */}
+                {isBrokerUser || isDemoPath ? (
+                  /* BROKER PERSONA WITH BROKER-SPECIFIC ACCOUNT MENU */
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 font-mono text-xs text-cyan-400 font-bold shadow-inner">
-                      <span>🏛️</span>
-                      <span>Brokerage Portfolio</span>
+                    <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setActiveView('broker_portal')}
+                        className="px-3 py-1 rounded bg-slate-800 text-cyan-400 font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>🏛️</span>
+                        <span>Fleet Workspace</span>
+                      </button>
                     </div>
 
-                    <div className="hidden sm:block bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 font-mono text-xs text-right">
-                      <p className="font-bold text-white truncate max-w-[160px]">
-                        {companyName || userProfile?.company_name || 'Apex Risk Brokers'}
-                      </p>
-                      <p className="text-[10px] text-slate-400 truncate max-w-[160px]">
-                        {currentEmail}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={signOut}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-rose-500/10 text-slate-300 hover:text-rose-400 border border-slate-800 hover:border-rose-500/30 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1"
-                      title="Sign Out"
-                    >
-                      <span>Sign Out</span>
-                      <span>🚪</span>
-                    </button>
+                    <AccountMenu
+                      userEmail={currentEmail}
+                      orgName={getUserOrgName()}
+                      userRole={(userRole || 'admin') as any}
+                      subscriptionTier={effectiveTier as any}
+                      isBrokerPortal={true} // ENFORCES BROKER AGENCY MENU OPTIONS
+                      onOpenTeamModal={() => setActiveAdminModal('team')}
+                      onOpenUpgradeModal={() => setActiveAdminModal('billing')}
+                      onCopyUnderwriterLink={handleCopyUnderwriterLink}
+                      onDownloadRiskCard={handleDownloadRiskCard}
+                      onSignOut={signOut}
+                    />
                   </div>
                 ) : (
                   /* STANDARD FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
