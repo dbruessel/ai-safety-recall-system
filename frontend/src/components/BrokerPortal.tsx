@@ -20,40 +20,37 @@ export const BrokerPortal: React.FC = () => {
   const [copiedInvite, setCopiedInvite] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // GUIDED TOUR OVERLAY STATE
-  const [isTourActive, setIsTourActive] = useState<boolean>(() => {
-    return sessionStorage.getItem('recalllogic_broker_tour_seen') !== 'true';
-  });
+  // FORCE TOUR ACTIVE BY DEFAULT FOR DEMO OUTREACH
+  const [isTourActive, setIsTourActive] = useState<boolean>(true);
   const [currentTourStep, setCurrentTourStep] = useState<number>(0);
 
-  // Dynamic Brokerage Brand Name
   const brokerBrandName = userProfile?.company_name || companyName || 'Partner Brokerage';
 
   const tourSteps = [
     {
-      title: "1. Portfolio Command Center",
+      title: "1. Book Safety Score & Risk Metrics",
       badge: "MACRO RISK OVERVIEW",
-      description: "Monitor real-time Book Safety Scores, total managed VINs, and unremedied safety recalls across your entire commercial book."
+      description: "Monitor real-time Book Safety Scores, active fleets, managed VINs, and open recalls across your commercial accounts."
     },
     {
-      title: "2. Underwriter Compliance PDF Export",
+      title: "2. Export Underwriter Compliance PDF",
       badge: "RENEWAL LEVERAGE",
-      description: "Export consolidated Loss Control Risk Certificates with a single click to negotiate lower renewal rates with carriers."
+      description: "Export unified Loss Control Risk Certificates with one click to prove client risk reduction to carrier underwriters."
     },
     {
-      title: "3. Client Workspace Drill-Down",
+      title: "3. Single Client Workspace Drill-Down",
       badge: "READ-ONLY AUDIT ACCESS",
-      description: "Click any account (like Apex Logistics or Summit) to inspect individual VIN recall statuses and repair completion rates."
+      description: "Click any account (like Apex Logistics or Summit) to inspect individual VIN recall statuses and dealer repair progress."
     },
     {
-      title: "4. Agency Co-Branding & Control",
+      title: "4. Agency Co-Branded Portal",
       badge: "AGENCY AUTHORITY",
-      description: "Your clients see YOUR agency branding when running safety audits—keeping your brokerage top-of-mind year-round."
+      description: "Your policyholders see YOUR brokerage branding during safety audits, reinforcing agency value year-round."
     },
     {
-      title: "5. Ready to Invite Your Fleets?",
+      title: "5. Ready to Onboard Your Fleets?",
       badge: "LAUNCH YOUR FLYWHEEL",
-      description: "Gift policyholders 10 free VIN lookups. Click below to copy your co-branded onboarding link and send it directly to your fleet clients!"
+      description: "Gift your policyholders complimentary VIN lookups. Click below to copy your agency onboarding link and share it with clients!"
     }
   ];
 
@@ -115,14 +112,8 @@ export const BrokerPortal: React.FC = () => {
       setCurrentTourStep(prev => prev + 1);
     } else {
       handleCopyInviteLink();
-      sessionStorage.setItem('recalllogic_broker_tour_seen', 'true');
       setIsTourActive(false);
     }
-  };
-
-  const handleCloseTour = () => {
-    sessionStorage.setItem('recalllogic_broker_tour_seen', 'true');
-    setIsTourActive(false);
   };
 
   const handleExportPortfolioPDF = async () => {
@@ -162,107 +153,35 @@ export const BrokerPortal: React.FC = () => {
   const totalOpenRecalls = fleets.reduce((acc, f) => acc + f.open_recalls, 0);
   const avgSafetyScore = fleets.length ? Math.round(fleets.reduce((acc, f) => acc + f.safety_score, 0) / fleets.length) : 100;
 
-  // HELPER TOOLTIP CARD COMPONENT
-  const RenderTooltip = ({ stepIndex }: { stepIndex: number }) => {
-    if (!isTourActive || currentTourStep !== stepIndex) return null;
-
-    return (
-      <div className="absolute z-50 w-72 sm:w-80 bg-[#0D1322] border-2 border-cyan-400 rounded-2xl p-4 shadow-[0_0_30px_rgba(6,182,212,0.3)] space-y-3 font-mono text-slate-100 animate-in fade-in zoom-in-95">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-          <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
-            {tourSteps[stepIndex].badge}
-          </span>
-          <button 
-            type="button" 
-            onClick={handleCloseTour}
-            className="text-slate-400 hover:text-white transition text-xs cursor-pointer px-1"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="space-y-1">
-          <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5">
-            <span>💡</span> {tourSteps[stepIndex].title}
-          </h3>
-          <p className="text-[11px] text-slate-300 leading-normal">
-            {tourSteps[stepIndex].description}
-          </p>
-        </div>
-
-        {/* Footer Navigation */}
-        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            {tourSteps.map((_, idx) => (
-              <span 
-                key={idx}
-                className={`h-1 rounded-full transition-all ${
-                  idx === currentTourStep ? 'w-4 bg-cyan-400' : 'w-1 bg-slate-700'
-                }`}
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {currentTourStep > 0 && (
-              <button
-                type="button"
-                onClick={() => setCurrentTourStep(prev => prev - 1)}
-                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded cursor-pointer"
-              >
-                ← Back
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleNextTourStep}
-              className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-[10px] font-bold rounded cursor-pointer font-bold"
-            >
-              {currentTourStep === tourSteps.length - 1 ? "🔗 Copy Link & Finish" : "Next →"}
-            </button>
-          </div>
-        </div>
-
-      </div>
-    );
-  };
-
   return (
     <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
       
-      {/* DEMO BANNER & HEADER TOOLBAR */}
-      <div className="bg-[#0D1322] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
+      {/* DEMO BANNER & HEADER TOOLBAR (STEP 5 HIGHLIGHT) */}
+      <div className={`bg-[#0D1322] p-4 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+        isTourActive && currentTourStep === 4 ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-slate-800'
+      }`}>
         <div className="text-xs text-slate-300 flex items-center gap-2">
           <span className="text-amber-400">⚡</span>
           <span>Interactive Demo View: Displaying sample commercial fleet accounts &amp; live loss metrics for <strong className="text-white">{brokerBrandName}</strong>.</span>
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={handleCopyInviteLink}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap border ${
-              copiedInvite
-                ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
-                : 'bg-[#06B6D4] hover:bg-cyan-400 border-cyan-500 text-slate-950 shadow-lg shadow-cyan-950/50'
-            }`}
-          >
-            {copiedInvite ? <span>✓ Link Copied!</span> : <span>🔗 Share Client Onboarding Link</span>}
-          </button>
-
-          {/* ANCHOR FOR STEP 5: SHARE LINK */}
-          <div className="absolute top-12 right-0">
-            <RenderTooltip stepIndex={4} />
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={handleCopyInviteLink}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap border ${
+            copiedInvite
+              ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
+              : 'bg-[#06B6D4] hover:bg-cyan-400 border-cyan-500 text-slate-950 shadow-lg shadow-cyan-950/50'
+          }`}
+        >
+          {copiedInvite ? <span>✓ Link Copied!</span> : <span>🔗 Share Client Onboarding Link</span>}
+        </button>
       </div>
 
-      {/* CO-BRANDED PORTFOLIO COMMAND HEADER */}
-      <div className="bg-[#0D1322] p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl relative">
+      {/* CO-BRANDED PORTFOLIO COMMAND HEADER (STEP 2 & STEP 4 HIGHLIGHT) */}
+      <div className={`bg-[#0D1322] p-6 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl ${
+        isTourActive && (currentTourStep === 1 || currentTourStep === 3) ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-slate-800'
+      }`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-cyan-950/80 border border-cyan-500/30 rounded-xl text-cyan-400 text-xl">
             🏛️
@@ -282,73 +201,56 @@ export const BrokerPortal: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={handleExportPortfolioPDF}
-            disabled={isExporting}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
-              isExporting
-                ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
-                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-            }`}
-          >
-            {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
-          </button>
+        <button
+          type="button"
+          onClick={handleExportPortfolioPDF}
+          disabled={isExporting}
+          className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
+            isExporting
+              ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
+              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+          }`}
+        >
+          {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
+        </button>
+      </div>
 
-          {/* ANCHOR FOR STEP 2: EXPORT PDF */}
-          <div className="absolute top-12 right-0">
-            <RenderTooltip stepIndex={1} />
-          </div>
+      {/* METRIC SUMMARY CARDS (STEP 1 HIGHLIGHT) */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-2 rounded-2xl transition-all duration-300 ${
+        isTourActive && currentTourStep === 0 ? 'border border-cyan-400 ring-2 ring-cyan-400/80 bg-cyan-950/20' : ''
+      }`}>
+        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Active Fleets</p>
+          <p className="text-2xl font-black text-white">{fleets.length}</p>
+        </div>
+
+        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Managed VINs</p>
+          <p className="text-2xl font-black text-cyan-400">{totalVins.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Book Safety Score</p>
+          <p className="text-2xl font-black text-emerald-400">{avgSafetyScore} / 100</p>
+        </div>
+
+        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Unremedied Recalls</p>
+          <p className="text-2xl font-black text-rose-400">{totalOpenRecalls}</p>
         </div>
       </div>
 
-      {/* METRIC SUMMARY CARDS WITH STEP 1 ANCHOR */}
-      <div className="relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Active Fleets</p>
-            <p className="text-2xl font-black text-white">{fleets.length}</p>
-          </div>
-
-          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Managed VINs</p>
-            <p className="text-2xl font-black text-cyan-400">{totalVins.toLocaleString()}</p>
-          </div>
-
-          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Book Safety Score</p>
-            <p className="text-2xl font-black text-emerald-400">{avgSafetyScore} / 100</p>
-          </div>
-
-          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Unremedied Recalls</p>
-            <p className="text-2xl font-black text-rose-400">{totalOpenRecalls}</p>
-          </div>
-        </div>
-
-        {/* ANCHOR FOR STEP 1: METRICS CENTER */}
-        <div className="absolute -bottom-24 left-1/2 transform -translate-x-1/2">
-          <RenderTooltip stepIndex={0} />
-        </div>
-      </div>
-
-      {/* MANAGED FLEET GRID WITH STEP 3 & STEP 4 ANCHOR */}
-      <div className="space-y-3 relative pt-12">
-        <div className="flex justify-between items-center relative">
+      {/* MANAGED FLEET GRID (STEP 3 HIGHLIGHT) */}
+      <div className={`space-y-3 p-2 rounded-2xl transition-all duration-300 ${
+        isTourActive && currentTourStep === 2 ? 'border border-cyan-400 ring-2 ring-cyan-400/80 bg-cyan-950/20' : ''
+      }`}>
+        <div className="flex justify-between items-center">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             {brokerBrandName} — Client Accounts
           </h2>
-
-          {/* ANCHOR FOR STEP 4: AGENCY CO-BRANDING */}
-          <div className="absolute top-8 left-0">
-            <RenderTooltip stepIndex={3} />
-          </div>
-
-          {/* ANCHOR FOR STEP 3: CLIENT GRID */}
-          <div className="absolute top-8 right-0">
-            <RenderTooltip stepIndex={2} />
-          </div>
+          <span className="text-[11px] text-slate-500">
+            Click any account to audit client workspace
+          </span>
         </div>
 
         {loading ? (
@@ -412,7 +314,69 @@ export const BrokerPortal: React.FC = () => {
         )}
       </div>
 
-      {/* RE-OPEN TOUR FLOATING BUTTON */}
+      {/* GUARANTEED UN-CLIPPED FLOATING TOUR CARD */}
+      {isTourActive && (
+        <div className="fixed bottom-6 right-6 z-[9999] w-80 sm:w-96 bg-[#0D1322] border-2 border-cyan-400 rounded-2xl p-5 shadow-[0_0_50px_rgba(6,182,212,0.4)] space-y-3 font-mono text-slate-100 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
+          
+          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+            <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
+              {tourSteps[currentTourStep].badge}
+            </span>
+            <button 
+              type="button" 
+              onClick={() => setIsTourActive(false)}
+              className="text-slate-400 hover:text-white transition text-xs cursor-pointer px-1"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+              <span>💡</span> {tourSteps[currentTourStep].title}
+            </h3>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              {tourSteps[currentTourStep].description}
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              {tourSteps.map((_, idx) => (
+                <span 
+                  key={idx}
+                  className={`h-1 rounded-full transition-all ${
+                    idx === currentTourStep ? 'w-4 bg-cyan-400' : 'w-1 bg-slate-700'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {currentTourStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentTourStep(prev => prev - 1)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded cursor-pointer"
+                >
+                  ← Back
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleNextTourStep}
+                className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-[10px] font-extrabold rounded cursor-pointer"
+              >
+                {currentTourStep === tourSteps.length - 1 ? "🔗 Copy Link & Finish" : "Next Step →"}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* RESTART TOUR BUTTON */}
       {!isTourActive && (
         <button
           type="button"
