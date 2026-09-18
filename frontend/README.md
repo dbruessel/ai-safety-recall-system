@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# RecallLogic — Commercial Auto Safety & Risk Intelligence
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+RecallLogic is an automated safety recall tracking and loss-control compliance platform built for **Commercial Insurance Brokers** and **Commercial Fleet Operators**. The platform continuously syncs vehicle VINs against official NHTSA recall databases, generates underwriter-ready Loss Control Risk Certificates, and drives a two-sided sales flywheel.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Key Platform Features
 
-## React Compiler
+* **Dual-Persona Workspaces:**
+  * **Insurance Brokers:** Access a macro Portfolio Command dashboard to monitor book safety scores, protect portfolio loss ratios, export loss control audit PDFs, and distribute co-branded client referral links.
+  * **Fleet Operators:** Manage single-VIN or bulk fleet recall tracking, organize dealer repair logistics (Open, Scheduled, Cleared), and generate proof-of-remedy certificates for policy renewal discounts.
+* **Non-Blocking Guided Product Tours:** Interactive, step-by-step contextual overlay tours on both Broker (`/audit/demo`) and Fleet (`/taskboard/demo`) demo routes to maximize conversion during cold outreach.
+* **Instant Inbound Lead Capture:** Built-in "Request Agency Access" modal on the landing page that saves high-intent broker leads directly to Supabase.
+* **Paywall & Stripe Checkout Sync:** Integrated with Stripe Checkout for seamless tier upgrades (`Standard $99/mo`, `Professional $249/mo`, `Enterprise $499/mo`) with automated post-checkout profile provision handlers.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Tech Stack & Architecture
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+* **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
+* **Database & Auth:** Supabase (PostgreSQL, Row Level Security, Auth Services)
+* **Payment Engine:** Stripe Checkout API & Webhooks
+* **Backend API:** Python / FastAPI / Node.js Engine (NHTSA Live Sync & PDF Export Generators)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🔗 Route Map & Testing URLs
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Target Persona | URL / Route | Description |
+| :--- | :--- | :--- |
+| **Root Homepage** | `https://recalllogic.ai/` | Direct VIN audit tool, broker value proposition section, and lead capture modal. |
+| **Broker Portfolio Demo** | `https://recalllogic.ai/audit/demo` | Bypasses auth; loads interactive broker portfolio command with guided agency tour. |
+| **Fleet Operator Demo** | `https://recalllogic.ai/taskboard/demo` | Bypasses auth; loads interactive vehicle taskboard with guided operational tour. |
+| **Co-Branded Sign Up** | `https://recalllogic.ai/signup?broker_id=<ID>` | Custom referral onboarding route linking new fleet accounts to referring brokerages. |
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## ⚙️ Environment Variables Setup
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Create a `.env.local` file in the root directory and configure the following parameters:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=[https://your-supabase-project.supabase.co](https://your-supabase-project.supabase.co)
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Backend API Engine URL
+VITE_API_URL=[https://ai-safety-recall-system.onrender.com](https://ai-safety-recall-system.onrender.com)
+
+# Stripe Pricing Tier IDs
+VITE_STRIPE_PRICE_STANDARD=price_1N...
+VITE_STRIPE_PRICE_PRO=price_1N...
+VITE_STRIPE_PRICE_ENTERPRISE=price_1N...
+
+git clone [https://github.com/your-org/recalllogic-frontend.git](https://github.com/your-org/recalllogic-frontend.git)
+cd recalllogic-frontend
+
+npm install
+
+npm run dev
