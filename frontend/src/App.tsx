@@ -24,36 +24,32 @@ const MainApp: React.FC = () => {
   const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
   const isAcceptInvitePath = window.location.pathname.toLowerCase().startsWith('/accept-invite');
 
-  // Track direct URL subpaths for explicit broker or audit share views
-  const [isDemoPath, setIsDemoPath] = useState<boolean>(false);
+  // Track DEMO routes for Fleet & Broker outreach
+  const isFleetDemoPath = window.location.pathname.toLowerCase().includes('/taskboard/demo') || new URLSearchParams(window.location.search).get('role') === 'fleet';
+  const isBrokerDemoPath = window.location.pathname.toLowerCase().includes('/audit/demo') || window.location.pathname.toLowerCase().includes('/broker');
+  const isDemoPath = isFleetDemoPath || isBrokerDemoPath;
 
-  // STRICT BROKER CHECK: Require explicit boolean, role, or demo subpath
+  // STRICT BROKER CHECK: Require explicit boolean or role
   const isBrokerUser = Boolean(
-    userProfile?.is_broker === true || 
-    userProfile?.role === 'broker' || 
-    window.location.pathname.toLowerCase().includes('/audit/demo') ||
-    window.location.pathname.toLowerCase().includes('/broker')
+    userProfile?.is_broker === true || userProfile?.role === 'broker'
   );
 
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
-    const path = window.location.pathname.toLowerCase();
-    if (path.includes('/audit/demo') || path.includes('/broker')) {
-      return 'broker_portal';
-    }
-    return isBrokerUser ? 'broker_portal' : 'workspace';
+    if (isFleetDemoPath) return 'workspace';
+    if (isBrokerDemoPath || isBrokerUser) return 'broker_portal';
+    return 'workspace';
   });
 
   // Track client fleet auditing drill-down
   const [auditingFleetId, setAuditingFleetId] = useState<string | null>(null);
 
   // Modal display states for header controls
-  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
   // Handle URL parameter inspection, broker attribution capture, and strict view routing
   useEffect(() => {
-    const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
 
     // 1. SAFE BROKER ATTRIBUTION CAPTURE
@@ -71,19 +67,17 @@ const MainApp: React.FC = () => {
 
     // 2. VIEW ROUTING LOGIC
     const auditedOrg = params.get('org');
-
     if (auditedOrg) {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
-    } else if (path.includes('/audit/demo') || path.includes('/audit/share') || path.includes('/broker')) {
-      setIsDemoPath(true);
-      setActiveView('broker_portal');
-    } else if (isBrokerUser) {
+    } else if (isFleetDemoPath) {
+      setActiveView('workspace');
+    } else if (isBrokerDemoPath || isBrokerUser) {
       setActiveView('broker_portal');
     } else {
       setActiveView('workspace');
     }
-  }, [isBrokerUser]);
+  }, [isBrokerUser, isFleetDemoPath, isBrokerDemoPath]);
 
   // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
   useEffect(() => {
@@ -93,7 +87,6 @@ const MainApp: React.FC = () => {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const activeUser = session?.user || user;
-
           if (activeUser?.email) {
             const userEmail = activeUser.email;
             const prefix = userEmail.split('@')[0];
@@ -137,24 +130,21 @@ const MainApp: React.FC = () => {
   }
 
   const isAuthenticated = Boolean(user?.email) || demoAuthenticated || isDemoPath;
-  const currentEmail = user?.email || userProfile?.email || 'demo-broker@recalllogic.ai';
-
-  const effectiveTier = isDemoPath 
-    ? 'professional' 
-    : (userTier || userProfile?.subscription_tier || 'free');
+  const currentEmail = user?.email || userProfile?.email || (isBrokerDemoPath ? 'demo-broker@recalllogic.ai' : 'demo-fleet@recalllogic.ai');
+  const effectiveTier = isDemoPath ? 'professional' : (userTier || userProfile?.subscription_tier || 'free');
 
   const getUserOrgName = (): string => {
-    if (isBrokerUser || isDemoPath) {
+    if (isBrokerUser || isBrokerDemoPath) {
       return companyName || userProfile?.company_name || 'Partner Brokerage';
     }
     if (companyName && companyName.trim() !== '') {
       return companyName;
     }
-    if (currentEmail && !currentEmail.includes('demo-broker')) {
+    if (currentEmail && !currentEmail.includes('demo-')) {
       const prefix = currentEmail.split('@')[0];
       return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
     }
-    return 'Fleet Command';
+    return 'Apex Freight Logistics';
   };
 
   const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
@@ -162,15 +152,8 @@ const MainApp: React.FC = () => {
     const rawCompany = customCompany || companyName || 'My Fleet Co.';
     const targetCompany = typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
 
-    const brokerId = 
-      sessionStorage.getItem('broker_id') || 
-      sessionStorage.getItem('recalllogic_referred_broker_id') || 
-      'direct';
-
-    const brokerName = 
-      sessionStorage.getItem('broker_name') || 
-      sessionStorage.getItem('recalllogic_referred_broker_name') || 
-      '';
+    const brokerId = sessionStorage.getItem('broker_id') || sessionStorage.getItem('recalllogic_referred_broker_id') || 'direct';
+    const brokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
 
     if (!targetEmail) {
       console.error('Checkout blocked: User email missing.');
@@ -179,13 +162,12 @@ const MainApp: React.FC = () => {
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-
       const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           email: targetEmail,
           customer_email: targetEmail,
           tier: tierId,
@@ -202,7 +184,6 @@ const MainApp: React.FC = () => {
       }
 
       const data = await response.json();
-
       if (data?.url) {
         window.location.href = data.url;
       } else if (data?.sessionId) {
@@ -223,14 +204,11 @@ const MainApp: React.FC = () => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const fleetId = auditingFleetId || userProfile?.organization_id || 'demo-fleet-001';
-
       const response = await fetch(
         `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
         { method: 'GET' }
       );
-
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
-
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -246,148 +224,125 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col justify-between font-sans">
-      <main className="flex-1">
-        {!isAuthenticated ? (
-          <LandingPage
-            onSignIn={signInDemo}
-            onSelectTier={(tierId, email, company) => handleCheckout(tierId, email, company)}
-          />
-        ) : (
-          <div>
-            {/* TOP GLOBAL HEADER */}
-            <header className="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/80 gap-4">
-              <div className="flex items-center gap-3">
-                <img 
-                  src="/recall-logo.png" 
-                  alt="RecallLogic Logo" 
-                  className="h-6 w-auto object-contain"
+    <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {!isAuthenticated ? (
+        <LandingPage
+          onSignIn={signInDemo}
+          onSelectTier={(tierId, email, company) => handleCheckout(tierId, email, company)}
+        />
+      ) : (
+        <>
+          {/* TOP GLOBAL HEADER */}
+          <header className="border-b border-slate-800/80 bg-[#070B14]/90 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-[#06B6D4] font-extrabold tracking-wider font-mono text-sm sm:text-base">
+                RECALLLOGIC WORKSPACE
+              </span>
+              <span className="hidden sm:inline-block text-slate-600">|</span>
+              <span className="hidden sm:inline-block text-slate-400 font-mono text-xs">
+                {isBrokerDemoPath
+                  ? 'BROKER AUDIT DEMO MODE'
+                  : isFleetDemoPath
+                  ? 'FLEET AUDIT DEMO MODE'
+                  : 'Safety Intelligence System'}
+              </span>
+            </div>
+
+            {/* UNIFIED ROLE-BASED HEADER INDICATOR & ACCOUNT MENU */}
+            <div className="flex items-center gap-3">
+              {isBrokerUser || isBrokerDemoPath ? (
+                /* BROKER PERSONA WITH BROKER-SPECIFIC ACCOUNT MENU */
+                <AccountMenu
+                  userEmail={currentEmail}
+                  orgName={getUserOrgName()}
+                  userRole="broker"
+                  subscriptionTier="Enterprise"
+                  isBrokerPortal={true}
+                  onOpenTeamModal={() => setActiveAdminModal('team')}
+                  onOpenUpgradeModal={() => setActiveAdminModal('billing')}
+                  onCopyUnderwriterLink={handleCopyUnderwriterLink}
+                  onDownloadRiskCard={handleDownloadRiskCard}
+                  onSignOut={signOut}
                 />
-                <span className="font-extrabold text-white text-sm tracking-tight font-mono">
-                  RECALLLOGIC WORKSPACE
-                </span>
-                <span className="text-slate-600 text-xs">|</span>
-                <span className="text-xs text-[#06B6D4] font-mono font-bold">
-                  {isDemoPath ? 'BROKER AUDIT DEMO MODE' : 'Safety Intelligence System'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                {/* UNIFIED ROLE-BASED HEADER INDICATOR & ACCOUNT MENU */}
-                {isBrokerUser || isDemoPath ? (
-                  /* BROKER PERSONA WITH BROKER-SPECIFIC ACCOUNT MENU */
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setActiveView('broker_portal')}
-                        className="px-3 py-1 rounded bg-slate-800 text-cyan-400 font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                      >
-                        <span>🏛️</span>
-                        <span>Fleet Workspace</span>
-                      </button>
-                    </div>
-
-                    <AccountMenu
-                      userEmail={currentEmail}
-                      orgName={getUserOrgName()}
-                      userRole={(userRole || 'admin') as any}
-                      subscriptionTier={effectiveTier as any}
-                      isBrokerPortal={true} // ENFORCES BROKER AGENCY MENU OPTIONS
-                      onOpenTeamModal={() => setActiveAdminModal('team')}
-                      onOpenUpgradeModal={() => setActiveAdminModal('billing')}
-                      onCopyUnderwriterLink={handleCopyUnderwriterLink}
-                      onDownloadRiskCard={handleDownloadRiskCard}
-                      onSignOut={signOut}
-                    />
-                  </div>
-                ) : (
-                  /* STANDARD FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
-                  <>
-                    <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 font-mono text-xs">
-                      <button
-                        onClick={() => setActiveView('workspace')}
-                        className="px-3 py-1 rounded bg-slate-800 text-white font-bold transition-all cursor-pointer"
-                      >
-                        Fleet Workspace
-                      </button>
-                    </div>
-
-                    <AccountMenu
-                      userEmail={currentEmail}
-                      orgName={getUserOrgName()}
-                      userRole={(userRole || 'admin') as any}
-                      subscriptionTier={effectiveTier as any}
-                      isBrokerPortal={false}
-                      onOpenTeamModal={() => setActiveAdminModal('team')}
-                      onOpenUpgradeModal={() => setActiveAdminModal('billing')}
-                      onCopyUnderwriterLink={handleCopyUnderwriterLink}
-                      onDownloadRiskCard={handleDownloadRiskCard}
-                      onSignOut={signOut}
-                    />
-                  </>
-                )}
-              </div>
-            </header>
-
-            {/* ACTIVE CLIENT AUDIT BREADCRUMB BANNER */}
-            {auditingFleetId && (
-              <div className="bg-cyan-950/90 border-b border-cyan-500/40 px-6 py-2.5 flex justify-between items-center text-xs font-mono text-cyan-300 font-bold">
-                <div className="flex items-center gap-2">
-                  <span>🏛️ Portfolio Command</span>
-                  <span className="text-slate-500">&gt;</span>
-                  <span>🚚 Auditing: <strong className="text-white uppercase">{auditingFleetId}</strong> [Read-Only Mode]</span>
-                </div>
-                <button
-                  onClick={() => {
-                    window.history.pushState({}, '', window.location.pathname);
-                    setAuditingFleetId(null);
-                    setActiveView('broker_portal');
-                  }}
-                  className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
-                >
-                  ← Back to Portfolio Command
-                </button>
-              </div>
-            )}
-
-            {/* MAIN CONTENT ROUTER */}
-            <div className="py-6">
-              {activeView === 'broker_portal' && !auditingFleetId ? (
-                <BrokerPortal />
               ) : (
-                <TaskBoard userTier={effectiveTier} />
+                /* STANDARD FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
+                <AccountMenu
+                  userEmail={currentEmail}
+                  orgName={getUserOrgName()}
+                  userRole={userRole || 'admin'}
+                  subscriptionTier={effectiveTier}
+                  isBrokerPortal={false}
+                  onOpenTeamModal={() => setActiveAdminModal('team')}
+                  onOpenUpgradeModal={() => setActiveAdminModal('billing')}
+                  onCopyUnderwriterLink={handleCopyUnderwriterLink}
+                  onDownloadRiskCard={handleDownloadRiskCard}
+                  onSignOut={signOut}
+                />
               )}
             </div>
-          </div>
-        )}
-      </main>
+          </header>
 
-      <TeamManagementModal
-        isOpen={activeAdminModal === 'team'}
-        onClose={() => setActiveAdminModal(null)}
-      />
+          {/* ACTIVE CLIENT AUDIT BREADCRUMB BANNER */}
+          {auditingFleetId && (
+            <div className="bg-cyan-950/40 border-b border-cyan-500/30 px-6 py-2 flex items-center justify-between text-xs font-mono text-cyan-300">
+              <div className="flex items-center gap-2">
+                <span>🏛️ Portfolio Command &gt;</span>
+                <span className="font-bold text-white">🚚 Auditing: {auditingFleetId} [Read-Only Mode]</span>
+              </div>
+              <button
+                onClick={() => {
+                  window.history.pushState({}, '', window.location.pathname);
+                  setAuditingFleetId(null);
+                  setActiveView('broker_portal');
+                }}
+                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
+              >
+                ← Back to Portfolio Command
+              </button>
+            </div>
+          )}
 
-      {/* STRICTLY RENDERS BILLING MODAL ONLY FOR LOGGED IN USERS WITH VALID EMAIL */}
+          {/* MAIN CONTENT ROUTER */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {activeView === 'broker_portal' && !auditingFleetId ? (
+              <BrokerPortal />
+            ) : (
+              <TaskBoard userTier={effectiveTier} />
+            )}
+          </main>
+
+          <Footer />
+        </>
+      )}
+
+      {/* TEAM MANAGEMENT MODAL */}
+      {activeAdminModal === 'team' && (
+        <TeamManagementModal
+          isOpen={activeAdminModal === 'team'}
+          onClose={() => setActiveAdminModal(null)}
+        />
+      )}
+
+      {/* BILLING MANAGEMENT MODAL */}
       {activeAdminModal === 'billing' && isAuthenticated && currentEmail && (
         <BillingManagementModal
           isOpen={activeAdminModal === 'billing'}
-          subscriptionTier={(effectiveTier as any) || 'free'}
-          currentFleetCount={18}
           userEmail={currentEmail}
+          subscriptionTier={effectiveTier}
+          currentFleetCount={0}
           onClose={() => setActiveAdminModal(null)}
           onSelectTier={(tier) => handleCheckout(tier)}
         />
       )}
 
-      <BrokerShareModal
-        isOpen={isShareModalOpen}
-        userTier={effectiveTier}
-        shareUrl={`${window.location.origin}/audit/${userProfile?.organization_id || 'demo-fleet-001'}`}
-        onClose={() => setIsShareModalOpen(false)}
-      />
-
-      <Footer />
+      {/* SHARE / BROKER LINK MODAL */}
+      {isShareModalOpen && (
+        <BrokerShareModal
+          isOpen={isShareModalOpen}
+          shareUrl={window.location.href}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
