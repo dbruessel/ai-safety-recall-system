@@ -20,8 +20,43 @@ export const BrokerPortal: React.FC = () => {
   const [copiedInvite, setCopiedInvite] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  // GUIDED TOUR OVERLAY STATE
+  const [isTourActive, setIsTourActive] = useState<boolean>(() => {
+    return sessionStorage.getItem('recalllogic_broker_tour_seen') !== 'true';
+  });
+  const [currentTourStep, setCurrentTourStep] = useState<number>(0);
+
   // Dynamic Brokerage Brand Name
   const brokerBrandName = userProfile?.company_name || companyName || 'Partner Brokerage';
+
+  // TOUR STEPS CONFIGURATION: FINISHING WITH SHARE TO FLEET
+  const tourSteps = [
+    {
+      title: "1. Portfolio Command Center",
+      badge: "MACRO RISK OVERVIEW",
+      description: "Monitor real-time Book Safety Scores, total managed VINs, and unremedied safety recalls across your entire commercial book in one unified view."
+    },
+    {
+      title: "2. Underwriter Compliance PDF Export",
+      badge: "RENEWAL LEVERAGE",
+      description: "Export consolidated Loss Control Risk Certificates with a single click. Share underwriter-ready compliance cards with carriers to negotiate better renewal rates."
+    },
+    {
+      title: "3. Client Workspace Drill-Down",
+      badge: "READ-ONLY AUDIT ACCESS",
+      description: "Click any client account (like Apex Logistics or Summit Regional) to inspect individual VIN recall statuses, open campaigns, and repair completion rates in real time."
+    },
+    {
+      title: "4. Agency Co-Branding & Control",
+      badge: "AGENCY AUTHORITY",
+      description: "Your clients see YOUR agency branding when running safety audits—keeping your brokerage top-of-mind as a proactive risk partner year-round."
+    },
+    {
+      title: "5. Ready to Invite Your Fleets?",
+      badge: "LAUNCH YOUR FLYWHEEL",
+      description: "Gift your policyholders 10 free VIN lookups under your agency link. Click below to copy your co-branded onboarding link and send it directly to your fleet clients!"
+    }
+  ];
 
   // FETCH MANAGED FLEETS FOR BROKER BOOK-OF-BUSINESS
   useEffect(() => {
@@ -79,6 +114,23 @@ export const BrokerPortal: React.FC = () => {
     setTimeout(() => setCopiedInvite(false), 2500);
   };
 
+  // TOUR NAVIGATION & AUTO-COPY HANDLER
+  const handleNextTourStep = () => {
+    if (currentTourStep < tourSteps.length - 1) {
+      setCurrentTourStep(prev => prev + 1);
+    } else {
+      // Auto-copy onboarding link on final step completion
+      handleCopyInviteLink();
+      sessionStorage.setItem('recalllogic_broker_tour_seen', 'true');
+      setIsTourActive(false);
+    }
+  };
+
+  const handleCloseTour = () => {
+    sessionStorage.setItem('recalllogic_broker_tour_seen', 'true');
+    setIsTourActive(false);
+  };
+
   // MULTI-FLEET PORTFOLIO AUDIT PDF EXPORT HANDLER
   const handleExportPortfolioPDF = async () => {
     setIsExporting(true);
@@ -119,7 +171,7 @@ export const BrokerPortal: React.FC = () => {
   const avgSafetyScore = fleets.length ? Math.round(fleets.reduce((acc, f) => acc + f.safety_score, 0) / fleets.length) : 100;
 
   return (
-    <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto">
+    <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
       
       {/* DEMO BANNER & HEADER TOOLBAR */}
       <div className="bg-[#0D1322] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -272,6 +324,96 @@ export const BrokerPortal: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* GUIDED WALKTHROUGH OVERLAY MODAL */}
+      {isTourActive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#0D1322] border border-cyan-500/40 rounded-2xl p-6 max-w-lg w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] space-y-5 font-mono text-slate-100 relative">
+            
+            {/* Header Badge & Close */}
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30 uppercase tracking-widest">
+                {tourSteps[currentTourStep].badge}
+              </span>
+              <button 
+                type="button" 
+                onClick={handleCloseTour}
+                className="text-slate-400 hover:text-white transition text-xs cursor-pointer"
+              >
+                Skip Tour ✕
+              </button>
+            </div>
+
+            {/* Step Content */}
+            <div className="space-y-2">
+              <h3 className="text-base font-extrabold text-white">
+                {tourSteps[currentTourStep].title}
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {tourSteps[currentTourStep].description}
+              </p>
+            </div>
+
+            {/* Step Progress Dots & Navigation */}
+            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              
+              {/* Step Dots */}
+              <div className="flex items-center gap-1.5">
+                {tourSteps.map((_, idx) => (
+                  <span 
+                    key={idx}
+                    className={`h-1.5 rounded-full transition-all ${
+                      idx === currentTourStep 
+                        ? 'w-6 bg-cyan-400' 
+                        : 'w-1.5 bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Navigation Actions */}
+              <div className="flex items-center gap-2">
+                {currentTourStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentTourStep(prev => prev - 1)}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleNextTourStep}
+                  className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-lg transition cursor-pointer shadow-md shadow-cyan-950/50"
+                >
+                  {currentTourStep === tourSteps.length - 1 
+                    ? "🔗 Copy Link & Start Inviting Fleets" 
+                    : "Next Step &rarr;"
+                  }
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* RE-OPEN TOUR FLOATING BUTTON */}
+      {!isTourActive && (
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentTourStep(0);
+            setIsTourActive(true);
+          }}
+          className="fixed bottom-6 right-6 z-40 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 cursor-pointer"
+        >
+          <span>💡 Restart Product Tour</span>
+        </button>
+      )}
 
     </div>
   );
