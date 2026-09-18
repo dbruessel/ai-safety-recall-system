@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { FleetVinScanner } from './FleetVinScanner'; // Adjust path if fleetscanner sits in another folder
+import { FleetVinScanner } from './FleetVinScanner';
 
 interface TaskBoardProps {
   userTier?: string;
@@ -46,6 +46,46 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [exportState, setExportState] = useState<'idle' | 'generating' | 'done'>('idle');
 
+  // --- GUIDED PRODUCT TOUR STATE ---
+  const [isTourActive, setIsTourActive] = useState<boolean>(true);
+  const [currentTourStep, setCurrentTourStep] = useState<number>(0);
+
+  const tourSteps = [
+    {
+      title: "1. Recall Operations Workspace",
+      badge: "REAL-TIME SAFETY COMPLIANCE",
+      description: "Track power units, active NHTSA safety campaigns, dealer repair schedules, and vehicle limit quotas in one dashboard."
+    },
+    {
+      title: "2. Underwriter Verification & Proof",
+      badge: "INSURANCE SAVINGS LEVERAGE",
+      description: "Export signed PDF Loss Control Certificates or copy a live underwriter link to prove proactive safety management and request premium discounts."
+    },
+    {
+      title: "3. Precision Filter & Search Controls",
+      badge: "FLEET SEARCH ENGINE",
+      description: "Filter power units by vehicle make (Freightliner, Ford, Volvo) or compliance status (Open, Scheduled, Cleared) in milliseconds."
+    },
+    {
+      title: "4. Live Recall Monitoring Table",
+      badge: "ACTIVE TASKBOARD",
+      description: "Click 'Manage' on any power unit to update dealer repair logistics, track remedy progress, and mark safety campaigns as Cleared."
+    },
+    {
+      title: "5. Single-VIN Scan & Bulk CSV Import",
+      badge: "FLEET INGEST ENGINE",
+      description: "Add new power units anytime using 1-click VIN lookups or upload entire fleet CSV spreadsheets to sync live NHTSA records."
+    }
+  ];
+
+  const handleNextTourStep = () => {
+    if (currentTourStep < tourSteps.length - 1) {
+      setCurrentTourStep(prev => prev + 1);
+    } else {
+      setIsTourActive(false);
+    }
+  };
+
   // --- DYNAMIC TIER VIN LIMIT COMPUTATION ---
   const displayLimit = useMemo(() => {
     if (userProfile?.vehicle_limit) {
@@ -60,7 +100,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   // --- FETCH REAL FLEET DATA FROM SUPABASE ---
   const fetchFleetData = useCallback(async () => {
     if (!userProfile?.organization_id) {
-      setRecallUnits([]);
+      // Demo Data Fallback for Non-Authenticated Tour Views
+      setRecallUnits([
+        { id: '1', unit: 'UNIT-101', vin: '1FUJGLDR5MLKE1234', makeModel: 'FREIGHTLINER CASCADIA 2023', nhtsaCampaign: '23V-891', recallDetails: 'STEERING AXLE DRAG LINK', description: 'Drag link taper joint may separate leading to sudden loss of steering control.', remedyStatus: 'Unassigned', complianceStatus: 'OPEN', severity: 'CRITICAL' },
+        { id: '2', unit: 'UNIT-204', vin: '1FTBW1Y85PKA54321', makeModel: 'FORD TRANSIT VAN 2022', nhtsaCampaign: '24V-012', recallDetails: 'REAR DRIVESHAFT FLEX COUPLING', description: 'Driveshaft flex coupling separation may result in loss of motive power while driving.', remedyStatus: 'Scheduled', complianceStatus: 'SCHEDULED', severity: 'HIGH', dealerName: 'Metro Ford Commercial' },
+        { id: '3', unit: 'UNIT-309', vin: '5YJ3E1EA7MF987654', makeModel: 'VOLVO VNL 860 2023', nhtsaCampaign: '23V-838', recallDetails: 'AIR BRAKE ACTUATOR DIAPHRAGM', description: 'Air leak in brake chamber diaphragm may increase stopping distances or cause drag.', remedyStatus: 'Completed', complianceStatus: 'CLEARED', severity: 'MEDIUM', dealerName: 'Volvo Truck Center' },
+      ]);
       setLoading(false);
       return;
     }
@@ -75,7 +120,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
 
       if (error) {
         console.error('Error fetching organization VINs:', error);
-      } else if (data) {
+      } else if (data && data.length > 0) {
         const mappedUnits: RecallItem[] = data.map((item: any) => ({
           id: item.id,
           unit: item.unit_number || item.unit || `UNIT-${item.vin?.slice(-4)}`,
@@ -93,6 +138,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         }));
 
         setRecallUnits(mappedUnits);
+      } else {
+        setRecallUnits([]);
       }
     } catch (err) {
       console.error('Unexpected error loading fleet records:', err);
@@ -166,7 +213,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     }
   };
 
-  // Sleek Non-Blocking PDF Export via FastAPI Backend Engine
   const handleExportRiskCertificate = () => {
     requireProAccess('Export Loss Control PDF', async () => {
       setExportState('generating');
@@ -203,7 +249,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     });
   };
 
-  // Clean Non-Blocking Inline Clipboard Handler
   const handleShareAuditLink = () => {
     requireProAccess('Share Live Underwriter Link', () => {
       const fleetId = userProfile?.organization_id || 'demo-fleet-001';
@@ -245,9 +290,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   };
 
   return (
-    <div className="px-6 space-y-6">
-      {/* SECTION HEADER & PRO ACTIONS BAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0D1322] p-5 rounded-2xl border border-slate-800">
+    <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
+      
+      {/* SECTION HEADER & PRO ACTIONS BAR (STEP 1, STEP 2 & STEP 5 HIGHLIGHT) */}
+      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0D1322] p-5 rounded-2xl border transition-all duration-300 ${
+        isTourActive && (currentTourStep === 0 || currentTourStep === 1 || currentTourStep === 4)
+          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+          : 'border-slate-800'
+      }`}>
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-extrabold text-white font-mono tracking-tight">
@@ -268,7 +318,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           </p>
         </div>
 
-        {/* TOP TOOLBAR BUTTONS WITH UNIFIED MESSAGING */}
+        {/* TOP TOOLBAR BUTTONS */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -296,7 +346,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             ⚡ Bulk CSV Import
           </button>
 
-          {/* INLINE SHARE AUDIT LINK BUTTON */}
           <button
             type="button"
             onClick={handleShareAuditLink}
@@ -310,18 +359,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
             }`}
           >
             {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            {copiedLink ? (
-              <>
-                <span>✓</span> Live Link Copied!
-              </>
-            ) : (
-              <>
-                <span className="text-cyan-400">⚡</span> Share Live Underwriter Link
-              </>
-            )}
+            {copiedLink ? <span>✓ Live Link Copied!</span> : <span>⚡ Share Live Underwriter Link</span>}
           </button>
 
-          {/* EXPORT RISK CERTIFICATE BUTTON */}
           <button
             type="button"
             onClick={handleExportRiskCertificate}
@@ -345,8 +385,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       </div>
 
-      {/* FILTER & SEARCH CONTROL BAR */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#0D1322] p-4 rounded-xl border border-slate-800">
+      {/* FILTER & SEARCH CONTROL BAR (STEP 3 HIGHLIGHT) */}
+      <div className={`flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#0D1322] p-4 rounded-xl border transition-all duration-300 ${
+        isTourActive && currentTourStep === 2
+          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+          : 'border-slate-800'
+      }`}>
         <div className="w-full sm:w-80">
           <input
             type="text"
@@ -417,8 +461,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       </div>
 
-      {/* RECALL MONITORING TABLE */}
-      <div className="bg-[#0D1322] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+      {/* RECALL MONITORING TABLE (STEP 4 HIGHLIGHT) */}
+      <div className={`bg-[#0D1322] border rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
+        isTourActive && currentTourStep === 3
+          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+          : 'border-slate-800'
+      }`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -496,6 +544,82 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       </div>
 
+      {/* GUARANTEED UN-CLIPPED FLOATING TOUR CARD */}
+      {isTourActive && (
+        <div className="fixed bottom-6 right-6 z-[9999] w-80 sm:w-96 bg-[#0D1322] border-2 border-cyan-400 rounded-2xl p-5 shadow-[0_0_50px_rgba(6,182,212,0.4)] space-y-3 font-mono text-slate-100 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
+          
+          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+            <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
+              {tourSteps[currentTourStep].badge}
+            </span>
+            <button 
+              type="button" 
+              onClick={() => setIsTourActive(false)}
+              className="text-slate-400 hover:text-white transition text-xs cursor-pointer px-1"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+              <span>💡</span> {tourSteps[currentTourStep].title}
+            </h3>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              {tourSteps[currentTourStep].description}
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              {tourSteps.map((_, idx) => (
+                <span 
+                  key={idx}
+                  className={`h-1 rounded-full transition-all ${
+                    idx === currentTourStep ? 'w-4 bg-cyan-400' : 'w-1 bg-slate-700'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {currentTourStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentTourStep(prev => prev - 1)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded cursor-pointer"
+                >
+                  ← Back
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleNextTourStep}
+                className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-[10px] font-extrabold rounded cursor-pointer"
+              >
+                {currentTourStep === tourSteps.length - 1 ? "🚀 Start Free Fleet Audit" : "Next Step →"}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* RESTART TOUR BUTTON */}
+      {!isTourActive && (
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentTourStep(0);
+            setIsTourActive(true);
+          }}
+          className="fixed bottom-6 right-6 z-40 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 cursor-pointer"
+        >
+          <span>💡 Restart Fleet Tour</span>
+        </button>
+      )}
+
       {/* SINGLE VIN SCAN MODAL */}
       {isSingleScanOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -526,7 +650,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
         </div>
       )}
 
-      {/* BULK CSV IMPORT MODAL REUSING FLEETVINSCANNER WITH WORKSPACE FLAG */}
+      {/* BULK CSV IMPORT MODAL */}
       {isBulkImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="max-w-4xl w-full bg-[#0D1322] border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
@@ -574,15 +698,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'SCHEDULED')}
-                  className="py-2 bg-amber-950 border border-amber-800 text-amber-400 text-xs font-bold rounded cursor-pointer"
+                  className="py-2 bg-yellow-950 border border-yellow-800 text-yellow-400 text-xs font-bold rounded cursor-pointer"
                 >
-                  SCHEDULED
+                  Mark SCHEDULED
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'CLEARED')}
-                  className="py-2 bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold rounded cursor-pointer"
+                  className="py-2 bg-green-950 border border-green-800 text-green-400 text-xs font-bold rounded cursor-pointer"
                 >
-                  CLEARED
+                  Mark COMPLETED
                 </button>
               </div>
             </div>
@@ -591,6 +715,4 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       )}
     </div>
   );
-};
-
-export default TaskBoard;
+}

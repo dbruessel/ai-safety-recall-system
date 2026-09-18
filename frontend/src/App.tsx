@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
-import TaskBoard from './components/TaskBoard';
+import { TaskBoard } from './components/TaskBoard';
 import BrokerPortal from './components/BrokerPortal';
 import BrokerSignup from './components/BrokerSignup';
 import AcceptInvite from './components/AcceptInvite';
