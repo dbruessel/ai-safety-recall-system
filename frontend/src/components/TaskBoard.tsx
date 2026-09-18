@@ -54,7 +54,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     {
       title: "1. Recall Operations Workspace",
       badge: "REAL-TIME SAFETY COMPLIANCE",
-      description: "Track power units, active NHTSA safety campaigns, dealer repair schedules, and vehicle limit quotas in one dashboard."
+      description: "Track vehicles, active NHTSA safety campaigns, dealer repair schedules, and vehicle limit quotas in one dashboard."
     },
     {
       title: "2. Underwriter Verification & Proof",
@@ -64,17 +64,17 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     {
       title: "3. Precision Filter & Search Controls",
       badge: "FLEET SEARCH ENGINE",
-      description: "Filter power units by vehicle make (Freightliner, Ford, Volvo) or compliance status (Open, Scheduled, Cleared) in milliseconds."
+      description: "Filter vehicles by make (Freightliner, Ford, Volvo) or compliance status (Open, Scheduled, Cleared) in milliseconds."
     },
     {
       title: "4. Live Recall Monitoring Table",
       badge: "ACTIVE TASKBOARD",
-      description: "Click 'Manage' on any power unit to update dealer repair logistics, track remedy progress, and mark safety campaigns as Cleared."
+      description: "Click 'Manage' on any vehicle to update dealer repair logistics, track remedy progress, and mark safety campaigns as Cleared."
     },
     {
       title: "5. Single-VIN Scan & Bulk CSV Import",
       badge: "FLEET INGEST ENGINE",
-      description: "Add new power units anytime using 1-click VIN lookups or upload entire fleet CSV spreadsheets to sync live NHTSA records."
+      description: "Add new vehicles anytime using 1-click VIN lookups or upload entire fleet CSV spreadsheets to sync live NHTSA records."
     }
   ];
 
@@ -471,7 +471,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-800 text-[11px] font-mono text-slate-400 bg-slate-950/50 uppercase tracking-wider">
-                <th className="py-3 px-4">Power Unit / VIN</th>
+                <th className="py-3 px-4">VEHICLE / VIN</th>
                 <th className="py-3 px-4">Make &amp; Model</th>
                 <th className="py-3 px-4">Safety Recall Details</th>
                 <th className="py-3 px-4">Remedy Logistics</th>
@@ -698,15 +698,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'SCHEDULED')}
-                  className="py-2 bg-yellow-950 border border-yellow-800 text-yellow-400 text-xs font-bold rounded cursor-pointer"
+                  className="py-2 bg-amber-950 border border-amber-800 text-amber-400 text-xs font-bold rounded cursor-pointer"
                 >
-                  Mark SCHEDULED
+                  SCHEDULED
                 </button>
                 <button
                   onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'CLEARED')}
-                  className="py-2 bg-green-950 border border-green-800 text-green-400 text-xs font-bold rounded cursor-pointer"
+                  className="py-2 bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold rounded cursor-pointer"
                 >
-                  Mark COMPLETED
+                  CLEARED
                 </button>
               </div>
             </div>
@@ -715,4 +715,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
       )}
     </div>
   );
-}
+};
+
+export default TaskBoard;
