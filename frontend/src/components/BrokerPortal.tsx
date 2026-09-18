@@ -29,36 +29,34 @@ export const BrokerPortal: React.FC = () => {
   // Dynamic Brokerage Brand Name
   const brokerBrandName = userProfile?.company_name || companyName || 'Partner Brokerage';
 
-  // TOUR STEPS CONFIGURATION: FINISHING WITH SHARE TO FLEET
   const tourSteps = [
     {
       title: "1. Portfolio Command Center",
       badge: "MACRO RISK OVERVIEW",
-      description: "Monitor real-time Book Safety Scores, total managed VINs, and unremedied safety recalls across your entire commercial book in one unified view."
+      description: "Monitor real-time Book Safety Scores, total managed VINs, and unremedied safety recalls across your entire commercial book."
     },
     {
       title: "2. Underwriter Compliance PDF Export",
       badge: "RENEWAL LEVERAGE",
-      description: "Export consolidated Loss Control Risk Certificates with a single click. Share underwriter-ready compliance cards with carriers to negotiate better renewal rates."
+      description: "Export consolidated Loss Control Risk Certificates with a single click to negotiate lower renewal rates with carriers."
     },
     {
       title: "3. Client Workspace Drill-Down",
       badge: "READ-ONLY AUDIT ACCESS",
-      description: "Click any client account (like Apex Logistics or Summit Regional) to inspect individual VIN recall statuses, open campaigns, and repair completion rates in real time."
+      description: "Click any account (like Apex Logistics or Summit) to inspect individual VIN recall statuses and repair completion rates."
     },
     {
       title: "4. Agency Co-Branding & Control",
       badge: "AGENCY AUTHORITY",
-      description: "Your clients see YOUR agency branding when running safety audits—keeping your brokerage top-of-mind as a proactive risk partner year-round."
+      description: "Your clients see YOUR agency branding when running safety audits—keeping your brokerage top-of-mind year-round."
     },
     {
       title: "5. Ready to Invite Your Fleets?",
       badge: "LAUNCH YOUR FLYWHEEL",
-      description: "Gift your policyholders 10 free VIN lookups under your agency link. Click below to copy your co-branded onboarding link and send it directly to your fleet clients!"
+      description: "Gift policyholders 10 free VIN lookups. Click below to copy your co-branded onboarding link and send it directly to your fleet clients!"
     }
   ];
 
-  // FETCH MANAGED FLEETS FOR BROKER BOOK-OF-BUSINESS
   useEffect(() => {
     async function fetchBrokerFleets() {
       setLoading(true);
@@ -71,7 +69,6 @@ export const BrokerPortal: React.FC = () => {
           .eq('parent_brokerage_id', brokerageId);
 
         if (error || !data || data.length === 0) {
-          // Fallback Demo Data for Interactive Broker View
           setFleets([
             { organization_id: 'demo-org-1', fleet_name: 'Apex Logistics & Freight', subscription_tier: 'Enterprise', total_vins: 142, open_recalls: 3, scheduled_recalls: 5, cleared_recalls: 134, safety_score: 82 },
             { organization_id: 'demo-org-2', fleet_name: 'Summit Regional Transport', subscription_tier: 'Professional', total_vins: 68, open_recalls: 0, scheduled_recalls: 2, cleared_recalls: 66, safety_score: 98 },
@@ -101,7 +98,6 @@ export const BrokerPortal: React.FC = () => {
     fetchBrokerFleets();
   }, [userProfile?.brokerage_id]);
 
-  // CO-BRANDED CLIENT ONBOARDING LINK HANDLER
   const handleCopyInviteLink = () => {
     const brokerageId = userProfile?.brokerage_id || 'demo-broker';
     const inviteUrl = `${window.location.origin}/signup?broker_id=${brokerageId}`;
@@ -114,12 +110,10 @@ export const BrokerPortal: React.FC = () => {
     setTimeout(() => setCopiedInvite(false), 2500);
   };
 
-  // TOUR NAVIGATION & AUTO-COPY HANDLER
   const handleNextTourStep = () => {
     if (currentTourStep < tourSteps.length - 1) {
       setCurrentTourStep(prev => prev + 1);
     } else {
-      // Auto-copy onboarding link on final step completion
       handleCopyInviteLink();
       sessionStorage.setItem('recalllogic_broker_tour_seen', 'true');
       setIsTourActive(false);
@@ -131,7 +125,6 @@ export const BrokerPortal: React.FC = () => {
     setIsTourActive(false);
   };
 
-  // MULTI-FLEET PORTFOLIO AUDIT PDF EXPORT HANDLER
   const handleExportPortfolioPDF = async () => {
     setIsExporting(true);
     try {
@@ -165,37 +158,111 @@ export const BrokerPortal: React.FC = () => {
     }
   };
 
-  // AGGREGATED METRICS
   const totalVins = fleets.reduce((acc, f) => acc + f.total_vins, 0);
   const totalOpenRecalls = fleets.reduce((acc, f) => acc + f.open_recalls, 0);
   const avgSafetyScore = fleets.length ? Math.round(fleets.reduce((acc, f) => acc + f.safety_score, 0) / fleets.length) : 100;
+
+  // HELPER TOOLTIP CARD COMPONENT
+  const RenderTooltip = ({ stepIndex }: { stepIndex: number }) => {
+    if (!isTourActive || currentTourStep !== stepIndex) return null;
+
+    return (
+      <div className="absolute z-50 w-72 sm:w-80 bg-[#0D1322] border-2 border-cyan-400 rounded-2xl p-4 shadow-[0_0_30px_rgba(6,182,212,0.3)] space-y-3 font-mono text-slate-100 animate-in fade-in zoom-in-95">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+          <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
+            {tourSteps[stepIndex].badge}
+          </span>
+          <button 
+            type="button" 
+            onClick={handleCloseTour}
+            className="text-slate-400 hover:text-white transition text-xs cursor-pointer px-1"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="space-y-1">
+          <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+            <span>💡</span> {tourSteps[stepIndex].title}
+          </h3>
+          <p className="text-[11px] text-slate-300 leading-normal">
+            {tourSteps[stepIndex].description}
+          </p>
+        </div>
+
+        {/* Footer Navigation */}
+        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {tourSteps.map((_, idx) => (
+              <span 
+                key={idx}
+                className={`h-1 rounded-full transition-all ${
+                  idx === currentTourStep ? 'w-4 bg-cyan-400' : 'w-1 bg-slate-700'
+                }`}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {currentTourStep > 0 && (
+              <button
+                type="button"
+                onClick={() => setCurrentTourStep(prev => prev - 1)}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded cursor-pointer"
+              >
+                ← Back
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleNextTourStep}
+              className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-[10px] font-bold rounded cursor-pointer font-bold"
+            >
+              {currentTourStep === tourSteps.length - 1 ? "🔗 Copy Link & Finish" : "Next →"}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    );
+  };
 
   return (
     <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
       
       {/* DEMO BANNER & HEADER TOOLBAR */}
-      <div className="bg-[#0D1322] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-[#0D1322] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
         <div className="text-xs text-slate-300 flex items-center gap-2">
           <span className="text-amber-400">⚡</span>
           <span>Interactive Demo View: Displaying sample commercial fleet accounts &amp; live loss metrics for <strong className="text-white">{brokerBrandName}</strong>.</span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCopyInviteLink}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap border ${
-            copiedInvite
-              ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
-              : 'bg-[#06B6D4] hover:bg-cyan-400 border-cyan-500 text-slate-950 shadow-lg shadow-cyan-950/50'
-          }`}
-          title={`Copy co-branded ${brokerBrandName} referral URL to onboard new commercial fleet clients`}
-        >
-          {copiedInvite ? <span>✓ Link Copied!</span> : <span>🔗 Share Client Onboarding Link</span>}
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={handleCopyInviteLink}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap border ${
+              copiedInvite
+                ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
+                : 'bg-[#06B6D4] hover:bg-cyan-400 border-cyan-500 text-slate-950 shadow-lg shadow-cyan-950/50'
+            }`}
+          >
+            {copiedInvite ? <span>✓ Link Copied!</span> : <span>🔗 Share Client Onboarding Link</span>}
+          </button>
+
+          {/* ANCHOR FOR STEP 5: SHARE LINK */}
+          <div className="absolute top-12 right-0">
+            <RenderTooltip stepIndex={4} />
+          </div>
+        </div>
       </div>
 
       {/* CO-BRANDED PORTFOLIO COMMAND HEADER */}
-      <div className="bg-[#0D1322] p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+      <div className="bg-[#0D1322] p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl relative">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-cyan-950/80 border border-cyan-500/30 rounded-xl text-cyan-400 text-xl">
             🏛️
@@ -215,53 +282,73 @@ export const BrokerPortal: React.FC = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleExportPortfolioPDF}
-          disabled={isExporting}
-          className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
-            isExporting
-              ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
-              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-          }`}
-          title={`Export consolidated ${brokerBrandName} loss-control audit PDF for carrier underwriters`}
-        >
-          {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
-        </button>
-      </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={handleExportPortfolioPDF}
+            disabled={isExporting}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
+              isExporting
+                ? 'bg-cyan-950 border-cyan-500/50 text-cyan-400 animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+            }`}
+          >
+            {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
+          </button>
 
-      {/* METRIC SUMMARY CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Active Fleets</p>
-          <p className="text-2xl font-black text-white">{fleets.length}</p>
-        </div>
-
-        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Managed VINs</p>
-          <p className="text-2xl font-black text-cyan-400">{totalVins.toLocaleString()}</p>
-        </div>
-
-        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Book Safety Score</p>
-          <p className="text-2xl font-black text-emerald-400">{avgSafetyScore} / 100</p>
-        </div>
-
-        <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
-          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Unremedied Recalls</p>
-          <p className="text-2xl font-black text-rose-400">{totalOpenRecalls}</p>
+          {/* ANCHOR FOR STEP 2: EXPORT PDF */}
+          <div className="absolute top-12 right-0">
+            <RenderTooltip stepIndex={1} />
+          </div>
         </div>
       </div>
 
-      {/* MANAGED FLEET GRID */}
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
+      {/* METRIC SUMMARY CARDS WITH STEP 1 ANCHOR */}
+      <div className="relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Active Fleets</p>
+            <p className="text-2xl font-black text-white">{fleets.length}</p>
+          </div>
+
+          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Managed VINs</p>
+            <p className="text-2xl font-black text-cyan-400">{totalVins.toLocaleString()}</p>
+          </div>
+
+          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Book Safety Score</p>
+            <p className="text-2xl font-black text-emerald-400">{avgSafetyScore} / 100</p>
+          </div>
+
+          <div className="bg-[#0D1322] p-4 rounded-xl border border-slate-800 space-y-1">
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Unremedied Recalls</p>
+            <p className="text-2xl font-black text-rose-400">{totalOpenRecalls}</p>
+          </div>
+        </div>
+
+        {/* ANCHOR FOR STEP 1: METRICS CENTER */}
+        <div className="absolute -bottom-24 left-1/2 transform -translate-x-1/2">
+          <RenderTooltip stepIndex={0} />
+        </div>
+      </div>
+
+      {/* MANAGED FLEET GRID WITH STEP 3 & STEP 4 ANCHOR */}
+      <div className="space-y-3 relative pt-12">
+        <div className="flex justify-between items-center relative">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             {brokerBrandName} — Client Accounts
           </h2>
-          <span className="text-[11px] text-slate-500">
-            Click any account to audit client workspace
-          </span>
+
+          {/* ANCHOR FOR STEP 4: AGENCY CO-BRANDING */}
+          <div className="absolute top-8 left-0">
+            <RenderTooltip stepIndex={3} />
+          </div>
+
+          {/* ANCHOR FOR STEP 3: CLIENT GRID */}
+          <div className="absolute top-8 right-0">
+            <RenderTooltip stepIndex={2} />
+          </div>
         </div>
 
         {loading ? (
@@ -324,82 +411,6 @@ export const BrokerPortal: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* GUIDED WALKTHROUGH OVERLAY MODAL */}
-      {isTourActive && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#0D1322] border border-cyan-500/40 rounded-2xl p-6 max-w-lg w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] space-y-5 font-mono text-slate-100 relative">
-            
-            {/* Header Badge & Close */}
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30 uppercase tracking-widest">
-                {tourSteps[currentTourStep].badge}
-              </span>
-              <button 
-                type="button" 
-                onClick={handleCloseTour}
-                className="text-slate-400 hover:text-white transition text-xs cursor-pointer"
-              >
-                Skip Tour ✕
-              </button>
-            </div>
-
-            {/* Step Content */}
-            <div className="space-y-2">
-              <h3 className="text-base font-extrabold text-white">
-                {tourSteps[currentTourStep].title}
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {tourSteps[currentTourStep].description}
-              </p>
-            </div>
-
-            {/* Step Progress Dots & Navigation */}
-            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-              
-              {/* Step Dots */}
-              <div className="flex items-center gap-1.5">
-                {tourSteps.map((_, idx) => (
-                  <span 
-                    key={idx}
-                    className={`h-1.5 rounded-full transition-all ${
-                      idx === currentTourStep 
-                        ? 'w-6 bg-cyan-400' 
-                        : 'w-1.5 bg-slate-700'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {/* Navigation Actions */}
-              <div className="flex items-center gap-2">
-                {currentTourStep > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setCurrentTourStep(prev => prev - 1)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition cursor-pointer"
-                  >
-                    ← Back
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleNextTourStep}
-                  className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-lg transition cursor-pointer shadow-md shadow-cyan-950/50"
-                >
-                  {currentTourStep === tourSteps.length - 1 
-                    ? "🔗 Copy Link & Start Inviting Fleets" 
-                    : "Next Step &rarr;"
-                  }
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* RE-OPEN TOUR FLOATING BUTTON */}
       {!isTourActive && (
