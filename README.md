@@ -1,49 +1,101 @@
-RecallLogic Intelligence System
-A production-grade, cloud-native intelligence engine for predictive vehicle safety and recall management.
+# RecallLogic — Commercial Auto Safety & Risk Intelligence
 
-RecallLogic normalizes complex, inconsistent government vehicle data into actionable fleet safety intelligence, enabling fleet operators to proactively identify subassembly failure risks, schedule maintenance, and mitigate liability.
+RecallLogic is an automated safety recall tracking and loss-control compliance platform built for **Commercial Insurance Brokers** and **Commercial Fleet Operators**. The platform continuously syncs vehicle VINs against official NHTSA recall databases, generates underwriter-ready Loss Control Risk Certificates, and drives a two-sided sales flywheel.
 
-📌 Overview
-The RecallLogic Intelligence System automates the collection, normalization, and analysis of vehicle safety data from the National Highway Traffic Safety Administration (NHTSA). By transforming raw, unreliable datasets into a high-fidelity intelligence layer, the system provides:
+---
 
-Fleet Recall Intelligence: Comprehensive monitoring of vehicle safety status.
+## 🚀 Key Platform Features
 
-Materialized Intelligence: Pre-calculated safety scoring (severity, regional climate vulnerability) performed during ingestion.
+* **Dual-Persona Workspaces:**
+  * **Insurance Brokers:** Access a macro Portfolio Command dashboard to monitor book safety scores, protect portfolio loss ratios, export loss control audit PDFs, and distribute co-branded client referral links.
+  * **Fleet Operators:** Manage single-VIN or bulk fleet recall tracking, organize dealer repair logistics (Open, Scheduled, Cleared), and generate proof-of-remedy certificates for policy renewal discounts.
+* **Non-Blocking Guided Product Tours:** Interactive, step-by-step contextual overlay tours on both Broker (`/audit/demo`) and Fleet (`/taskboard/demo`) demo routes to maximize conversion during cold outreach.
+* **Instant Inbound Lead Capture:** Built-in "Request Agency Access" modal on the landing page that saves high-intent broker leads directly to Supabase.
+* **Paywall & Stripe Checkout Sync:** Integrated with Stripe Checkout for seamless tier upgrades (`Standard $99/mo`, `Professional $249/mo`, `Enterprise $499/mo`) with automated post-checkout profile provision handlers.
 
-Predictive Risk Scoring: Actionable directives tailored for fleet dispatch managers.
+---
 
-Automated Delta Sync: Resilient 3:00 AM data ingestion ensuring data is always current.
+## 🛠️ Tech Stack & Architecture
 
-🚀 Quick Start
-Environment Setup: Ensure your monorepo is located at C:\dev\clean-repo.
+* **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
+* **Database & Auth:** Supabase (PostgreSQL, Row Level Security, Auth Services)
+* **Payment Engine:** Stripe Checkout API & Webhooks
+* **Backend API:** Python / FastAPI / Node.js Engine (NHTSA Live Sync & PDF Export Generators)
 
-Backend: Navigate to backend/ and run the FastAPI server:
+---
 
-Bash
-uvicorn app.main:app --reload --port 8000
-Frontend: Navigate to frontend/ and start the development server:
+## 🔗 Route Map & Testing URLs
 
-Bash
+| Target Persona | URL / Route | Description |
+| :--- | :--- | :--- |
+| **Root Homepage** | `https://recalllogic.ai/` | Direct VIN audit tool, broker value proposition section, and lead capture modal. |
+| **Broker Portfolio Demo** | `https://recalllogic.ai/audit/demo` | Bypasses auth; loads interactive broker portfolio command with guided agency tour. |
+| **Fleet Operator Demo** | `https://recalllogic.ai/taskboard/demo` | Bypasses auth; loads interactive vehicle taskboard with guided operational tour. |
+| **Co-Branded Sign Up** | `https://recalllogic.ai/signup?broker_id=<ID>` | Custom referral onboarding route linking new fleet accounts to referring brokerages. |
+
+---
+
+## ⚙️ Environment Variables Setup
+
+Create a `.env.local` file in the root directory and configure the following parameters:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=[https://your-supabase-project.supabase.co](https://your-supabase-project.supabase.co)
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Backend API Engine URL
+VITE_API_URL=[https://ai-safety-recall-system.onrender.com](https://ai-safety-recall-system.onrender.com)
+
+# Stripe Pricing Tier IDs
+VITE_STRIPE_PRICE_STANDARD=price_1N...
+VITE_STRIPE_PRICE_PRO=price_1N...
+VITE_STRIPE_PRICE_ENTERPRISE=price_1N...
+
+
+🗄️ Supabase Backend Requirements
+Ensure the broker_leads table is active with proper public insert permissions for website lead collection:
+
+-- 1. Create Inbound Broker Lead Storage Table
+CREATE TABLE IF NOT EXISTS public.broker_leads (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT NOT NULL,
+    brokerage_name TEXT NOT NULL,
+    portfolio_size TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Schema Grants and Row Level Security Setup
+GRANT ALL ON TABLE public.broker_leads TO anon;
+GRANT ALL ON TABLE public.broker_leads TO authenticated;
+
+ALTER TABLE public.broker_leads ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public insert to broker_leads" ON public.broker_leads;
+CREATE POLICY "Allow public insert to broker_leads" 
+ON public.broker_leads 
+FOR INSERT TO anon, authenticated 
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select to broker_leads" ON public.broker_leads;
+CREATE POLICY "Allow public select to broker_leads" 
+ON public.broker_leads 
+FOR SELECT TO anon, authenticated 
+USING (true);
+
+💻 Local Development Setup
+Clone the repository:
+git clone [https://github.com/your-org/recalllogic-frontend.git](https://github.com/your-org/recalllogic-frontend.git)
+cd recalllogic-frontend
+
+Install dependencies:
+npm install
+
+Start the local development server:
 npm run dev
-🧪 Testing & Agent Workflow Framework
-To ensure enterprise reliability, RecallLogic employs a decoupled Replica Testing Architecture. This framework allows AI testing agents to safely interact with, stress-test, and validate product workflows without impacting production data.
 
-The Replica Strategy
-Isolated State: Agents operate within disposable, containerized environments (utilizing Docker-Compose mirrors) to prevent destructive updates on the live Supabase/PostgreSQL instance.
+Build for production:
+npm run build
 
-Deterministic Environment Provisioning: By using JSON-based "Task Matrices," we guarantee that every test run starts with the exact same data configuration, eliminating test flakiness.
-
-Risk Mitigation (Blast Radius): The Sandbox Control Plane (/api/sandbox/reset) makes it physically impossible for testing agents to accidentally execute against production data.
-
-Testing Tracks
-Unit & Integration (Backend): pytest suite focused on core scoring algorithms, data filtering, and API endpoint verification.
-
-Agent Workflows: A WorkflowExecutor parses JSON "Task Matrices" to simulate complex user behaviors (e.g., freemium limit enforcement, Stripe checkout interception, or CSV ingestion edge-cases).
-
-End-to-End (E2E) UI: Playwright integration utilized by AI agents to validate UI dashboard behaviors, freemium guardrails, and compliance badge generation.
-
-Observability
-All agent actions are captured in an Audit Log, providing a traceable history of how the agent performed, rather than just simple pass/fail results. This allows for rapid debugging of complex ingestion workflows.
-
-📄 License
-MIT License.
+📄 License & Intellectual Property
+Copyright © 2026 RecallLogic Inc. All Rights Reserved. Continuous Safety & Risk Intelligence.
