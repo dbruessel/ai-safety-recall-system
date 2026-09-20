@@ -52,9 +52,50 @@ VITE_STRIPE_PRICE_STANDARD=price_1N...
 VITE_STRIPE_PRICE_PRO=price_1N...
 VITE_STRIPE_PRICE_ENTERPRISE=price_1N...
 
+
+🗄️ Supabase Backend Requirements
+Ensure the broker_leads table is active with proper public insert permissions for website lead collection:
+
+-- 1. Create Inbound Broker Lead Storage Table
+CREATE TABLE IF NOT EXISTS public.broker_leads (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT NOT NULL,
+    brokerage_name TEXT NOT NULL,
+    portfolio_size TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Schema Grants and Row Level Security Setup
+GRANT ALL ON TABLE public.broker_leads TO anon;
+GRANT ALL ON TABLE public.broker_leads TO authenticated;
+
+ALTER TABLE public.broker_leads ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public insert to broker_leads" ON public.broker_leads;
+CREATE POLICY "Allow public insert to broker_leads" 
+ON public.broker_leads 
+FOR INSERT TO anon, authenticated 
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public select to broker_leads" ON public.broker_leads;
+CREATE POLICY "Allow public select to broker_leads" 
+ON public.broker_leads 
+FOR SELECT TO anon, authenticated 
+USING (true);
+
+💻 Local Development Setup
+Clone the repository:
 git clone [https://github.com/your-org/recalllogic-frontend.git](https://github.com/your-org/recalllogic-frontend.git)
 cd recalllogic-frontend
 
+Install dependencies:
 npm install
 
+Start the local development server:
 npm run dev
+
+Build for production:
+npm run build
+
+📄 License & Intellectual Property
+Copyright © 2026 RecallLogic Inc. All Rights Reserved. Continuous Safety & Risk Intelligence.
