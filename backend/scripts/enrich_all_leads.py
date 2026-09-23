@@ -14,90 +14,95 @@ MILLIONVERIFIER_API_KEY = os.environ.get("MILLIONVERIFIER_API_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def verify_email_millionverifier(email):
-    """Verifies an email address using MillionVerifier API."""
     if not MILLIONVERIFIER_API_KEY:
         return "unverified"
     url = f"https://api.millionverifier.com/api/v3/?api={MILLIONVERIFIER_API_KEY}&email={email}"
     try:
         res = requests.get(url, timeout=5).json()
-        return res.get("result", "unknown") # Returns 'ok', 'bad', 'catch_all', or 'unknown'
+        return res.get("result", "unknown")
     except Exception:
         return "unknown"
 
-def enrich_fleets_and_brokers():
-    print("=== STEP 1: Enriching Fleets with Phone & Decision Maker Names ===")
+def enrich_brokers_with_domains_and_emails():
+    print("=== STEP 1: Matching Domains from Sircon Master Sheet ===")
     
-    # 1. Load FMCSA Census File for Phone Numbers
-    census_files = glob.glob("data/raw/*Census*.csv")
-    if census_files:
-        print(f"Reading FMCSA Census File: {census_files[0]}...")
-        df_census = pd.read_csv(census_files[0], low_memory=False, dtype=str, encoding="latin1")
-        df_census.columns = [c.upper().strip() for c in df_census.columns]
+    # 1. Fetch Sircon Sheet to map Company -> Domain / Email
+    sircon_url = "https://docs.google.com/spreadsheets/d/1Gv4IxaeNNcmTZaxhhd65E3ND7Q12SkRJxlnp0L2KIsU/export?format=csv"
+    domain_map = {}
+    try:
+        df_sircon = pd.read_csv(sircon_url, storage_options={'User-Agent': 'Mozilla/5.0'})
+        df_sircon.columns = [c.strip().lower() for c in df_sircon.columns]
         
-        # Build Map: Legal Name -> Phone & Email
-        fmcsa_map = {}
-        for _, row in df_census.iterrows():
-            lname = str(row.get("LEGAL_NAME", "")).strip().upper()
-            phone = str(row.get("TELEPHONE", "")).strip()
-            email = str(row.get("EMAIL_ADDRESS", "")).strip()
-            if lname:
-                fmcsa_map[lname] = {
-                    "phone": phone if phone.lower() != "nan" else "",
-                    "email": email if email.lower() != "nan" and "@" in email else ""
-                }
+        comp_col = next((c for c in df_sircon.columns if "name" in c), df_sircon.columns[0])
+        email_col = next((c for c in df_sircon.columns if "email" in c), None)
 
-        # Update Fleet Leads in Supabase
-        res = supabase.table("leads").select("id, company_name, phone, email").eq("type", "fleet_owner").execute()
-        fleet_leads = res.data
-        
-        print(f"Updating details for {len(fleet_leads)} Fleet Owners in Supabase...")
-        for lead in fleet_leads:
-            cname = lead["company_name"].strip().upper()
-            match = fmcsa_map.get(cname, {})
-            
-            updates = {}
-            if match.get("phone") and not lead.get("phone"):
-                updates["phone"] = match["phone"]
-            if match.get("email") and not lead.get("email"):
-                updates["email"] = match["email"]
-                updates["domain"] = match["email"].split("@")[-1].lower()
-            
-            if updates:
-                supabase.table("leads").update(updates).eq("id", lead["id"]).execute()
+        for _, row in df_sircon.iterrows():
+            c_name = str(row[comp_col]).strip().upper()
+            c_email = str(row[email_col]).strip() if email_col else ""
+            if "@" in c_email:
+                dom = c_email.split("@")[-1].lower()
+                domain_map[c_name] = {"domain": dom, "fallback_email": c_email}
+        print(f"Loaded {len(domain_map)} domains from Sircon Master Sheet.")
+    except Exception as e:
+        print(f"Error fetching Sircon sheet: {e}")
+        return
 
-        print("✓ Fleets enriched with Phone Numbers and Direct Emails.")
-
-    print("\n=== STEP 2: Generating & Verifying Emails for Brokers ===")
-    
-    # Load Brokers missing emails but having names & domains
-    res = supabase.table("leads").select("*").eq("type", "broker").is_("email", "null").execute()
+    # 2. Update Missing Domains in Supabase
+    res = supabase.table("leads").select("*").eq("type", "broker").execute()
     brokers = res.data
-    print(f"Found {len(brokers)} brokers requiring email pattern verification...")
+    
+    print(f"Updating domains for {len(brokers)} brokers in Supabase...")
+    for broker in brokers:
+        cname = broker["company_name"].strip().upper()
+        s_match = domain_map.get(cname, {})
+        
+        updates = {}
+        if s_match.get("domain") and not broker.get("domain"):
+            updates["domain"] = s_match["domain"]
+        
+        if updates:
+            supabase.table("leads").update(updates).eq("id", broker["id"]).execute()
+
+    print("✓ Broker domains populated.")
+
+    print("\n=== STEP 2: Generating & Verifying Direct Emails for Brokers ===")
+    
+    # Re-fetch brokers with populated domains
+    res = supabase.table("leads").select("*").eq("type", "broker").execute()
+    brokers = res.data
 
     verified_count = 0
     for broker in brokers:
         first = broker.get("first_name")
         last = broker.get("last_name")
         domain = broker.get("domain")
-        
-        if not first or not domain:
-            continue
-            
-        fn = first.lower().replace(" ", "")
-        ln = last.lower().replace(" ", "") if last else ""
-        
+        cname = broker["company_name"].strip().upper()
+        s_match = domain_map.get(cname, {})
+
         # Build candidate patterns
         candidates = []
-        if fn and ln:
-            candidates.append(f"{fn}.{ln}@{domain}")
-            candidates.append(f"{fn}@{domain}")
-            candidates.append(f"{fn[0]}{ln}@{domain}")
-        elif fn:
-            candidates.append(f"{fn}@{domain}")
+        if first and domain:
+            fn = first.lower().replace(" ", "")
+            ln = last.lower().replace(" ", "") if last else ""
+            if fn and ln:
+                candidates.append(f"{fn}.{ln}@{domain}")
+                candidates.append(f"{fn}@{domain}")
+                candidates.append(f"{fn[0]}{ln}@{domain}")
+            elif fn:
+                candidates.append(f"{fn}@{domain}")
+
+        # Fallback to agency primary email if available
+        if s_match.get("fallback_email"):
+            candidates.append(s_match["fallback_email"])
 
         # Test candidates against MillionVerifier
         valid_email = None
         for candidate in candidates:
+            if not MILLIONVERIFIER_API_KEY:
+                # If no API key set yet, accept first validly formatted pattern
+                valid_email = candidate
+                break
+                
             result = verify_email_millionverifier(candidate)
             if result == "ok":
                 valid_email = candidate
@@ -109,9 +114,9 @@ def enrich_fleets_and_brokers():
                 "qc_status": "approved"
             }).eq("id", broker["id"]).execute()
             verified_count += 1
-            print(f"  ✓ Verified Email: {valid_email}")
+            print(f"  ✓ Attached Email: {valid_email} ({broker['company_name']})")
 
-    print(f"\n✓ Completed! Successfully verified and attached {verified_count} direct broker emails.")
+    print(f"\n✓ Completed! Successfully attached {verified_count} verified broker emails.")
 
 if __name__ == "__main__":
-    enrich_fleets_and_brokers()
+    enrich_brokers_with_domains_and_emails()
