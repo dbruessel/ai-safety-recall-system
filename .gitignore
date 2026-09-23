@@ -33,6 +33,17 @@ frontend/dist/
 frontend/dist-ssr/
 *.local
 
+# Secret Keys & Credentials
+*.json
+serviceAccountKey.json
+backend/scripts/serviceAccountKey.json
+supabase/.temp/
+
+# Log files
+backend/logs/
+logs/
+*.log
+
 # --- Editor directories and OS files ---
 .vscode/*
 !.vscode/extensions.json
