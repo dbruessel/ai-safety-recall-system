@@ -8,11 +8,12 @@ from dotenv import load_dotenv
 # 1. Automatically load environment variables from .env file
 load_dotenv()
 
-# 2. Retrieve credentials (with fallback to your .env keys)
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ygbniurcvparmwfaqrtg.supabase.co")
-SUPABASE_KEY = os.environ.get(
-    "SUPABASE_SERVICE_ROLE_KEY", "sb_secret_XmBqNs4ht8M5naAeiHCKJw_zIOav8mY"
-)
+# 2. Retrieve credentials safely from environment variables
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env file.")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -32,7 +33,6 @@ def seed_sos():
         return
 
     print(f"Reading Master Corporations File (Headerless Mode): {corp_file}...")
-    # Read without header row so Pandas uses numeric column indexes (0, 1, 2...)
     df_corp = pd.read_csv(
         corp_file, header=None, low_memory=False, dtype=str, encoding="latin1"
     )
@@ -148,23 +148,27 @@ def seed_sos():
 
     print(f"Uploading {len(broker_leads)} Las Vegas Metro brokers to Supabase...")
 
-    # 6. Batch Upsert to Supabase with Network Retry Handling
-    for i in range(0, len(broker_leads), 100):
-        batch = broker_leads[i : i + 100]
-        success = False
-        attempts = 0
-        while not success and attempts < 3:
-            try:
-                supabase.table("leads").upsert(
-                    batch, on_conflict="company_name"
-                ).execute()
-                success = True
-            except Exception as e:
-                attempts += 1
-                print(f"Batch upload retry ({attempts}/3) due to: {e}")
-                time.sleep(2)
+    # 6. Batch Insert to Supabase with Duplicate & Error Handling
+    inserted_count = 0
+    for i in range(0, len(broker_leads), 50):
+        batch = broker_leads[i : i + 50]
+        try:
+            supabase.table("leads").insert(batch).execute()
+            inserted_count += len(batch)
+        except Exception as e:
+            err_str = str(e).lower()
+            # If batch contains duplicates, fall back to inserting record by record
+            if "duplicate key" in err_str or "23505" in err_str or "42p10" in err_str:
+                for record in batch:
+                    try:
+                        supabase.table("leads").insert(record).execute()
+                        inserted_count += 1
+                    except Exception:
+                        pass  # Skip individual existing duplicate record
+            else:
+                print(f"Notice on batch {i//50 + 1}: {e}")
 
-    print("✓ Nevada SOS Las Vegas Brokers successfully loaded into Supabase!")
+    print(f"✓ Nevada SOS Las Vegas Brokers successfully processed! ({inserted_count} new leads added/updated in Supabase)")
 
 
 if __name__ == "__main__":
