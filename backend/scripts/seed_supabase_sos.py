@@ -1,7 +1,7 @@
-import pandas as pd
-from supabase import create_client
 import os
 import glob
+import pandas as pd
+from supabase import create_client
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://YOUR_SUPABASE_PROJECT.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
@@ -20,67 +20,70 @@ def seed_sos():
         print("Error: Could not locate Corporations file in data/raw/")
         return
 
-    print(f"Reading Master Corporations File: {corp_file}...")
-    df_corp = pd.read_csv(corp_file, low_memory=False, dtype=str, encoding="latin1")
-    df_corp.columns = [c.strip().upper() for c in df_corp.columns]
+    print(f"Reading Master Corporations File (Headerless Mode): {corp_file}...")
+    # Read without header row so Pandas uses numeric column indexes (0, 1, 2...)
+    df_corp = pd.read_csv(corp_file, header=None, low_memory=False, dtype=str, encoding="latin1")
 
-    # Find Corp ID & Name Columns
-    corp_id_col = next((c for c in df_corp.columns if any(k in c for k in ["CORP_ID", "ENTITY_ID", "ID"])), df_corp.columns[0])
-    corp_name_col = next((c for c in df_corp.columns if any(k in c for k in ["CORP_NAME", "NAME", "ENTITY_NAME"])), df_corp.columns[1])
+    print(f"Total Raw Nevada Entities Loaded: {len(df_corp)}")
+
+    # Map Positional Indexes from NV SOS Dump
+    corp_id_col = 0      # Corp ID
+    status_col = 4       # Entity Status
+    name_col = 6         # Company Name
     
-    # Find City & Status Columns
-    city_col = next((c for c in df_corp.columns if "CITY" in c), None)
-    status_col = next((c for c in df_corp.columns if "STATUS" in c), None)
-
-    # 1. Filter for Active Insurance / Brokerage Keywords FIRST (Massively reduces row count)
-    keywords = ["INSURANCE", "BROKERAGE", "RISK", "UNDERWRITER", "AGENCY"]
+    # 1. Keyword Filter for Commercial Insurance & Brokerages
+    keywords = ["INSURANCE", "BROKERAGE", "RISK", "UNDERWRIT", "AGENCY", "SURETY", "ASSURANCE"]
     pattern = "|".join(keywords)
-    df_corp = df_corp[df_corp[corp_name_col].fillna("").astype(str).str.upper().str.contains(pattern)]
 
-    # 2. Filter out Non-Commercial Keywords
-    exclude_pattern = "TAX|SMOG|NOTARY|NAIL|SALON|BAIL"
-    df_corp = df_corp[~df_corp[corp_name_col].fillna("").astype(str).str.upper().str.contains(exclude_pattern)]
+    df_corp[name_col] = df_corp[name_col].fillna("").astype(str)
+    df_filtered = df_corp[df_corp[name_col].str.upper().str.contains(pattern, regex=True)].copy()
 
-    # 3. Filter for Las Vegas Metro Cities
-    lv_metro = ["LAS VEGAS", "NORTH LAS VEGAS", "HENDERSON", "SLOAN", "ENTERPRISE", "APEX"]
-    if city_col:
-        df_corp = df_corp[df_corp[city_col].fillna("").astype(str).str.upper().isin(lv_metro)]
+    # 2. Filter Out Non-Target Categories
+    exclude_pattern = "TAX|SMOG|NOTARY|NAIL|SALON|BAIL|FUNERAL|TITLE|TRAVEL|CLEAN"
+    df_filtered = df_filtered[~df_filtered[name_col].str.upper().str.contains(exclude_pattern, regex=True)]
 
-    # 4. Filter for Active Status
-    if status_col:
-        df_corp = df_corp[df_corp[status_col].fillna("").astype(str).str.upper().str.contains("ACTIVE|DEFAULT|QUALIFIED")]
+    # 3. Filter for Active Status
+    if status_col in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered[status_col].fillna("").astype(str).str.upper().str.contains("ACTIVE|DEFAULT|QUALIFIED|GOOD")]
 
-    print(f"✓ Target locked: Isolated {len(df_corp)} active commercial insurance entities in Las Vegas.")
+    print(f"✓ Isolated {len(df_filtered)} active commercial insurance entities in Nevada.")
 
-    # Match Officers only for the targeted brokers
-    target_ids = set(df_corp[corp_id_col].dropna().astype(str).str.strip())
+    # 4. Load Officers File to Match Names & Extract Address/City
+    target_ids = set(df_filtered[corp_id_col].dropna().astype(str).str.strip())
     officer_dict = {}
 
     if officer_file and os.path.exists(officer_file) and target_ids:
         print(f"Reading Officers File: {officer_file}...")
-        df_off = pd.read_csv(officer_file, low_memory=False, dtype=str, encoding="latin1")
-        df_off.columns = [c.strip().upper() for c in df_off.columns]
+        df_off = pd.read_csv(officer_file, header=None, low_memory=False, dtype=str, encoding="latin1")
 
-        off_corp_id = next((c for c in df_off.columns if any(k in c for k in ["CORP_ID", "ENTITY_ID"])), df_off.columns[0])
-        first_col = next((c for c in df_off.columns if "FIRST" in c), "")
-        last_col = next((c for c in df_off.columns if "LAST" in c), "")
+        # Officer Positional Indexes
+        off_corp_id = 0
+        off_first = 2
+        off_last = 4
+        off_city = 8 if len(df_off.columns) > 8 else None
 
-        # Only extract officers for our target brokers
         df_off_filtered = df_off[df_off[off_corp_id].astype(str).str.strip().isin(target_ids)]
+
+        lv_metro = ["LAS VEGAS", "NORTH LAS VEGAS", "HENDERSON", "SLOAN", "ENTERPRISE", "APEX"]
 
         for _, row in df_off_filtered.iterrows():
             cid = str(row.get(off_corp_id, "")).strip()
-            if cid and cid not in officer_dict:
-                first = str(row.get(first_col, "")).strip().title()
-                last = str(row.get(last_col, "")).strip().title()
-                if first and first.lower() != "nan":
-                    officer_dict[cid] = {"first_name": first, "last_name": last}
+            first = str(row.get(off_first, "")).strip().title()
+            last = str(row.get(off_last, "")).strip().title()
+            city = str(row.get(off_city, "")).strip().upper() if off_city else ""
+
+            if cid and cid not in officer_dict and first and first.lower() != "nan":
+                officer_dict[cid] = {
+                    "first_name": first,
+                    "last_name": last,
+                    "city": city if city in lv_metro else "LAS VEGAS"
+                }
 
     # Format leads for Supabase
     broker_leads = []
-    for _, row in df_corp.iterrows():
+    for _, row in df_filtered.iterrows():
         cid = str(row.get(corp_id_col, "")).strip()
-        company = str(row.get(corp_name_col, "")).strip()
+        company = str(row.get(name_col, "")).strip()
         officer = officer_dict.get(cid, {})
 
         if company and company.lower() != "nan":
@@ -89,12 +92,12 @@ def seed_sos():
                 "company_name": company,
                 "first_name": officer.get("first_name", ""),
                 "last_name": officer.get("last_name", ""),
-                "city": str(row.get(city_col, "Las Vegas")).title() if city_col else "Las Vegas",
+                "city": officer.get("city", "Las Vegas").title(),
                 "state": "NV",
                 "qc_status": "pending"
             })
 
-    print(f"Uploading {len(broker_leads)} target commercial brokers to Supabase...")
+    print(f"Uploading {len(broker_leads)} commercial insurance brokers into Supabase...")
     for i in range(0, len(broker_leads), 200):
         batch = broker_leads[i:i+200]
         supabase.table("leads").upsert(batch, on_conflict="company_name").execute()
