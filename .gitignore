@@ -1,16 +1,22 @@
+# --- Local Raw Data Dumps, CSVs & Big Files ---
+data/
+data/raw/
+data/processed/
+*.csv
+*.zip
+
 # --- Backend Storage Restrictions ---
-# Ignore the raw flat data dumps and zip files located inside the scripts folder
+# Ignore raw flat data dumps and zip files located inside scripts
 backend/scripts/FLAT_RCL_*
 backend/scripts/*.txt
 backend/scripts/*.zip
 
-# Also catch generic local data files, python caches, and your virtual environment
+# Catch local data files, python environments, and secret keys
 backend/.venv/
 backend/__pycache__/
 backend/.env
-*.zip
-*.txt
-*.json
+.venv/
+.env
 
 # --- Python Runtime and App Cache ---
 __pycache__/
@@ -23,3 +29,17 @@ __pycache__/
 node_modules/
 frontend/node_modules/
 frontend/test-results/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# --- Editor directories and OS files ---
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
