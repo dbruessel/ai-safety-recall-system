@@ -26,104 +26,98 @@ def fix_and_enrich_leads():
         print("Error: Raw SOS files not found in data/raw/")
         return
 
-    print("Reading Corporations and Officers files locally...")
-    df_corp = pd.read_csv(corp_file, header=None, low_memory=False, dtype=str, encoding="latin1")
-    df_off = pd.read_csv(officer_file, header=None, low_memory=False, dtype=str, encoding="latin1")
+    # 1. Fetch Supabase Records First (Only process companies we actually have in DB)
+    print("1/4. Fetching broker records from Supabase...")
+    res = supabase.table("leads").select("id, company_name, phone").eq("type", "broker").execute()
+    leads = res.data
+    if not leads:
+        print("No broker leads found in Supabase.")
+        return
 
-    # Map Corp ID -> { Company Name, Phone }
-    corp_map = {}
-    for _, row in df_corp.iterrows():
-        cid = str(row[0]).strip()
-        cname = str(row[6]).strip()
-        # Grab phone if available in SOS Corp export (Index 11 or positional)
-        phone = str(row[11]).strip() if len(row) > 11 else ""
-        if cid and cname and cname.lower() != "nan":
-            corp_map[cid] = {
-                "company": cname,
-                "phone": phone if phone and phone.lower() != "nan" else ""
-            }
+    # Build lookup set of targeted upper-case company names
+    target_companies = {l["company_name"].strip().upper(): l for l in leads}
+    print(f"Targeting {len(target_companies)} distinct agencies...")
 
-    # Map Corp Name -> { First Name, Last Name, Phone }
+    # 2. Vectorized Read of Corporations File (Filters in milliseconds)
+    print("2/4. Indexing Nevada Corporations file...")
+    df_corp = pd.read_csv(
+        corp_file, 
+        header=None, 
+        usecols=[0, 6], 
+        names=["corp_id", "company_name"], 
+        dtype=str, 
+        encoding="latin1",
+        on_bad_lines="skip"
+    )
+    df_corp["company_name_upper"] = df_corp["company_name"].str.strip().str.upper()
+    
+    # Filter only corps matching our Supabase leads
+    df_corp_matched = df_corp[df_corp["company_name_upper"].isin(target_companies.keys())]
+    corp_id_to_name = dict(zip(df_corp_matched["corp_id"].str.strip(), df_corp_matched["company_name_upper"]))
+
+    print(f"   ✓ Matched {len(corp_id_to_name)} Corporation IDs in raw state file.")
+
+    # 3. Vectorized Read of Officers File
+    print("3/4. Parsing Officer First & Last Names...")
+    matched_corp_ids = set(corp_id_to_name.keys())
+    
+    # Read Officers file in 100k chunks for zero memory lag
     name_map = {}
-    for _, row in df_off.iterrows():
-        cid = str(row[0]).strip()
-        first = str(row[3]).strip().title() if len(row) > 3 else ""
-        last = str(row[4]).strip().title() if len(row) > 4 else ""
+    for chunk in pd.read_csv(
+        officer_file, 
+        header=None, 
+        usecols=[0, 3, 4], 
+        names=["corp_id", "first_name", "last_name"], 
+        dtype=str, 
+        encoding="latin1",
+        chunksize=100000,
+        on_bad_lines="skip"
+    ):
+        chunk["corp_id"] = chunk["corp_id"].str.strip()
+        matched_chunk = chunk[chunk["corp_id"].isin(matched_corp_ids)]
+        
+        for _, row in matched_chunk.iterrows():
+            cid = row["corp_id"]
+            comp_name = corp_id_to_name.get(cid)
+            first = str(row["first_name"]).strip().title() if pd.notna(row["first_name"]) else ""
+            last = str(row["last_name"]).strip().title() if pd.notna(row["last_name"]) else ""
 
-        if cid in corp_map and first and first.lower() != "nan":
-            cinfo = corp_map[cid]
-            cname_upper = cinfo["company"].upper()
-            if cname_upper not in name_map:
-                name_map[cname_upper] = {
+            if comp_name and first and first.lower() != "nan" and comp_name not in name_map:
+                name_map[comp_name] = {
                     "first_name": first,
-                    "last_name": last if last and last.lower() != "nan" else "",
-                    "phone": cinfo["phone"]
+                    "last_name": last if last.lower() != "nan" else ""
                 }
 
-    # Load Sircon Sheet with a 10s Timeout
-    domain_map = {}
-    sircon_url = "https://docs.google.com/spreadsheets/d/1Gv4IxaeNNcmTZaxhhd65E3ND7Q12SkRJxlnp0L2KIsU/export?format=csv"
-    print("Fetching Sircon Master List for domain matching...")
-    try:
-        df_sircon = pd.read_csv(sircon_url, storage_options={'User-Agent': 'Mozilla/5.0'})
-        df_sircon.columns = [c.strip().lower() for c in df_sircon.columns]
-        email_col = next((c for c in df_sircon.columns if "email" in c), None)
-        comp_col = next((c for c in df_sircon.columns if "name" in c), df_sircon.columns[0])
+    print(f"   ✓ Successfully mapped full officer names for {len(name_map)} agencies.")
 
-        for _, row in df_sircon.iterrows():
-            c_name = str(row[comp_col]).strip().upper()
-            c_email = str(row[email_col]).strip() if email_col else ""
-            if "@" in c_email:
-                domain_map[c_name] = {"email": c_email, "domain": c_email.split("@")[-1].lower()}
-    except Exception as e:
-        print(f"Warning: Could not fetch Google Sheet directly ({e}). Proceeding with local names...")
-
-    # Fetch Supabase Records
-    print("Fetching existing broker records from Supabase...")
-    res = supabase.table("leads").select("*").eq("type", "broker").execute()
-    leads = res.data
-
-    print(f"Processing and enriching {len(leads)} brokers...")
-
+    # 4. Stream Updates to Supabase
+    print("4/4. Updating Supabase leads table...")
     updated_count = 0
-    for lead in leads:
-        comp_upper = lead["company_name"].strip().upper()
-        names = name_map.get(comp_upper, {})
-        first = names.get("first_name", "")
-        last = names.get("last_name", "")
-        sos_phone = names.get("phone", "")
-
-        sircon_match = domain_map.get(comp_upper, {})
-        domain = sircon_match.get("domain", "")
-
-        updates = {}
-        if first:
-            updates["first_name"] = first
-        if last:
-            updates["last_name"] = last
-        if sos_phone and not lead.get("phone"):
-            updates["phone"] = sos_phone
-
-        if domain:
-            updates["domain"] = domain
+    for comp_name, lead_info in target_companies.items():
+        if comp_name in name_map:
+            officer = name_map[comp_name]
+            first = officer["first_name"]
+            last = officer["last_name"]
+            
+            # Construct corporate email pattern if domain exists
+            updates = {"first_name": first, "last_name": last}
+            
             fn_clean = first.lower().replace(" ", "")
             ln_clean = last.lower().replace(" ", "")
             
-            if fn_clean and ln_clean:
-                updates["email"] = f"{fn_clean}.{ln_clean}@{domain}"
-            elif fn_clean:
-                updates["email"] = f"{fn_clean}@{domain}"
-            else:
-                updates["email"] = sircon_match.get("email", "")
+            # If domain is present in record, construct direct pattern
+            domain_res = supabase.table("leads").select("domain").eq("id", lead_info["id"]).execute()
+            if domain_res.data and domain_res.data[0].get("domain"):
+                dom = domain_res.data[0]["domain"]
+                if fn_clean and ln_clean:
+                    updates["email"] = f"{fn_clean}.{ln_clean}@{dom}"
+                elif fn_clean:
+                    updates["email"] = f"{fn_clean}@{dom}"
 
-        if updates:
-            try:
-                supabase.table("leads").update(updates).eq("id", lead["id"]).execute()
-                updated_count += 1
-            except Exception:
-                pass
+            supabase.table("leads").update(updates).eq("id", lead_info["id"]).execute()
+            updated_count += 1
 
-    print(f"✓ Successfully updated {updated_count} broker records in Supabase with Full Names, Phones & Domain Emails!")
+    print(f"✓ FINISHED! Updated {updated_count} broker records with First & Last names and email patterns.")
 
 if __name__ == "__main__":
     fix_and_enrich_leads()
