@@ -13,7 +13,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 INSTANTLY_API_KEY = os.getenv("INSTANTLY_API_KEY")
 
-INSTANTLY_BROKER_CAMPAIGN_ID = os.getenv("INSTANTLY_BROKER_CAMPAIGN_ID")
+INSTANTLY_BROKER_CAMPAIGN_ID = os.getenv("INSTANTLY_BROKER_CAMPAIGN_ID") or "8e99d2a6-8038-43f0-b18c-5dea242bf570"
 INSTANTLY_FLEET_CAMPAIGN_ID = os.getenv("INSTANTLY_FLEET_CAMPAIGN_ID")
 
 if not SUPABASE_URL:
@@ -55,7 +55,9 @@ def push_lead_to_instantly(campaign_id, email, first_name, last_name, company_na
         "last_name": last_name or "",
         "company_name": company_name or "",
         "phone": phone or "",
-        "skip_if_in_workspace": True
+        "custom_variables": {
+            "Broker Dashboard": f"https://recalllogic.ai/audit/detail?company={company_name or ''}"
+        }
     }
 
     try:
@@ -73,10 +75,11 @@ def push_lead_to_instantly(campaign_id, email, first_name, last_name, company_na
 def run_gtm_pipeline():
     print("\n--- STARTING GTM PIPELINE EXECUTION ---")
 
-    # Fetch approved leads from Supabase safely
+    # Fetch approved leads that haven't been pushed yet
     query = lambda: supabase.table("leads") \
         .select("*") \
         .eq("qc_status", "approved") \
+        .eq("pushed_to_instantly", False) \
         .limit(100) \
         .execute()
 
@@ -111,18 +114,18 @@ def run_gtm_pipeline():
             phone=phone
         )
 
-        if pushed or not INSTANTLY_API_KEY:
-            # Mark lead as synced in Supabase
+        if pushed:
+            # Mark lead as pushed in Supabase (leaving ENUM qc_status untouched)
             update_query = lambda: supabase.table("leads") \
-                .update({"qc_status": "synced"}) \
+                .update({"pushed_to_instantly": True}) \
                 .eq("id", lead_id) \
                 .execute()
             
             safe_db_query(update_query)
             synced_count += 1
-            print(f"  ✓ Successfully synced and updated status to 'synced'\n")
+            print(f"  ✓ Successfully pushed to Instantly and updated Supabase!\n")
 
-    print(f"--- FINISHED: {synced_count} leads processed and updated in Supabase. ---")
+    print(f"--- FINISHED: {synced_count} leads processed and pushed to Instantly. ---")
 
 
 if __name__ == "__main__":
