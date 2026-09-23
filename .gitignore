@@ -54,3 +54,6 @@ logs/
 *.njsproj
 *.sln
 *.sw?
+.env
+*.key
+*.json
