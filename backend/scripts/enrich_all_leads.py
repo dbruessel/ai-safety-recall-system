@@ -3,16 +3,23 @@ import re
 import urllib.parse
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 from supabase import create_client, Client
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Environment / API Credentials
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://YOUR_SUPABASE_PROJECT.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
-MILLIONVERIFIER_API_KEY = os.environ.get("MILLIONVERIFIER_API_KEY", "YOUR_MILLIONVERIFIER_API_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+MILLIONVERIFIER_API_KEY = os.environ.get("MILLIONVERIFIER_API_KEY")
 
 # Sircon Master Google Sheet (Domain Mapping Engine)
 SHEET_ID = "1Gv4IxaeNNcmTZaxhhd65E3ND7Q12SkRJxlnp0L2KIsU"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in your .env file")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
