@@ -1,132 +1,129 @@
 import os
+import sys
+import time
 import requests
-from supabase import create_client, Client
+from dotenv import load_dotenv
+from supabase import create_client
 
-# Environment Credentials
-SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT.supabase.co"
-SUPABASE_KEY = "YOUR_SUPABASE_SERVICE_ROLE_KEY"
-MILLIONVERIFIER_API_KEY = "YOUR_MILLIONVERIFIER_API_KEY"
-INSTANTLY_API_KEY = "YOUR_INSTANTLY_API_KEY"
+# Explicitly load .env from the backend directory
+env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(dotenv_path=env_path)
 
-# Instantly Campaign IDs
-BROKER_CAMPAIGN_ID = "YOUR_INSTANTLY_BROKER_CAMPAIGN_ID"
-FLEET_CAMPAIGN_ID = "YOUR_INSTANTLY_FLEET_CAMPAIGN_ID"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+INSTANTLY_API_KEY = os.getenv("INSTANTLY_API_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+INSTANTLY_BROKER_CAMPAIGN_ID = os.getenv("INSTANTLY_BROKER_CAMPAIGN_ID")
+INSTANTLY_FLEET_CAMPAIGN_ID = os.getenv("INSTANTLY_FLEET_CAMPAIGN_ID")
 
-# -------------------------------------------------------------------
-# 1. MILLIONVERIFIER INTEGRATION
-# -------------------------------------------------------------------
-def verify_email_millionverifier(email):
-    """
-    Calls MillionVerifier Single Email API.
-    Returns: (result_string, quality_score, is_valid_boolean)
-    Results: 'ok', 'catch_all', 'unknown', 'disposable', 'invalid'
-    """
-    url = f"https://api.millionverifier.com/api/v3/single?api_key={MILLIONVERIFIER_API_KEY}&email={email}"
-    try:
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            result = data.get("result", "unknown").lower()
-            score = data.get("quality_score", 0)
-            
-            # Strict verification rule: Only allow 'ok' (and optionally 'catch_all' if score > 70)
-            is_valid = (result == "ok") or (result == "catch_all" and score >= 70)
-            return result, score, is_valid
-    except Exception as e:
-        print(f"MillionVerifier API Error for {email}: {e}")
-    
-    return "error", 0, False
+if not SUPABASE_URL:
+    print(f"Error: Could not load SUPABASE_URL. Checked path: {os.path.abspath(env_path)}")
+    sys.exit(1)
 
-def process_pending_verifications(limit=50):
-    """Fetches pending leads and runs them through MillionVerifier before approving."""
-    response = supabase.table("leads") \
-        .select("*") \
-        .eq("qc_status", "pending") \
-        .not_.is_("email", "null") \
-        .limit(limit) \
-        .execute()
+def get_supabase_client():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    pending_leads = response.data
-    if not pending_leads:
-        print("No pending leads to verify with MillionVerifier.")
-        return
+supabase = get_supabase_client()
 
-    print(f"Running MillionVerifier on {len(pending_leads)} pending leads...")
 
-    for lead in pending_leads:
-        mv_result, mv_score, is_valid = verify_email_millionverifier(lead['email'])
-        new_status = "approved" if is_valid else "rejected"
+def safe_db_query(query_func, retries=3):
+    """Executes a Supabase query with automatic retry on DNS/Connection drops."""
+    global supabase
+    for attempt in range(retries):
+        try:
+            return query_func()
+        except Exception as e:
+            print(f"  [Connection Retry {attempt+1}/{retries}] Reconnecting to Supabase... ({e})")
+            time.sleep(2)
+            supabase = get_supabase_client()
+    print("Error: Could not complete database request due to persistent network failure.")
+    return None
 
-        supabase.table("leads").update({
-            "qc_status": new_status,
-            "mv_result": mv_result,
-            "mv_score": mv_score
-        }).eq("id", lead['id']).execute()
 
-        print(f" Verified: {lead['email']} | MV Result: {mv_result} (Score: {mv_score}) | QC: {new_status}")
+def push_lead_to_instantly(campaign_id, email, first_name, last_name, company_name, phone=None):
+    """Pushes a single verified lead into an Instantly campaign."""
+    if not INSTANTLY_API_KEY or not campaign_id:
+        print("  [Warning] Missing INSTANTLY_API_KEY or Campaign ID in .env. Skipping API push.")
+        return False
 
-# -------------------------------------------------------------------
-# 2. INSTANTLY API INTEGRATION
-# -------------------------------------------------------------------
-def push_to_instantly(lead):
-    """Router function to push clean leads to Instantly API."""
     url = "https://api.instantly.ai/api/v1/lead/add"
-    campaign_id = BROKER_CAMPAIGN_ID if lead['type'] == 'broker' else FLEET_CAMPAIGN_ID
-
     payload = {
         "api_key": INSTANTLY_API_KEY,
         "campaign_id": campaign_id,
-        "email": lead['email'],
-        "first_name": lead.get('first_name') or "",
-        "last_name": lead.get('last_name') or "",
-        "company_name": lead['company_name'],
-        "custom_variables": {
-            "Fleet Size": str(lead.get('fleet_size', 0)),
-            "City": lead.get('city', 'Las Vegas'),
-            "Segment": lead['type']
-        }
+        "email": email,
+        "first_name": first_name or "",
+        "last_name": last_name or "",
+        "company_name": company_name or "",
+        "phone": phone or "",
+        "skip_if_in_workspace": True
     }
 
     try:
         res = requests.post(url, json=payload, timeout=10)
-        return res.status_code in [200, 201]
+        if res.status_code in [200, 201]:
+            return True
+        else:
+            print(f"  [Instantly Error] Status {res.status_code}: {res.text}")
     except Exception as e:
-        print(f"Instantly API Error for {lead['email']}: {e}")
-        return False
-
-# -------------------------------------------------------------------
-# 3. DAILY PIPELINE EXECUTION
-# -------------------------------------------------------------------
-def run_gtm_pipeline(batch_per_segment=30):
-    print("--- STARTING GTM PIPELINE EXECUTION ---")
+        print(f"  [Instantly Connection Error]: {e}")
     
-    # Step A: Verify Pending Emails via MillionVerifier
-    process_pending_verifications(limit=100)
+    return False
 
-    # Step B: Sync Approved Leads to Instantly
-    for segment in ['broker', 'fleet_owner']:
-        response = supabase.table("leads") \
-            .select("*") \
-            .eq("type", segment) \
-            .eq("qc_status", "approved") \
-            .eq("pushed_to_instantly", False) \
-            .limit(batch_per_segment) \
-            .execute()
 
-        approved_leads = response.data
-        print(f"[{segment.upper()}] Pushing {len(approved_leads)} verified leads to Instantly...")
+def run_gtm_pipeline():
+    print("\n--- STARTING GTM PIPELINE EXECUTION ---")
 
-        for lead in approved_leads:
-            if push_to_instantly(lead):
-                supabase.table("leads") \
-                    .update({"pushed_to_instantly": True}) \
-                    .eq("id", lead['id']) \
-                    .execute()
-                print(f"  ✓ Synced: {lead['email']}")
-            else:
-                print(f"  ✗ Failed to sync: {lead['email']}")
+    # Fetch approved leads from Supabase safely
+    query = lambda: supabase.table("leads") \
+        .select("*") \
+        .eq("qc_status", "approved") \
+        .limit(100) \
+        .execute()
+
+    res = safe_db_query(query)
+    if not res or not res.data:
+        print("No approved leads waiting in queue for Instantly sync.")
+        return
+
+    leads = res.data
+    print(f"Found {len(leads)} approved leads ready for sync.\n")
+
+    synced_count = 0
+    for lead in leads:
+        lead_id = lead.get("id")
+        email = lead.get("email")
+        company = lead.get("company_name", "")
+        first_name = lead.get("first_name", "")
+        last_name = lead.get("last_name", "")
+        phone = lead.get("phone", "")
+        lead_type = lead.get("type", "broker")
+
+        target_campaign = INSTANTLY_FLEET_CAMPAIGN_ID if lead_type == "fleet_owner" else INSTANTLY_BROKER_CAMPAIGN_ID
+
+        print(f"Syncing [{lead_type.upper()}]: {email} ({company})...")
+
+        pushed = push_lead_to_instantly(
+            campaign_id=target_campaign,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            company_name=company,
+            phone=phone
+        )
+
+        if pushed or not INSTANTLY_API_KEY:
+            # Mark lead as synced in Supabase
+            update_query = lambda: supabase.table("leads") \
+                .update({"qc_status": "synced"}) \
+                .eq("id", lead_id) \
+                .execute()
+            
+            safe_db_query(update_query)
+            synced_count += 1
+            print(f"  ✓ Successfully synced and updated status to 'synced'\n")
+
+    print(f"--- FINISHED: {synced_count} leads processed and updated in Supabase. ---")
+
 
 if __name__ == "__main__":
-    run_gtm_pipeline(batch_per_segment=30)
+    run_gtm_pipeline()
