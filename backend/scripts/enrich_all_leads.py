@@ -1,189 +1,130 @@
 import os
 import re
-import urllib.parse
-import pandas as pd
+import time
 import requests
+import pandas as pd
+from supabase import create_client
 from dotenv import load_dotenv
-from supabase import create_client, Client
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Environment / API Credentials
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 MILLIONVERIFIER_API_KEY = os.environ.get("MILLIONVERIFIER_API_KEY")
 
-# Sircon Master Google Sheet (Domain Mapping Engine)
-SHEET_ID = "1Gv4IxaeNNcmTZaxhhd65E3ND7Q12SkRJxlnp0L2KIsU"
-GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in your .env file")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def verify_email_millionverifier(email):
-    """
-    Calls MillionVerifier Single Email API.
-    Returns True if valid ('ok' or 'catch_all' with high quality score).
-    """
-    if not email or "@" not in email:
-        return False, "invalid", 0
-
-    url = f"https://api.millionverifier.com/api/v3/single?api_key={MILLIONVERIFIER_API_KEY}&email={email}"
+    """Pings MillionVerifier with a strict 3-second timeout."""
+    if not MILLIONVERIFIER_API_KEY or "your_actual" in MILLIONVERIFIER_API_KEY:
+        return "unverified", {}
+    
+    url = f"https://api.millionverifier.com/api/v3/?api={MILLIONVERIFIER_API_KEY}&email={email}"
     try:
-        res = requests.get(url, timeout=8)
-        if res.status_code == 200:
-            data = res.json()
-            result = data.get("result", "unknown").lower()
-            score = data.get("quality_score", 0)
-
-            # Accept 'ok' or high quality 'catch_all'
-            is_valid = (result == "ok") or (result == "catch_all" and score >= 70)
-            return is_valid, result, score
+        res = requests.get(url, timeout=3).json()
+        result = res.get("result", "unknown")
+        return result, res
+    except requests.exceptions.Timeout:
+        print(f"  ⏳ Timeout on {email} - skipping candidate.")
+        return "timeout", {}
     except Exception as e:
-        print(f"    ⚠️ MillionVerifier error for {email}: {e}")
+        return "error", {}
 
-    return False, "error", 0
-
-
-def generate_domain_from_company(company_name):
-    """Generates a cleaned domain guess based on the company name."""
-    clean_name = re.sub(
-        r"(?i)\b(llc|inc|corp|corporation|group|agency|services|insurance)\b",
-        "",
-        company_name,
-    )
-    clean_name = re.sub(r"[^\w\s]", "", clean_name).strip().replace(" ", "")
-    if clean_name:
-        return f"{clean_name.lower()}.com"
-    return None
-
-
-def generate_email_permutations(first_name, last_name, domain):
-    """Generates candidate email permutations for verification."""
-    patterns = []
-    dom = domain.lower().replace("http://", "").replace("https://", "").replace("www.", "").strip("/")
-
-    if first_name and last_name:
-        fn = re.sub(r"[^\w]", "", first_name.lower())
-        ln = re.sub(r"[^\w]", "", last_name.lower())
-        if fn and ln:
-            patterns.append(f"{fn}.{ln}@{dom}")
-            patterns.append(f"{fn[0]}{ln}@{dom}")
-            patterns.append(f"{fn}@{dom}")
-
-    elif first_name:
-        fn = re.sub(r"[^\w]", "", first_name.lower())
-        if fn:
-            patterns.append(f"{fn}@{dom}")
-
-    # Standard fallback agency patterns
-    patterns.append(f"info@{dom}")
-    patterns.append(f"contact@{dom}")
-
-    return patterns
-
+def normalize_company(name):
+    if not name or pd.isna(name):
+        return ""
+    name = str(name).upper()
+    for drop in ["LLC", "INC", "CORP", "CORPORATION", "GROUP", "AGENCY", "INSURANCE", "SERVICES", "NV", "LAS VEGAS", "CO", "COMPANY"]:
+        name = re.sub(r'\b' + drop + r'\b', '', name)
+    return re.sub(r'[^A-Z0-9]', '', name).strip()
 
 def enrich_brokers_and_verify():
     print("=== STEP 1: Matching Domains from Sircon Master Sheet ===")
+    sircon_url = "https://docs.google.com/spreadsheets/d/1Gv4IxaeNNcmTZaxhhd65E3ND7Q12SkRJxlnp0L2KIsU/export?format=csv"
+    
     domain_map = {}
     try:
-        df_sircon = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df_sircon.columns = [col.strip().lower() for col in df_sircon.columns]
-
-        name_col = next((c for c in df_sircon.columns if "name" in c or "agency" in c), df_sircon.columns[0])
-        email_col = next((c for c in df_sircon.columns if "email" in c or "domain" in c), None)
-
-        if email_col:
-            for _, row in df_sircon.iterrows():
-                comp = str(row[name_col]).strip().upper()
-                email = str(row[email_col]).strip()
-                if "@" in email:
-                    dom = email.split("@")[-1].lower()
-                    domain_map[comp] = dom
-
+        df_sircon = pd.read_csv(sircon_url, storage_options={'User-Agent': 'Mozilla/5.0'})
         print(f"Read {len(df_sircon)} rows from Sircon Google Sheet.")
-        print(f"Mapped {len(domain_map)} direct domains/emails from Sircon Sheet.")
+        
+        for _, row in df_sircon.iterrows():
+            c_name = str(row.get('Name', '')).strip()
+            c_email = str(row.get('Email', '')).strip().lower()
+            if c_name and "@" in c_email and "nan" not in c_email:
+                dom = c_email.split("@")[-1].strip()
+                domain_map[normalize_company(c_name)] = {"domain": dom, "fallback_email": c_email}
+                
+        print(f"Mapped {len(domain_map)} domains from Sircon Sheet.")
     except Exception as e:
-        print(f"⚠️ Could not load Sircon Sheet: {e}")
+        print(f"Error fetching Sircon sheet: {e}")
 
-    # Fetch brokers with missing emails or pending status
-    res = supabase.table("leads").select("*").eq("type", "broker").neq("qc_status", "rejected").execute()
+    # Fetch Pending Brokers from Supabase
+    res = supabase.table("leads").select("*").eq("type", "broker").eq("qc_status", "pending").execute()
     brokers = res.data
-    print(f"Processing {len(brokers)} brokers in Supabase...")
+    print(f"Processing {len(brokers)} pending brokers in Supabase...\n")
 
+    print("=== STEP 2: Running MillionVerifier Pattern Pings ===")
+    
     verified_count = 0
+    rejected_count = 0
 
-    for broker in brokers:
-        # If already approved and email present, skip
-        if broker.get("qc_status") == "approved" and broker.get("email"):
+    for idx, broker in enumerate(brokers, start=1):
+        cname_norm = normalize_company(broker.get("company_name", ""))
+        s_match = domain_map.get(cname_norm, {})
+        
+        domain = broker.get("domain") or s_match.get("domain")
+        first = broker.get("first_name")
+        last = broker.get("last_name")
+        existing_email = broker.get("email") or s_match.get("fallback_email")
+
+        # Build Candidate Emails
+        candidates = []
+        if first and domain:
+            fn = first.lower().replace(" ", "")
+            ln = last.lower().replace(" ", "") if last else ""
+            if fn and ln:
+                candidates.append(f"{fn}.{ln}@{domain}")
+                candidates.append(f"{fn}@{domain}")
+                candidates.append(f"{fn[0]}{ln}@{domain}")
+            elif fn:
+                candidates.append(f"{fn}@{domain}")
+
+        if existing_email and "@" in existing_email:
+            candidates.append(existing_email)
+
+        candidates = list(dict.fromkeys(candidates))
+
+        if not candidates:
+            supabase.table("leads").update({"qc_status": "rejected"}).eq("id", broker["id"]).execute()
+            rejected_count += 1
             continue
 
-        company = broker["company_name"].strip().upper()
-        domain = broker.get("domain")
-
-        # Check domain map from Sircon sheet if missing
-        if not domain and company in domain_map:
-            domain = domain_map[company]
-
-        # Generate domain guess if still missing
-        if not domain:
-            domain = generate_domain_from_company(broker["company_name"])
-
-        if not domain:
-            continue
-
-        # Generate candidate permutations
-        candidates = generate_email_permutations(
-            broker.get("first_name"), broker.get("last_name"), domain
-        )
-
-        verified_email = None
-
+        # Verify Candidates with MillionVerifier
+        valid_email = None
         for candidate in candidates:
-            is_valid, mv_res, score = verify_email_millionverifier(candidate)
-            if is_valid:
-                verified_email = candidate
+            result, _ = verify_email_millionverifier(candidate)
+            time.sleep(0.1) # Throttling to keep API connection stable
+            
+            if result == "ok":
+                valid_email = candidate
                 break
 
-        # Safely verify and update in Supabase
-        if verified_email:
-            try:
-                # Check if email is already assigned to another lead to prevent unique key violations
-                existing = (
-                    supabase.table("leads")
-                    .select("id")
-                    .eq("email", verified_email)
-                    .execute()
-                )
-                if existing.data and existing.data[0]["id"] != broker["id"]:
-                    print(
-                        f"   ⚠️ Skipping {verified_email} (already assigned to another lead)"
-                    )
-                    continue
+        if valid_email:
+            supabase.table("leads").update({
+                "email": valid_email,
+                "domain": valid_email.split("@")[-1],
+                "qc_status": "approved"
+            }).eq("id", broker["id"]).execute()
+            verified_count += 1
+            print(f"  ✓ [{verified_count}] Approved: {valid_email} ({broker['company_name']})")
+        else:
+            supabase.table("leads").update({"qc_status": "rejected"}).eq("id", broker["id"]).execute()
+            rejected_count += 1
 
-                # Update Supabase lead record
-                supabase.table("leads").update(
-                    {
-                        "email": verified_email,
-                        "domain": domain,
-                        "qc_status": "approved",
-                    }
-                ).eq("id", broker["id"]).execute()
+        if idx % 50 == 0:
+            print(f"\n--- Progress: {idx}/{len(brokers)} processed ({verified_count} Approved, {rejected_count} Rejected) ---\n")
 
-                verified_count += 1
-                print(
-                    f"  ✓ [{verified_count}] Attached Verified Email: {verified_email} ({broker['company_name']})"
-                )
-            except Exception as e:
-                print(
-                    f"   ⚠️ Could not assign {verified_email} to {broker['company_name']}: {e}"
-                )
-                continue
-
+    print(f"\n✓ Completed! {verified_count} emails approved, {rejected_count} rejected.")
 
 if __name__ == "__main__":
     enrich_brokers_and_verify()
