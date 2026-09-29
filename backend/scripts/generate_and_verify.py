@@ -111,21 +111,14 @@ def process_pending_leads():
                 final_score = score
                 break
 
-        if verified_email:
+    if verified_email:
             safe_db_update(lead["id"], {
                 "email": verified_email,
-                "qc_status": "approved",
+                "qc_status": "human_review",  # <-- STAGED FOR HUMAN REVIEW
                 "mv_result": final_result,
                 "mv_score": final_score
             })
-            print(f"  ✓ APPROVED & SAVED: {verified_email}\n")
-        else:
-            safe_db_update(lead["id"], {
-                "qc_status": "rejected",
-                "mv_result": "invalid",
-                "mv_score": 0
-            })
-            print(f"  ✗ REJECTED: No valid inbox found for {domain}\n")
+            print(f"  ✓ STAGED FOR HUMAN REVIEW: {verified_email}\n")
 
     print("================ PROCESS COMPLETE ================")
 
