@@ -23,11 +23,12 @@ def stage_unverified_fleets():
         # Check if lead has no email OR uses a disallowed webmail domain
         if not email or domain in DISALLOWED or not domain:
             supabase.table("leads").update({
-                "qc_status": "human_review"
+                "qc_status": "pending",
+                "mv_result": "review_needed"
             }).eq("id", lead["id"]).execute()
             staged_count += 1
 
-    print(f"\n✓ Moved {staged_count} unverified fleet leads (webmail & missing emails) to 'human_review'.")
+    print(f"\n✓ Moved {staged_count} unverified fleet leads to 'pending' with mv_result = 'review_needed'.")
 
 if __name__ == "__main__":
     stage_unverified_fleets()
