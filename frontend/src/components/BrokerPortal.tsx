@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
+import { ShieldAlert, ExternalLink } from 'lucide-react';
 
 interface ManagedFleet {
   organization_id: string;
@@ -11,6 +12,9 @@ interface ManagedFleet {
   scheduled_recalls: number;
   cleared_recalls: number;
   safety_score: number;
+  // Nuclear alert tracking across portfolio
+  has_nuclear_recall?: boolean;
+  nuclear_campaign_details?: string;
 }
 
 export const BrokerPortal: React.FC = () => {
@@ -66,11 +70,54 @@ export const BrokerPortal: React.FC = () => {
           .eq('parent_brokerage_id', brokerageId);
 
         if (error || !data || data.length === 0) {
+          // Demo Data Fallback with High-Liability Flags
           setFleets([
-            { organization_id: 'demo-org-1', fleet_name: 'Apex Logistics & Freight', subscription_tier: 'Enterprise', total_vins: 142, open_recalls: 3, scheduled_recalls: 5, cleared_recalls: 134, safety_score: 82 },
-            { organization_id: 'demo-org-2', fleet_name: 'Summit Regional Transport', subscription_tier: 'Professional', total_vins: 68, open_recalls: 0, scheduled_recalls: 2, cleared_recalls: 66, safety_score: 98 },
-            { organization_id: 'demo-org-3', fleet_name: 'Titan Heavy Hauling Co.', subscription_tier: 'Professional', total_vins: 210, open_recalls: 14, scheduled_recalls: 8, cleared_recalls: 188, safety_score: 58 },
-            { organization_id: 'demo-org-4', fleet_name: 'Metro Last-Mile Delivery', subscription_tier: 'Standard', total_vins: 45, open_recalls: 1, scheduled_recalls: 1, cleared_recalls: 43, safety_score: 90 },
+            { 
+              organization_id: 'demo-org-1', 
+              fleet_name: 'Apex Logistics & Freight', 
+              subscription_tier: 'Enterprise', 
+              total_vins: 142, 
+              open_recalls: 3, 
+              scheduled_recalls: 5, 
+              cleared_recalls: 134, 
+              safety_score: 82,
+              has_nuclear_recall: true,
+              nuclear_campaign_details: 'Campaign #23V-891 (STEERING AXLE DRAG LINK)'
+            },
+            { 
+              organization_id: 'demo-org-2', 
+              fleet_name: 'Summit Regional Transport', 
+              subscription_tier: 'Professional', 
+              total_vins: 68, 
+              open_recalls: 0, 
+              scheduled_recalls: 2, 
+              cleared_recalls: 66, 
+              safety_score: 98,
+              has_nuclear_recall: false
+            },
+            { 
+              organization_id: 'demo-org-3', 
+              fleet_name: 'Titan Heavy Hauling Co.', 
+              subscription_tier: 'Professional', 
+              total_vins: 210, 
+              open_recalls: 14, 
+              scheduled_recalls: 8, 
+              cleared_recalls: 188, 
+              safety_score: 58,
+              has_nuclear_recall: true,
+              nuclear_campaign_details: 'Campaign #23V-838 (AIR BRAKE ACTUATOR DIAPHRAGM)'
+            },
+            { 
+              organization_id: 'demo-org-4', 
+              fleet_name: 'Metro Last-Mile Delivery', 
+              subscription_tier: 'Standard', 
+              total_vins: 45, 
+              open_recalls: 1, 
+              scheduled_recalls: 1, 
+              cleared_recalls: 43, 
+              safety_score: 90,
+              has_nuclear_recall: false
+            },
           ]);
         } else {
           const mappedFleets: ManagedFleet[] = data.map((org: any) => ({
@@ -82,6 +129,7 @@ export const BrokerPortal: React.FC = () => {
             scheduled_recalls: 1,
             cleared_recalls: 47,
             safety_score: 88,
+            has_nuclear_recall: false
           }));
           setFleets(mappedFleets);
         }
@@ -152,10 +200,52 @@ export const BrokerPortal: React.FC = () => {
   const totalVins = fleets.reduce((acc, f) => acc + f.total_vins, 0);
   const totalOpenRecalls = fleets.reduce((acc, f) => acc + f.open_recalls, 0);
   const avgSafetyScore = fleets.length ? Math.round(fleets.reduce((acc, f) => acc + f.safety_score, 0) / fleets.length) : 100;
+  
+  // High-Risk Fleets Across Portfolio
+  const nuclearFleets = fleets.filter(f => f.has_nuclear_recall);
 
   return (
     <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
       
+      {/* PORTFOLIO NUCLEAR LIABILITY ALERT BANNER */}
+      {nuclearFleets.length > 0 && (
+        <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-5 text-white shadow-2xl backdrop-blur-md">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              <ShieldAlert className="w-8 h-8 text-red-500 animate-pulse" />
+              <div>
+                <h3 className="text-lg font-extrabold text-red-100 tracking-tight">
+                  ⚠️ {nuclearFleets.length} High Liability Exposure Alert(s) Detected in Portfolio
+                </h3>
+                <p className="text-xs text-red-300">
+                  Commercial policyholders in your book are operating vehicles with unaddressed, critical safety recalls (Brakes/Steering).
+                </p>
+              </div>
+            </div>
+            <span className="bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest">
+              Underwriter Risk Flag
+            </span>
+          </div>
+
+          <div className="space-y-2 mt-4">
+            {nuclearFleets.map((fleet) => (
+              <div key={fleet.organization_id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-red-900/40 p-3 rounded-xl border border-red-800/80 gap-2">
+                <div className="text-xs">
+                  <span className="font-bold text-white">{fleet.fleet_name}:</span>
+                  <span className="text-red-300 ml-2">{fleet.nuclear_campaign_details}</span>
+                </div>
+                <a
+                  href={`/?org=${fleet.organization_id}`}
+                  className="flex items-center text-[11px] bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Audit Client Workspace →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* DEMO BANNER & HEADER TOOLBAR (STEP 5 HIGHLIGHT) */}
       <div className={`bg-[#0D1322] p-4 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
         isTourActive && currentTourStep === 4 ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-slate-800'
@@ -211,7 +301,14 @@ export const BrokerPortal: React.FC = () => {
               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
           }`}
         >
-          {isExporting ? <span>⏳ Exporting PDF...</span> : <span>📄 Export Portfolio Audit PDF</span>}
+          {isExporting ? (
+            <span>⏳ Exporting PDF...</span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <span>📄 Export Portfolio Audit PDF</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </span>
+          )}
         </button>
       </div>
 
@@ -262,7 +359,9 @@ export const BrokerPortal: React.FC = () => {
             {fleets.map((fleet) => (
               <div
                 key={fleet.organization_id}
-                className="bg-[#0D1322] border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition"
+                className={`bg-[#0D1322] border rounded-2xl p-5 space-y-4 transition ${
+                  fleet.has_nuclear_recall ? 'border-red-600/70 bg-red-950/10' : 'border-slate-800 hover:border-slate-700'
+                }`}
               >
                 <div className="flex justify-between items-start">
                   <div>
