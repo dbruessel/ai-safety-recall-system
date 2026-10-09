@@ -2,7 +2,9 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { FleetVinScanner } from './FleetVinScanner';
+import { ShieldAlert, ExternalLink } from 'lucide-react';
 
+// --- INTERFACES ---
 interface TaskBoardProps {
   userTier?: string;
 }
@@ -21,8 +23,73 @@ interface RecallItem {
   dealerName?: string;
   scheduledDate?: string;
   organization_id?: string;
+  // Fleetio & Nuclear Liability Extensions
+  nuclear_liability_flag?: boolean;
+  fleetio_vehicle_id?: string;
 }
 
+interface NuclearAlertTask {
+  id: string;
+  campaign_number: string;
+  component: string;
+  nuclear_liability_flag: boolean;
+  fleetio_vehicle_id: string;
+}
+
+// --- FLEETIO NUCLEAR LIABILITY ALERT BANNER COMPONENT ---
+const FleetioNuclearAlert: React.FC<{ recallTasks: NuclearAlertTask[] }> = ({ recallTasks }) => {
+  const nuclearTasks = recallTasks.filter(t => t.nuclear_liability_flag);
+
+  if (nuclearTasks.length === 0) return null;
+
+  return (
+    <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-5 mb-6 text-white shadow-2xl backdrop-blur-md">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          <ShieldAlert className="w-8 h-8 text-red-500 animate-pulse" />
+          <div>
+            <h3 className="text-lg font-extrabold text-red-100 tracking-tight">
+              ⚠️ {nuclearTasks.length} Nuclear Liability Alert(s) Detected
+            </h3>
+            <p className="text-xs text-red-300">
+              Active fleet vehicles are operating with unaddressed, high-severity safety recalls (Brakes, Steering, Airbags).
+            </p>
+          </div>
+        </div>
+        <span className="bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest">
+          High Legal Exposure
+        </span>
+      </div>
+
+      <div className="space-y-2 mt-4">
+        {nuclearTasks.map((task) => (
+          <div key={task.id} className="flex justify-between items-center bg-red-900/40 p-3 rounded-xl border border-red-800/80">
+            <div className="text-xs">
+              <span className="font-bold text-red-200">Campaign #{task.campaign_number}</span>
+              <span className="text-red-300 ml-2">({task.component})</span>
+            </div>
+            {task.fleetio_vehicle_id ? (
+              <a
+                href={`https://secure.fleetio.com/vehicles/${task.fleetio_vehicle_id}/issues`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center text-[11px] bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-lg transition-colors cursor-pointer"
+              >
+                View in Fleetio <ExternalLink className="w-3 h-3 ml-1.5" />
+              </a>
+            ) : (
+              <span className="text-[10px] bg-red-900 text-red-300 px-2 py-0.5 rounded border border-red-700">
+                Action Required
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN TASKBOARD COMPONENT ---
 export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) => {
   const { userProfile } = useAuth();
   const isPro = userTier.toLowerCase() === 'professional' || userTier.toLowerCase() === 'enterprise';
@@ -102,9 +169,49 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
     if (!userProfile?.organization_id) {
       // Demo Data Fallback for Non-Authenticated Tour Views
       setRecallUnits([
-        { id: '1', unit: 'UNIT-101', vin: '1FUJGLDR5MLKE1234', makeModel: 'FREIGHTLINER CASCADIA 2023', nhtsaCampaign: '23V-891', recallDetails: 'STEERING AXLE DRAG LINK', description: 'Drag link taper joint may separate leading to sudden loss of steering control.', remedyStatus: 'Unassigned', complianceStatus: 'OPEN', severity: 'CRITICAL' },
-        { id: '2', unit: 'UNIT-204', vin: '1FTBW1Y85PKA54321', makeModel: 'FORD TRANSIT VAN 2022', nhtsaCampaign: '24V-012', recallDetails: 'REAR DRIVESHAFT FLEX COUPLING', description: 'Driveshaft flex coupling separation may result in loss of motive power while driving.', remedyStatus: 'Scheduled', complianceStatus: 'SCHEDULED', severity: 'HIGH', dealerName: 'Metro Ford Commercial' },
-        { id: '3', unit: 'UNIT-309', vin: '5YJ3E1EA7MF987654', makeModel: 'VOLVO VNL 860 2023', nhtsaCampaign: '23V-838', recallDetails: 'AIR BRAKE ACTUATOR DIAPHRAGM', description: 'Air leak in brake chamber diaphragm may increase stopping distances or cause drag.', remedyStatus: 'Completed', complianceStatus: 'CLEARED', severity: 'MEDIUM', dealerName: 'Volvo Truck Center' },
+        { 
+          id: '1', 
+          unit: 'UNIT-101', 
+          vin: '1FUJGLDR5MLKE1234', 
+          makeModel: 'FREIGHTLINER CASCADIA 2023', 
+          nhtsaCampaign: '23V-891', 
+          recallDetails: 'STEERING AXLE DRAG LINK', 
+          description: 'Drag link taper joint may separate leading to sudden loss of steering control.', 
+          remedyStatus: 'Unassigned', 
+          complianceStatus: 'OPEN', 
+          severity: 'CRITICAL',
+          nuclear_liability_flag: true,
+          fleetio_vehicle_id: '101'
+        },
+        { 
+          id: '2', 
+          unit: 'UNIT-204', 
+          vin: '1FTBW1Y85PKA54321', 
+          makeModel: 'FORD TRANSIT VAN 2022', 
+          nhtsaCampaign: '24V-012', 
+          recallDetails: 'REAR DRIVESHAFT FLEX COUPLING', 
+          description: 'Driveshaft flex coupling separation may result in loss of motive power while driving.', 
+          remedyStatus: 'Scheduled', 
+          complianceStatus: 'SCHEDULED', 
+          severity: 'HIGH', 
+          dealerName: 'Metro Ford Commercial',
+          nuclear_liability_flag: false,
+          fleetio_vehicle_id: '204'
+        },
+        { 
+          id: '3', 
+          unit: 'UNIT-309', 
+          vin: '5YJ3E1EA7MF987654', 
+          makeModel: 'VOLVO VNL 860 2023', 
+          nhtsaCampaign: '23V-838', 
+          recallDetails: 'AIR BRAKE ACTUATOR DIAPHRAGM', 
+          description: 'Air leak in brake chamber diaphragm may increase stopping distances or cause drag.', 
+          remedyStatus: 'Completed', 
+          complianceStatus: 'CLEARED', 
+          severity: 'MEDIUM', 
+          dealerName: 'Volvo Truck Center',
+          nuclear_liability_flag: false
+        },
       ]);
       setLoading(false);
       return;
@@ -134,7 +241,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
           severity: (item.severity || 'HIGH').toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM',
           dealerName: item.dealer_name,
           scheduledDate: item.scheduled_date,
-          organization_id: item.organization_id
+          organization_id: item.organization_id,
+          nuclear_liability_flag: item.nuclear_liability_flag || item.severity === 'CRITICAL',
+          fleetio_vehicle_id: item.fleetio_vehicle_id || item.fleetio_id || ''
         }));
 
         setRecallUnits(mappedUnits);
@@ -292,6 +401,17 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) =
   return (
     <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
       
+      {/* ⚡ NUCLEAR LIABILITY ALERT BANNER ⚡ */}
+      <FleetioNuclearAlert 
+        recallTasks={recallUnits.map(unit => ({
+          id: unit.id,
+          campaign_number: unit.nhtsaCampaign,
+          component: unit.recallDetails,
+          nuclear_liability_flag: Boolean(unit.nuclear_liability_flag && unit.complianceStatus === 'OPEN'),
+          fleetio_vehicle_id: unit.fleetio_vehicle_id || ''
+        }))} 
+      />
+
       {/* SECTION HEADER & PRO ACTIONS BAR (STEP 1, STEP 2 & STEP 5 HIGHLIGHT) */}
       <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0D1322] p-5 rounded-2xl border transition-all duration-300 ${
         isTourActive && (currentTourStep === 0 || currentTourStep === 1 || currentTourStep === 4)
