@@ -1,10 +1,18 @@
 import json
 import logging
 from typing import Dict, Any, List
-from vertexai.generative_models import GenerativeModel
 from app.engine import get_supabase_client
 
 logger = logging.getLogger(__name__)
+
+# Safely handle Vertex AI imports so app boots even if dependency is missing
+try:
+    from vertexai.generative_models import GenerativeModel
+    HAS_VERTEX_AI = True
+except ImportError:
+    GenerativeModel = None
+    HAS_VERTEX_AI = False
+    logger.warning("vertexai module not found. AI recall analysis will use graceful fallback handlers.")
 
 NUCLEAR_KEYWORDS = ["brake", "steering", "airbag", "fire", "fuel", "suspension"]
 
@@ -175,18 +183,26 @@ def analyze_recall(recall: Dict) -> Dict:
     """
     prompt = _build_prompt(recall)
 
-    try:
-        model = GenerativeModel("gemini-1.5-pro")
-        response = model.generate_content(prompt)
+    if HAS_VERTEX_AI and GenerativeModel is not None:
+        try:
+            model = GenerativeModel("gemini-1.5-pro")
+            response = model.generate_content(prompt)
 
-        text = "".join(
-            part.text
-            for part in response.candidates[0].content.parts
-            if hasattr(part, "text")
-        )
-        data = json.loads(text)
-    except Exception as e:
-        logger.error(f"Error executing Gemini recall analysis: {e}")
+            text = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            data = json.loads(text)
+        except Exception as e:
+            logger.error(f"Error executing Gemini recall analysis: {e}")
+            data = {}
+    else:
+        logger.info("Vertex AI unavailable. Using default recall risk fallback.")
+        data = {}
+
+    # Default fallback values if analysis fails or package is uninstalled
+    if not data:
         data = {
             "ai_summary": "This recall may affect the safe operation of this vehicle.",
             "risk_level": "medium",
@@ -279,18 +295,25 @@ def analyze_context(context: Dict) -> Dict:
     """
     prompt = _build_contextual_prompt(context)
     
-    try:
-        model = GenerativeModel("gemini-1.5-pro")
-        response = model.generate_content(prompt)
+    if HAS_VERTEX_AI and GenerativeModel is not None:
+        try:
+            model = GenerativeModel("gemini-1.5-pro")
+            response = model.generate_content(prompt)
 
-        text = "".join(
-            part.text
-            for part in response.candidates[0].content.parts
-            if hasattr(part, "text")
-        )
-        data = json.loads(text)
-    except Exception as e:
-        logger.error(f"Error executing Gemini context analysis: {e}")
+            text = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            data = json.loads(text)
+        except Exception as e:
+            logger.error(f"Error executing Gemini context analysis: {e}")
+            data = {}
+    else:
+        logger.info("Vertex AI unavailable. Using default context risk fallback.")
+        data = {}
+
+    if not data:
         data = {
             "ai_summary": "This vehicle may be exposed to safety risks based on its configuration and environment.",
             "risk_level": "medium",

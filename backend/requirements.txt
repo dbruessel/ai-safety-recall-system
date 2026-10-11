@@ -12,3 +12,4 @@ gunicorn
 reportlab
 pandas
 resend
+google-cloud-aiplatform>=1.60.0
