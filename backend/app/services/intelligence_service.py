@@ -29,7 +29,7 @@ class ActuarialRiskEngine:
 
     @staticmethod
     def calculate_fleet_risk(organization_id: str) -> Dict[str, Any]:
-        supabase = get_supabase_client()
+        supabase = get_supabase()
 
         # 1. Fetch all monitored vehicles for the organization
         vehicles_res = supabase.table("monitored_vehicles") \

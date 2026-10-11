@@ -16,15 +16,15 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 class VehicleAddRequest(BaseModel):
     vin: str
-    user_id: str  # In production, this will be resolved via Auth token middleware[cite: 8]
+    user_id: str
 
 class TaskStatusUpdateRequest(BaseModel):
-    status: str  # 'pending', 'scheduled', or 'repaired'[cite: 8]
+    status: str  # 'pending', 'scheduled', or 'repaired'
     scheduled_repair_date: Optional[str] = None
 
 
 # =====================================================================
-# NEW ACTUARIAL & RISK METRICS ENDPOINTS
+# ACTUARIAL & RISK METRICS ENDPOINTS
 # =====================================================================
 
 @router.get("/actuarial-score/{organization_id}")
@@ -55,15 +55,12 @@ async def get_fleet_dashboard_summary(organization_id: str) -> Dict[str, Any]:
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
     try:
-        # Fetch monitored vehicles count[cite: 8]
         vehicles_res = sb.table("monitored_vehicles") \
             .select("id", count="exact") \
             .eq("organization_id", organization_id) \
             .execute()
         
         total_vins = vehicles_res.count or 0
-
-        # Compute actuarial metrics for health overview
         actuarial_data = ActuarialRiskEngine.calculate_fleet_risk(organization_id)
 
         return {
@@ -90,10 +87,10 @@ async def get_fleet_dashboard_summary(organization_id: str) -> Dict[str, Any]:
 @router.post("/vehicles", status_code=status.HTTP_201_CREATED)
 async def add_monitored_vehicle(payload: VehicleAddRequest):
     """
-    1. Adds a 17-digit VIN to the user's active fleet list[cite: 8].
-    2. Decodes the VIN via NHTSA vPIC[cite: 8].
-    3. Finds matching safety campaigns in your database[cite: 8].
-    4. Automatically generates 'pending' task cards for each campaign[cite: 8].
+    1. Adds a 17-digit VIN to the user's active fleet list.
+    2. Decodes the VIN via NHTSA vPIC.
+    3. Finds matching safety campaigns in your database.
+    4. Automatically generates 'pending' task cards for each campaign.
     """
     from supabase import create_client, Client
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
@@ -102,7 +99,6 @@ async def add_monitored_vehicle(payload: VehicleAddRequest):
     if len(clean_vin) != 17:
         raise HTTPException(status_code=400, detail="VIN must be exactly 17 characters.")
 
-    # Step A: Decode VIN via NHTSA[cite: 8]
     vpic_url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{clean_vin}?format=json"
     try:
         async with httpx.AsyncClient() as client:
@@ -126,7 +122,6 @@ async def add_monitored_vehicle(payload: VehicleAddRequest):
         logger.error(f"VIN Decode failed: {str(e)}")
         raise HTTPException(status_code=502, detail="Federal decoder handshake failed.")
 
-    # Step B: Write to monitored_vehicles table[cite: 8]
     try:
         vehicle_payload = {
             "profile_id": payload.user_id,
@@ -142,7 +137,6 @@ async def add_monitored_vehicle(payload: VehicleAddRequest):
         logger.error(f"Failed to insert vehicle: {str(e)}")
         raise HTTPException(status_code=409, detail="Vehicle is already being monitored in this fleet.")
 
-    # Step C: Query central database for active recalls on this Make/Model/Year[cite: 8]
     try:
         recalls_res = sb.table("recall_results").select("*") \
             .ilike("make", make) \
@@ -152,10 +146,8 @@ async def add_monitored_vehicle(payload: VehicleAddRequest):
         active_recalls = recalls_res.data or []
     except Exception as e:
         logger.error(f"Failed querying safety threats: {str(e)}")
-        # Vehicle was added, but scan failed. Return success, but flag the scanning issue[cite: 8].
         return {"status": "warning", "message": "Vehicle added, but initial scan deferred.", "vehicle": new_vehicle}
 
-    # Step D: Bulk insert safety campaigns as 'pending' tasks for the user[cite: 8]
     tasks_to_insert = []
     for r in active_recalls:
         tasks_to_insert.append({
@@ -165,12 +157,12 @@ async def add_monitored_vehicle(payload: VehicleAddRequest):
             "summary": r.get("summary", ""),
             "remedy": r.get("remedy", ""),
             "severity_score": r.get("calculated_severity_score", 50.0),
-            "status": "pending"  # Task starts in 'pending' status[cite: 8]
+            "status": "pending"
         })
 
     if tasks_to_insert:
         try:
-            sb.table("recall_tasks").insert(tasks_to_insert).execute()[cite: 8]
+            sb.table("recall_tasks").insert(tasks_to_insert).execute()
         except Exception as e:
             logger.error(f"Failed to populate threat tasks: {str(e)}")
 
@@ -190,7 +182,7 @@ def get_fleet_vehicles(user_id: str):
     from supabase import create_client, Client
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
-    res = sb.table("monitored_vehicles").select("*").eq("profile_id", user_id).execute()[cite: 8]
+    res = sb.table("monitored_vehicles").select("*").eq("profile_id", user_id).execute()
     return res.data or []
 
 
@@ -200,18 +192,16 @@ def get_fleet_vehicles(user_id: str):
 @router.get("/tasks", response_model=List[dict])
 def get_recall_tasks(user_id: str):
     """
-    Fetches all active recall tasks for a user's vehicles[cite: 8].
-    Perfect for organizing into 'Pending', 'Scheduled', and 'Repaired' dashboard columns[cite: 8]!
+    Fetches all active recall tasks for a user's vehicles.
+    Organizes tasks into 'Pending', 'Scheduled', and 'Repaired' columns.
     """
     from supabase import create_client, Client
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
-    # Run an inner join query utilizing PostgreSQL relationships[cite: 8]
     res = sb.table("recall_tasks").select(
         "*, monitored_vehicles(vin, make, model, year)"
     ).execute()
     
-    # Filter on python-side or use Supabase join-filtering to ensure users only see their own tasks[cite: 8]
     filtered_tasks = [
         task for task in (res.data or [])
         if task.get("monitored_vehicles", {}).get("profile_id") == user_id
@@ -220,17 +210,17 @@ def get_recall_tasks(user_id: str):
 
 
 # =====================================================================
-# ENDPOINT 4: UPDATE RECALL TASK STATE (THE KANBAN TRANSITION)
+# ENDPOINT 4: UPDATE RECALL TASK STATE (KANBAN TRANSITION)
 # =====================================================================
 @router.patch("/tasks/{task_id}")
 def update_recall_task_status(task_id: str, payload: TaskStatusUpdateRequest):
     """
-    Updates a task's state (e.g., when a user schedules or completes a repair)[cite: 8].
+    Updates a task's state when a user schedules or completes a repair.
     """
     from supabase import create_client, Client
     sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
     
-    update_data = {"status": payload.status} # 'pending', 'scheduled', or 'repaired'[cite: 8]
+    update_data = {"status": payload.status}
     
     if payload.status == "scheduled":
         update_data["scheduled_repair_date"] = payload.scheduled_repair_date
@@ -239,7 +229,7 @@ def update_recall_task_status(task_id: str, payload: TaskStatusUpdateRequest):
         update_data["repaired_at"] = datetime.utcnow().isoformat()
 
     try:
-        res = sb.table("recall_tasks").update(update_data).eq("id", task_id).execute()[cite: 8]
+        res = sb.table("recall_tasks").update(update_data).eq("id", task_id).execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Task card not found.")
         return {"status": "success", "task": res.data}
