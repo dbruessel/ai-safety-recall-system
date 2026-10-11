@@ -5,7 +5,7 @@ from app.engine import get_supabase
 
 logger = logging.getLogger(__name__)
 
-# Safely handle Vertex AI imports so app boots even if dependency is missing
+# Safely handle Vertex AI imports so missing packages never crash app boot
 try:
     from vertexai.generative_models import GenerativeModel
     HAS_VERTEX_AI = True
@@ -79,7 +79,6 @@ class ActuarialRiskEngine:
 
             if is_nuclear:
                 nuclear_count += 1
-                # Base penalty: 25 points per nuclear recall
                 recall_penalty_points += 25.0
             else:
                 standard_recall_count += 1
@@ -102,7 +101,6 @@ class ActuarialRiskEngine:
         safety_score = max(0, min(100, round(raw_score)))
 
         # 6. Calculate Financial Exposure ($)
-        # $250,000 per nuclear liability vehicle + $50,000 per standard open recall
         financial_exposure = (nuclear_count * 250000) + (standard_recall_count * 50000)
 
         # Determine Underwriter Rating & Discount Status
@@ -137,13 +135,10 @@ class ActuarialRiskEngine:
 
 
 # =====================================================================
-# 2. AI SINGLE RECALL ANALYSIS (EXISTING AI ENGINE)
+# 2. AI SINGLE RECALL ANALYSIS
 # =====================================================================
 
 def _build_prompt(recall: Dict) -> str:
-    """
-    Build the structured prompt for Gemini to analyze a vehicle recall.
-    """
     title = recall.get("title", "")
     description = recall.get("description", "")
     vin = recall.get("vin", "UNKNOWN VIN")
@@ -174,13 +169,6 @@ Output JSON ONLY in this exact schema:
 
 
 def analyze_recall(recall: Dict) -> Dict:
-    """
-    Calls Gemini on Vertex AI to analyze a recall and return:
-    - ai_summary
-    - risk_level
-    - imminent_risk_score
-    - explainable_message
-    """
     prompt = _build_prompt(recall)
 
     if HAS_VERTEX_AI and GenerativeModel is not None:
@@ -201,7 +189,6 @@ def analyze_recall(recall: Dict) -> Dict:
         logger.info("Vertex AI unavailable. Using default recall risk fallback.")
         data = {}
 
-    # Default fallback values if analysis fails or package is uninstalled
     if not data:
         data = {
             "ai_summary": "This recall may affect the safe operation of this vehicle.",
@@ -210,7 +197,6 @@ def analyze_recall(recall: Dict) -> Dict:
             "explainable_message": "Risk could not be fully analyzed. Please review manually.",
         }
 
-    # Normalize risk score
     score = data.get("imminent_risk_score", 50)
     try:
         score = int(score)
@@ -218,7 +204,6 @@ def analyze_recall(recall: Dict) -> Dict:
         score = 50
     score = max(0, min(100, score))
 
-    # Normalize risk level
     level = str(data.get("risk_level", "medium")).lower()
     if level not in ["low", "medium", "high", "critical"]:
         level = "medium"
@@ -232,13 +217,10 @@ def analyze_recall(recall: Dict) -> Dict:
 
 
 # =====================================================================
-# 3. AI CONTEXTUAL FLEET ANALYSIS (EXISTING AI ENGINE)
+# 3. AI CONTEXTUAL FLEET ANALYSIS
 # =====================================================================
 
 def _build_contextual_prompt(context: Dict) -> str:
-    """
-    Build a prompt that includes vehicle, recall, weather, geographic, and seasonal risk.
-    """
     vin = context.get("vin", "UNKNOWN VIN")
     vehicle = context.get("vehicle", {})
     recalls = context.get("recalls", [])
@@ -290,9 +272,6 @@ Output JSON ONLY in this exact schema:
 
 
 def analyze_context(context: Dict) -> Dict:
-    """
-    Calls Gemini with full intelligence context (vehicle + recalls + environment).
-    """
     prompt = _build_contextual_prompt(context)
     
     if HAS_VERTEX_AI and GenerativeModel is not None:
