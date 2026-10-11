@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Dict, Any, List
-from app.engine import get_supabase_client
+from app.engine import get_supabase
 
 logger = logging.getLogger(__name__)
 
