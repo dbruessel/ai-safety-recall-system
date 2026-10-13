@@ -97,7 +97,7 @@ export const BrokerPortal: React.FC = () => {
               riskTier: client.id === "titan-hauling" ? "HIGH RISK / NUCLEAR EXPOSURE" : client.id === "apex-logistics" ? "STANDARD" : "PREFERRED",
               nuclearLiabilityCount: client.id === "apex-logistics" || client.id === "titan-hauling" ? 1 : 0,
               financialExposureUsd: client.id === "apex-logistics" ? 250000 : client.id === "titan-hauling" ? 500000 : 0,
-              underwriterDiscount: client.id === "apex-logistics" ? "12-15% Underwriter Credit" : client.id === "titan-hauling" ? "Subject to Audit / Surcharge Risk" : "15% Optimal Credit",
+              underwriterDiscount: client.id === "apex-logistics" ? "12-15% Optimal Credit" : client.id === "titan-hauling" ? "Subject to Surcharge Risk" : "15% Optimal Credit",
               hasNuclearRecall: client.id === "apex-logistics" || client.id === "titan-hauling",
               nuclearCampaign: client.id === "apex-logistics" ? "Campaign #23V-891" : client.id === "titan-hauling" ? "Campaign #23V-838" : undefined,
               nuclearComponent: client.id === "apex-logistics" ? "STEERING AXLE DRAG LINK" : client.id === "titan-hauling" ? "AIR BRAKE ACTUATOR DIAPHRAGM" : undefined,
@@ -265,7 +265,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects.
+                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects[cite: 1].
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -292,7 +292,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <div className="mt-3 p-2 bg-cyan-950/50 border border-cyan-800/60 rounded text-[11px] text-cyan-200">
-                💡 <strong>Underwriter Tip:</strong> Resolve 2 active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>.
+                💡 <strong>Underwriter Tip:</strong> Resolve 2 active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>[cite: 1].
               </div>
             </div>
           )}
@@ -328,7 +328,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties.
+                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls[cite: 1]. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties[cite: 1].
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -351,7 +351,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <div className="mt-3 p-2 bg-red-950/60 border border-red-800/80 rounded text-[11px] text-red-200">
-                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability.
+                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability[cite: 1].
               </div>
             </div>
           )}
@@ -414,7 +414,7 @@ export const BrokerPortal: React.FC = () => {
                 <div className="my-4 p-3.5 bg-slate-950 rounded-lg border border-slate-800/80 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-red-400" /> Punitive Liability Risk:
+                      <DollarSign className="w-4 h-4 text-red-400" /> Punitive Liability Exposure:
                     </span>
                     <span className={`font-mono font-bold ${
                       (account.financialExposureUsd || 0) > 0 ? "text-red-400" : "text-emerald-400"
@@ -425,10 +425,14 @@ export const BrokerPortal: React.FC = () => {
 
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 flex items-center gap-1.5">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" /> Underwriter Credit:
+                      <TrendingUp className="w-4 h-4 text-emerald-400" /> Underwriter Rate Credit:
                     </span>
-                    <span className="font-mono text-emerald-400 font-medium">
-                      {account.underwriterDiscount}
+                    <span className={`font-mono font-medium ${
+                      account.hasNuclearRecall ? "text-amber-400" : "text-emerald-400"
+                    }`}>
+                      {account.hasNuclearRecall 
+                        ? "Locked — Resolve Recalls to Unlock 12% Credit" 
+                        : account.underwriterDiscount}
                     </span>
                   </div>
                 </div>
@@ -441,7 +445,7 @@ export const BrokerPortal: React.FC = () => {
                       <div>
                         <span className="font-bold text-cyan-300">Actionable Underwriter ROI:</span>
                         <p className="text-slate-300 mt-0.5 leading-normal">
-                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>.
+                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>[cite: 1].
                         </p>
                       </div>
                     </div>
