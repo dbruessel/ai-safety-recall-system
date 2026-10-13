@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import BulkCsvImportModal from './BulkCsvImportModal';
 
 export interface LandingPageProps {
   onSignIn: () => void;
@@ -41,8 +40,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onSelectTier,
   totalGlobalRecalls 
 }) => {
-  const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30000);
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
+  const [realRecallCount, setRealRecallCount] = useState<number>(totalGlobalRecalls || 30381);
 
   // BROKER LEAD CAPTURE MODAL STATE
   const [isBrokerModalOpen, setIsBrokerModalOpen] = useState<boolean>(false);
@@ -99,7 +97,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     fetchRecallCount();
   }, []);
 
-  // BROKER LEAD SUBMISSION HANDLER (FIXED FOR STRICT SUPABASE API ERROR HANDLING)
   const handleBrokerLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingBrokerLead(true);
@@ -115,10 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         },
       ]);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       setBrokerLeadSuccess(true);
     } catch (err: any) {
       console.error('Supabase broker lead submission error:', err);
@@ -136,16 +130,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     try {
       if (isSignUp) {
         const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
-
-        const referredBrokerId = 
-          sessionStorage.getItem('broker_id') || 
-          sessionStorage.getItem('recalllogic_referred_broker_id') || 
-          'direct';
-
-        const referredBrokerName = 
-          sessionStorage.getItem('broker_name') || 
-          sessionStorage.getItem('recalllogic_referred_broker_name') || 
-          '';
+        const referredBrokerId = sessionStorage.getItem('broker_id') || 'direct';
+        const referredBrokerName = sessionStorage.getItem('broker_name') || '';
 
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
@@ -204,7 +190,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const extractAndAuditVins = async (rawInput: string) => {
     setScanError('');
     if (scansLeft <= 0) {
-      setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited fleet monitoring.');
+      setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited fleet risk monitoring.');
       return;
     }
 
@@ -219,12 +205,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
 
     const vinsToAudit = uniqueVins.slice(0, scansLeft);
-
     setIsAuditing(true);
     setAuditResult(null);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://recalllogic-api.onrender.com';
 
       const apiPromises = vinsToAudit.map(vin =>
         fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
@@ -267,8 +252,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         recall_count: totalOpenRecalls,
         recalls: allRecalls,
         status_label: hasAnyOpenRecalls 
-          ? `CRITICAL: ${totalOpenRecalls} OPEN RECALL(S) DETECTED` 
-          : '100% CLEAN / ZERO OPEN RECALLS',
+          ? `CRITICAL RISK: ${totalOpenRecalls} UNADDRESSED RECALL(S)` 
+          : 'PREFERRED RISK • ELIGIBLE FOR 15% CREDIT',
       });
 
       const nextScans = Math.max(0, scansLeft - results.length);
@@ -322,18 +307,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id: 'standard',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
       name: 'Standard',
-      subtitle: 'Fleet Operations Baseline',
-      price: '$99',
+      subtitle: 'Fleet Loss Control Baseline',
+      price: '\$99',
       billing: 'per month',
-      badge: 'ESSENTIAL MONITORING',
+      badge: 'ESSENTIAL SHIELD',
       color: 'border-slate-800 bg-slate-900/50',
       buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
       features: [
         'Up to 50 Vehicles Monitored',
-        'Continuous Active NHTSA & CPSC Monitoring',
-        'Full Kanban TaskBoard Workspace Access',
-        'Manual Status & Remediation Tracking',
-        'Standard Email Risk & Safety Alerts'
+        'Continuous NHTSA Recall Ingestion',
+        'Remediation Taskboard Workspace',
+        'Punitive Exposure Threshold Alerts',
+        'Standard Underwriter Compliance Export'
       ]
     },
     {
@@ -341,7 +326,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
       name: 'Professional',
       subtitle: 'Underwriter & Risk Intelligence',
-      price: '$249',
+      price: '\$249',
       billing: 'per month',
       badge: 'MOST POPULAR',
       popular: true,
@@ -349,40 +334,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
       features: [
         'Everything in Standard, plus:',
-        'Up to 250 Vehicles Monitored',
-        'Instant Single-VIN Scan Console',
-        'Real-Time Thermal & High-Severity Hazard Alerts',
-        'Signed Underwriter Compliance Cards (PDF Certificates)',
-        'Shareable Read-Only Broker Audit Links',
-        'Proof-of-Remedy & Repair Receipt Storage'
+        'Up to 250 Monitored VINs',
+        'Automated Fleetio & Telematics Webhook Sync',
+        'Two-Way Fleetio Work Order Fix-It Loop',
+        'Signed Underwriter Compliance Certificates (PDF)',
+        'Shareable Broker Audit Links',
+        '12–15% Premium Credit Evidence Locker'
       ]
     },
     {
       id: 'enterprise',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
       name: 'Enterprise',
-      subtitle: 'Automated Multi-Fleet Control',
-      price: '$499',
+      subtitle: 'Multi-Fleet Broker Command',
+      price: '\$499',
       billing: 'per month',
       badge: 'TOTAL AUTOMATION',
       color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
       buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
       features: [
         'Everything in Professional, plus:',
-        'Unlimited Vehicles & Multi-Fleet Portfolios',
-        'Telematics & TMS Platform Integrations',
-        'Dedicated Broker Quarterly Business Reviews (QBR)',
-        'Custom Batch Ingestion Engine & Webhooks',
-        'Multi-Site Operational Isolation & SSO',
-        'Custom Carrier SLA & Terms'
+        'Unlimited Monitored Vehicles',
+        'Co-Branded Broker Command Center',
+        'Samsara, Geotab & Motive ELD Ingestion',
+        'Actuarial Book Safety Score Analytics',
+        'Custom Carrier Underwriter SLAs',
+        'Dedicated Loss Control Advisor'
       ]
     }
   ];
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden relative">
-      
-      {/* Background Lighting */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-gradient-to-b from-[#06B6D4]/10 via-[#EF4444]/5 to-transparent blur-3xl opacity-60" />
       </div>
@@ -390,26 +373,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* GLOBAL NAV BAR */}
       <nav className="border-b border-slate-800/80 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-2.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          
-          {/* Logo & Branding */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <img 
-              src="/recall-logo.png" 
-              alt="RecallLogic Logo" 
-              className="h-7 w-auto object-contain"
-            />
+            <img src="/recall-logo.png" alt="RecallLogic Logo" className="h-7 w-auto object-contain" />
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-white text-base tracking-tight font-mono">
-                RecallLogic
-              </span>
+              <span className="font-extrabold text-white text-base tracking-tight font-mono">RecallLogic</span>
               <span className="text-slate-600 text-xs hidden sm:inline">|</span>
-              <span className="text-xs font-semibold tracking-wide text-slate-400 font-mono hidden sm:inline">
-                Safety Intelligence System
+              <span className="text-xs font-semibold tracking-wide text-cyan-400 font-mono hidden sm:inline">
+                Insurtech Loss-Control Engine
               </span>
             </div>
           </div>
 
-          {/* Real Supabase Record Counter Banner */}
           <div className="flex-1 max-w-md mx-2 px-3 py-1 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/40 flex items-center justify-center gap-2.5 shadow-[0_0_12px_rgba(239,68,68,0.12)]">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-75"></span>
@@ -420,53 +394,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 {realRecallCount.toLocaleString()}
               </span>
               <span className="text-[#EF4444] font-bold text-[10px] sm:text-[11px] uppercase tracking-wide">
-                Active Recalls Monitored
+                Active Safety Recalls Monitored
               </span>
             </div>
           </div>
 
-          {/* Nav Right Action Items */}
           <div className="shrink-0 flex items-center gap-4">
             <button 
               type="button"
-              onClick={() => {
-                setBrokerLeadSuccess(false);
-                setBrokerLeadError('');
-                setIsBrokerModalOpen(true);
-              }}
+              onClick={() => { setBrokerLeadSuccess(false); setBrokerLeadError(''); setIsBrokerModalOpen(true); }}
               className="hidden md:flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
             >
-              <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5"/>
-              </svg>
               For Brokers &amp; Agencies &rarr;
             </button>
-
             <button
               type="button"
-              onClick={() => {
-                setIsSignUp(false);
-                setSelectedTier('standard');
-                setIsAuthModalOpen(true);
-              }}
+              onClick={() => { setIsSignUp(false); setSelectedTier('standard'); setIsAuthModalOpen(true); }}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
               Sign In
             </button>
           </div>
-
         </div>
       </nav>
 
-      {/* HERO SECTION WITH INLINE VIN SCANNER */}
+      {/* HERO SECTION WITH INLINE VIN & RISK SCANNER */}
       <section className="relative pt-6 pb-8 px-4 max-w-5xl mx-auto text-center space-y-4">
         <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left">
-          
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
               <span className="text-xs font-bold text-cyan-300 font-mono uppercase tracking-wider">
-                Real-Time VIN Safety Sync Active
+                1-CLICK UNDERWRITER AUDIT • UNLOCK UP TO 15% RATE CREDIT
               </span>
             </div>
             <div className="px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs font-mono text-emerald-400 font-bold">
@@ -476,11 +435,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white font-mono tracking-tight">
-              Instant Fleet VIN Safety &amp; Recall Control
+              The Insurtech Loss-Control Engine for Commercial Fleets
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Paste your VINs directly or drop a fleet file to test our Real-Time Safety Sync engine with 10 free lookups.
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Translate raw Fleetio, Samsara, and NHTSA recall data into certified Underwriter Compliance Packets. Eliminate uninsurable \$250,000 punitive liability threats and secure 12–15% renewal rate credits.
             </p>
+          </div>
+
+          {/* INTEGRATION BADGES */}
+          <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-400">
+            <span className="text-slate-500 font-bold uppercase">Direct Integrations:</span>
+            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Fleetio</span>
+            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Samsara</span>
+            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Geotab</span>
+            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Motive</span>
           </div>
 
           <div className="flex border-b border-slate-800/80 font-mono text-xs gap-4 pt-2">
@@ -488,9 +456,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={() => setIngestMode('paste')}
               className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
-                ingestMode === 'paste'
-                  ? 'border-[#06B6D4] text-[#06B6D4]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                ingestMode === 'paste' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               Direct VIN Input / Paste
@@ -499,12 +465,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={() => setIngestMode('upload')}
               className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
-                ingestMode === 'upload'
-                  ? 'border-[#06B6D4] text-[#06B6D4]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                ingestMode === 'upload' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
-              Upload .CSV / .TXT File
+              Upload .CSV / .TXT Fleet List
             </button>
           </div>
 
@@ -520,14 +484,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               />
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <span className="text-[10px] text-slate-400 font-mono">
-                  Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> or <strong className="text-cyan-300">Make, Model, VIN</strong> (up to 10 entries).
+                  Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> (up to 10 entries).
                 </span>
                 <button
                   type="submit"
                   disabled={scansLeft <= 0 || isAuditing}
-                  className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto"
+                  className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto shadow-lg shadow-cyan-950"
                 >
-                  {isAuditing ? 'AUDITING FLEET...' : 'RUN VIN AUDIT'}
+                  {isAuditing ? 'CALCULATING ACTUARIAL RISK...' : 'AUDIT FLEET RISK & UNLOCK CREDITS →'}
                 </button>
               </div>
             </form>
@@ -537,30 +501,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
-                isDragging 
-                  ? 'border-[#06B6D4] bg-[#06B6D4]/10' 
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
+                isDragging ? 'border-[#06B6D4] bg-[#06B6D4]/10' : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
               }`}
             >
-              <input
-                type="file"
-                id="main-landing-file-upload"
-                accept=".csv,.txt"
-                className="hidden"
-                onChange={(e) => e.target.files?.[0] && processVinFile(e.target.files[0])}
-              />
+              <input type="file" id="main-landing-file-upload" accept=".csv,.txt" className="hidden" onChange={(e) => e.target.files?.[0] && processVinFile(e.target.files[0])} />
               <label htmlFor="main-landing-file-upload" className="cursor-pointer space-y-2 block">
-                <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-[#06B6D4]">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
                 <p className="text-xs font-semibold text-white">
-                  Drop your fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
+                  Drop fleet list here or <span className="text-[#06B6D4] underline">browse files</span>
                 </p>
-                <p className="text-[11px] text-slate-500 font-mono">
-                  Supported formats: <strong className="text-slate-400">.csv</strong> or <strong className="text-slate-400">.txt</strong>
-                </p>
+                <p className="text-[11px] text-slate-500 font-mono">Supported formats: .csv or .txt</p>
               </label>
             </div>
           )}
@@ -569,9 +518,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {auditResult && (
             <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
-              auditResult.has_open_recall
-                ? 'bg-red-950/20 border-red-800/80 text-red-200'
-                : 'bg-emerald-950/20 border-emerald-800/80 text-emerald-200'
+              auditResult.has_open_recall ? 'bg-red-950/20 border-red-800/80 text-red-200' : 'bg-emerald-950/20 border-emerald-800/80 text-emerald-200'
             }`}>
               <div className="flex justify-between items-center font-bold">
                 <span>{auditResult.vin}</span>
@@ -581,7 +528,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               {auditResult.has_open_recall ? (
                 <div className="space-y-2 pt-1">
-                  <p className="text-[11px] text-red-300">Found {auditResult.recall_count} active safety recall(s):</p>
+                  <p className="text-[11px] text-red-300">Found {auditResult.recall_count} active safety recall(s) creating uninsurable legal exposure:</p>
                   {auditResult.recalls.map((r, idx) => (
                     <div key={idx} className="bg-slate-950 p-2.5 rounded-lg border border-red-900/50 text-slate-300">
                       <strong className="text-white">Campaign #{r.campaign_number}</strong> — {r.component}
@@ -591,37 +538,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[11px] text-emerald-300">
-                  Zero active safety recalls detected on NHTSA records across the audited VINs.
+                  Zero active safety recalls detected. Fleet is in Preferred Risk Tier (Eligible for 15% rate credit).
                 </p>
               )}
             </div>
           )}
-
         </div>
 
         {/* SUB-HERO BROKER CALLOUT BANNER */}
         <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-lg backdrop-blur-sm mt-4">
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center p-2 rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-              </svg>
-            </span>
             <div>
               <p className="text-xs font-bold text-slate-200 font-mono">Commercial Auto Broker or Risk Manager?</p>
-              <p className="text-[11px] text-slate-400">Offer co-branded recall tracking, generate Loss Control Risk Certificates, and protect portfolio loss ratios.</p>
+              <p className="text-[11px] text-slate-400">Access co-branded portfolio safety scoring, generate Underwriter Loss Control Certificates, and protect book loss ratios.</p>
             </div>
           </div>
           <button 
             type="button"
-            onClick={() => {
-              setBrokerLeadSuccess(false);
-              setBrokerLeadError('');
-              setIsBrokerModalOpen(true);
-            }}
+            onClick={() => { setBrokerLeadSuccess(false); setBrokerLeadError(''); setIsBrokerModalOpen(true); }}
             className="whitespace-nowrap px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all shrink-0 cursor-pointer"
           >
-            Explore Broker Solutions &rarr;
+            Explore Broker Command Center &rarr;
           </button>
         </div>
       </section>
@@ -630,82 +567,64 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-12 bg-slate-950/60 border-y border-slate-800/80 my-4">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
-            <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase">Broker &amp; Agency Partner Program</span>
-            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono">Co-Branded Risk Intelligence Solutions</h2>
-            <p className="text-slate-400 text-xs">Drive client retention, optimize policy renewals, and maintain low loss ratios across your portfolio.</p>
+            <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase">Broker &amp; Agency Distribution Wedge</span>
+            <h2 className="text-xl sm:text-2xl font-bold text-white font-mono">Co-Branded Loss Control Solutions</h2>
+            <p className="text-slate-400 text-xs">Drive client retention, optimize policy renewals, and eliminate uninsurable lawsuit penalties across your portfolio.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-              </div>
-              <h3 className="text-sm font-bold text-slate-100 font-mono">Protect Book Loss Ratios</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automate recall and safety monitoring across your commercial accounts to stop preventable claims before policy renewal.</p>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Eliminate \$250k Punitive Exposure</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automatically detect nuclear brake/steering recalls and push repair tickets directly into Fleetio before catastrophic crashes occur.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-              </div>
-              <h3 className="text-sm font-bold text-slate-100 font-mono">Turnkey Client Retention</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Gift your fleet policyholders a co-branded safety workspace, keeping your brokerage top-of-mind every time they run an audit.</p>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Unlock 12–15% Underwriter Credits</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Export certified Underwriter Audit Packets that shift fleet accounts from Standard to Preferred risk pricing at renewal.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <h3 className="text-sm font-bold text-slate-100 font-mono">Underwriter Compliance</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Export unified Book Safety Scores and underwriter-ready Loss Control Risk Certificates to leverage better rates.</p>
+              <h3 className="text-sm font-bold text-slate-100 font-mono">Automated Two-Way Fix-It Loop</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Continuous sync with Fleetio, Samsara, and Geotab auto-clears safety risks in real time as mechanics complete work orders.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* STRIPE PRICING GRID */}
+      {/* PRICING GRID */}
       <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
-            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Transparent Pricing</h2>
-            <p className="text-xl sm:text-2xl font-extrabold text-white font-mono">Choose Your Safety Tier</p>
+            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono font-bold">Transparent Subscription Plans</h2>
+            <p className="text-xl sm:text-2xl font-extrabold text-white font-mono">Choose Your Loss Control Tier</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5 items-stretch">
             {pricingTiers.map((tier) => (
-              <div
-                key={tier.id}
-                className={`relative rounded-xl border p-5 flex flex-col justify-between ${tier.color}`}
-              >
+              <div key={tier.id} className={`relative rounded-xl border p-5 flex flex-col justify-between ${tier.color}`}>
                 {tier.popular && (
                   <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md font-mono">
                     {tier.badge}
                   </div>
                 )}
-
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-base font-bold text-white font-mono">{tier.name}</h3>
                     <p className="text-[11px] text-slate-400 mt-0.5">{tier.subtitle}</p>
                   </div>
-
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
                     <span className="text-[11px] text-slate-400 font-mono">{tier.billing}</span>
                   </div>
-
                   <ul className="space-y-2 text-[11px] text-slate-300">
                     {tier.features.map((feat, i) => (
                       <li key={i} className="flex items-start gap-1.5">
-                        <svg className="w-3.5 h-3.5 text-[#06B6D4] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                        <span className="text-[#06B6D4] font-bold">✓</span>
                         <span>{feat}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => handleTierCheckout(tier)}
@@ -719,219 +638,92 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* BROKER PARTNER REQUEST ACCESS MODAL */}
+      {/* BROKER PARTNER MODAL */}
       {isBrokerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
-            
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Request Agency Partner Access
-                </h3>
-                <p className="text-[11px] text-cyan-400 mt-0.5">
-                  Get a custom co-branded portal &amp; loss-control suite for your agency.
-                </p>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Request Agency Partner Access</h3>
+                <p className="text-[11px] text-cyan-400 mt-0.5">Get a custom co-branded portal &amp; loss-control suite for your agency.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsBrokerModalOpen(false)}
-                className="text-slate-400 hover:text-white transition cursor-pointer text-sm"
-              >
-                ✕
-              </button>
+              <button type="button" onClick={() => setIsBrokerModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
             </div>
 
             {brokerLeadSuccess ? (
               <div className="py-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
                 <h4 className="text-sm font-bold text-white">Partner Access Requested!</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Thank you. Our partnership team will configure your agency's co-branded portal and send your access link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIsBrokerModalOpen(false)}
-                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer mt-2"
-                >
-                  Close Window
-                </button>
+                <p className="text-xs text-slate-400">Our partnership team will configure your agency portal and email <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.</p>
+                <button type="button" onClick={() => setIsBrokerModalOpen(false)} className="px-6 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded-lg mt-2">Close</button>
               </div>
             ) : (
               <form onSubmit={handleBrokerLeadSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Work Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={brokerEmail}
-                    onChange={(e) => setBrokerEmail(e.target.value)}
-                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                    placeholder="broker@agency.com"
-                  />
+                  <input type="email" required value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="broker@agency.com" />
                 </div>
-
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Brokerage / Agency Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={brokerageName}
-                    onChange={(e) => setBrokerageName(e.target.value)}
-                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                    placeholder="e.g. Apex Risk Advisors"
-                  />
+                  <input type="text" required value={brokerageName} onChange={(e) => setBrokerageName(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="e.g. Apex Risk Advisors" />
                 </div>
-
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Commercial Fleet Book Size</label>
-                  <select
-                    value={portfolioSize}
-                    onChange={(e) => setPortfolioSize(e.target.value)}
-                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                  >
+                  <select value={portfolioSize} onChange={(e) => setPortfolioSize(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]">
                     <option value="1-10">1 – 10 Commercial Accounts</option>
                     <option value="10-50">10 – 50 Commercial Accounts</option>
                     <option value="50-200">50 – 200 Commercial Accounts</option>
                     <option value="200+">200+ Accounts (Enterprise Agency)</option>
                   </select>
                 </div>
-
-                {brokerLeadError && (
-                  <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
-                    {brokerLeadError}
-                  </div>
-                )}
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingBrokerLead}
-                    className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
-                  >
-                    {isSubmittingBrokerLead ? 'Submitting Request...' : 'Request Agency Workspace &rarr;'}
-                  </button>
-                </div>
+                {brokerLeadError && <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">{brokerLeadError}</div>}
+                <button type="submit" disabled={isSubmittingBrokerLead} className="w-full py-2.5 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg font-mono">
+                  {isSubmittingBrokerLead ? 'Submitting...' : 'Request Agency Workspace →'}
+                </button>
               </form>
             )}
-
           </div>
         </div>
       )}
 
-      {/* AUTHENTICATION MODAL OVERLAY */}
+      {/* AUTHENTICATION MODAL */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
-            
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  {isSignUp ? `Create Account (${selectedTier.toUpperCase()} TIER)` : 'Sign In to RecallLogic'}
-                </h3>
+                <h3 className="text-sm font-bold text-white uppercase">{isSignUp ? `Create Account (${selectedTier.toUpperCase()})` : 'Sign In'}</h3>
                 {isSignUp && activeBrokerName && (
                   <p className="text-[11px] text-cyan-400 mt-1">
                     🛡️ Linked to Broker: {activeBrokerName}
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAuthModalOpen(false)}
-                className="text-slate-400 hover:text-white transition cursor-pointer text-sm"
-              >
-                ✕
-              </button>
+              <button type="button" onClick={() => setIsAuthModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
             </div>
 
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                  placeholder="name@company.com"
-                />
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="name@company.com" />
               </div>
-
               {isSignUp && (
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Company / Fleet Name</label>
-                  <input
-                    type="text"
-                    required={isSignUp}
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                    placeholder="e.g. Apex Freight Logistics"
-                  />
+                  <input type="text" required={isSignUp} value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="e.g. Apex Freight Logistics" />
                 </div>
               )}
-
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
-                  placeholder="••••••••"
-                />
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="••••••••" />
               </div>
-
-              {authError && (
-                <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
-                  {authError}
-                </div>
-              )}
-
-              <div className="flex justify-end items-center pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmittingAuth}
-                  className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono"
-                >
-                  {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Continue to Checkout' : 'Sign In'}
-                </button>
-              </div>
+              {authError && <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">{authError}</div>}
+              <button type="submit" disabled={isSubmittingAuth} className="w-full py-2.5 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg font-mono">
+                {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Continue to Checkout' : 'Sign In'}
+              </button>
             </form>
-
-            <div className="border-t border-slate-800/80 pt-3 text-center">
-              <p className="text-xs text-slate-400">
-                {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthError('');
-                    setIsSignUp(!isSignUp);
-                  }}
-                  className="text-[#06B6D4] font-bold hover:underline ml-1 cursor-pointer"
-                >
-                  {isSignUp ? 'Sign In' : 'Sign Up'}
-                </button>
-              </p>
-            </div>
-
           </div>
         </div>
       )}
-
-      {/* BULK IMPORT MODAL */}
-      {isBulkModalOpen && (
-        <BulkCsvImportModal
-          isOpen={isBulkModalOpen}
-          onClose={() => setIsBulkModalOpen(false)}
-        />
-      )}
-
     </div>
   );
 };
