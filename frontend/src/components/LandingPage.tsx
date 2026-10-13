@@ -64,20 +64,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // DUAL-MODE VIN SCANNER STATE
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
   const [pastedText, setPastedText] = useState<string>('');
-  const [scansLeft, setScansLeft] = useState<number>(10);
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
-
-  useEffect(() => {
-    const storedScans = sessionStorage.getItem('recalllogic_demo_scans');
-    if (storedScans !== null) {
-      setScansLeft(parseInt(storedScans, 10));
-    } else {
-      sessionStorage.setItem('recalllogic_demo_scans', '10');
-    }
-  }, []);
 
   useEffect(() => {
     async function fetchRecallCount() {
@@ -189,10 +179,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const extractAndAuditVins = async (rawInput: string) => {
     setScanError('');
-    if (scansLeft <= 0) {
-      setScanError('You have used all 10 free trial VIN checks. Upgrade to Pro Tier for unlimited fleet risk monitoring.');
-      return;
-    }
 
     const rawTokens = rawInput.toUpperCase().split(/[^A-Z0-9]+/);
     const uniqueVins = Array.from(new Set(rawTokens.filter(token => 
@@ -204,14 +190,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return;
     }
 
-    const vinsToAudit = uniqueVins.slice(0, scansLeft);
     setIsAuditing(true);
     setAuditResult(null);
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://recalllogic-api.onrender.com';
 
-      const apiPromises = vinsToAudit.map(vin =>
+      const apiPromises = uniqueVins.map(vin =>
         fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -255,10 +240,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           ? `CRITICAL RISK: ${totalOpenRecalls} UNADDRESSED RECALL(S)` 
           : 'PREFERRED RISK • ELIGIBLE FOR 15% CREDIT',
       });
-
-      const nextScans = Math.max(0, scansLeft - results.length);
-      setScansLeft(nextScans);
-      sessionStorage.setItem('recalllogic_demo_scans', nextScans.toString());
 
     } catch (err: any) {
       setScanError(err.message || 'Error connecting to NHTSA recall engine.');
@@ -418,9 +399,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </nav>
 
-      {/* HERO SECTION WITH INLINE VIN & RISK SCANNER */}
+      {/* HERO SECTION WITH UNLIMITED INSTANT ACTUARIAL AUDIT */}
       <section className="relative pt-6 pb-8 px-4 max-w-5xl mx-auto text-center space-y-4">
-        <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left">
+        <div className="rounded-2xl bg-[#0B101D] border border-slate-800/80 p-6 shadow-2xl space-y-4 text-left backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse" />
@@ -428,8 +409,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 1-CLICK UNDERWRITER AUDIT • UNLOCK UP TO 15% RATE CREDIT
               </span>
             </div>
-            <div className="px-3 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-xs font-mono text-emerald-400 font-bold">
-              {scansLeft} FREE VIN LOOKUPS REMAINING
+            <div className="px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-800/80 text-xs font-mono text-cyan-300 font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              INSTANT ACTUARIAL AUDIT
             </div>
           </div>
 
@@ -437,39 +419,60 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <h1 className="text-2xl sm:text-3xl font-bold text-white font-mono tracking-tight">
               The Insurtech Loss-Control Engine for Commercial Fleets
             </h1>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Translate raw Fleetio, Samsara, and NHTSA recall data into certified Underwriter Compliance Packets. Eliminate uninsurable \$250,000 punitive liability threats and secure 12–15% renewal rate credits.
+            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-mono">
+              Translate raw Fleetio, Samsara, and NHTSA recall data into certified Underwriter Compliance Packets[cite: 1]. Eliminate uninsurable <strong className="text-red-400">\$250,000 punitive liability threats</strong> and secure <strong className="text-emerald-400">12–15% renewal rate credits</strong>[cite: 1].
             </p>
           </div>
 
-          {/* INTEGRATION BADGES */}
+          {/* ECOSYSTEM BADGES WITH NEON STATUS DOTS */}
           <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-400">
-            <span className="text-slate-500 font-bold uppercase">Direct Integrations:</span>
-            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Fleetio</span>
-            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Samsara</span>
-            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Geotab</span>
-            <span className="bg-slate-900 border border-cyan-800/60 text-cyan-300 px-2 py-0.5 rounded">🔌 Motive</span>
+            <span className="text-slate-500 font-bold uppercase text-[10px]">Connected Feeds:</span>
+            <span className="bg-slate-900 border border-cyan-800/80 text-cyan-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span> Fleetio
+            </span>
+            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Samsara
+            </span>
+            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Geotab
+            </span>
+            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Motive
+            </span>
           </div>
 
-          <div className="flex border-b border-slate-800/80 font-mono text-xs gap-4 pt-2">
-            <button
-              type="button"
-              onClick={() => setIngestMode('paste')}
-              className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
-                ingestMode === 'paste' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Direct VIN Input / Paste
-            </button>
-            <button
-              type="button"
-              onClick={() => setIngestMode('upload')}
-              className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
-                ingestMode === 'upload' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Upload .CSV / .TXT Fleet List
-            </button>
+          <div className="flex border-b border-slate-800/80 font-mono text-xs gap-4 pt-2 justify-between items-center">
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => setIngestMode('paste')}
+                className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
+                  ingestMode === 'paste' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Direct VIN Input / Paste
+              </button>
+              <button
+                type="button"
+                onClick={() => setIngestMode('upload')}
+                className={`pb-2 font-bold transition-all border-b-2 cursor-pointer ${
+                  ingestMode === 'upload' ? 'border-[#06B6D4] text-[#06B6D4]' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Upload .CSV / .TXT Fleet List
+              </button>
+            </div>
+
+            {/* SAMPLE AUTOFILL BUTTON */}
+            {ingestMode === 'paste' && (
+              <button
+                type="button"
+                onClick={() => setPastedText("FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nVOLVO / VNL 860 / 5YJ3E1EA7MF987654")}
+                className="pb-2 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+              >
+                ⚡ Load Sample Fleet (3 VINs)
+              </button>
+            )}
           </div>
 
           {ingestMode === 'paste' ? (
@@ -479,16 +482,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 placeholder={`FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nTESLA / MODEL 3 / 5YJ3E1EA7MF987654`}
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value.toUpperCase())}
-                disabled={scansLeft <= 0 || isAuditing}
+                disabled={isAuditing}
                 className="w-full bg-[#070B14] border border-slate-800 rounded-xl p-3 font-mono text-xs uppercase text-white placeholder-slate-600 focus:outline-none focus:border-[#06B6D4] transition"
               />
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <span className="text-[10px] text-slate-400 font-mono">
-                  Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> (up to 10 entries).
+                  Accepted Format: <strong className="text-cyan-300">Make / Model / VIN</strong> (or raw VIN lists).
                 </span>
                 <button
                   type="submit"
-                  disabled={scansLeft <= 0 || isAuditing}
+                  disabled={isAuditing}
                   className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto shadow-lg shadow-cyan-950"
                 >
                   {isAuditing ? 'CALCULATING ACTUARIAL RISK...' : 'AUDIT FLEET RISK & UNLOCK CREDITS →'}
@@ -538,7 +541,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[11px] text-emerald-300">
-                  Zero active safety recalls detected. Fleet is in Preferred Risk Tier (Eligible for 15% rate credit).
+                  Zero active safety recalls detected. Fleet is in Preferred Risk Tier (Eligible for 15% rate credit)[cite: 1].
                 </p>
               )}
             </div>
@@ -575,17 +578,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="grid md:grid-cols-3 gap-5">
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <h3 className="text-sm font-bold text-slate-100 font-mono">Eliminate \$250k Punitive Exposure</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automatically detect nuclear brake/steering recalls and push repair tickets directly into Fleetio before catastrophic crashes occur.</p>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Automatically detect nuclear brake/steering recalls and push repair tickets directly into Fleetio before catastrophic crashes occur[cite: 1].</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <h3 className="text-sm font-bold text-slate-100 font-mono">Unlock 12–15% Underwriter Credits</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Export certified Underwriter Audit Packets that shift fleet accounts from Standard to Preferred risk pricing at renewal.</p>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Export certified Underwriter Audit Packets that shift fleet accounts from Standard to Preferred risk pricing at renewal[cite: 1].</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all">
               <h3 className="text-sm font-bold text-slate-100 font-mono">Automated Two-Way Fix-It Loop</h3>
-              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Continuous sync with Fleetio, Samsara, and Geotab auto-clears safety risks in real time as mechanics complete work orders.</p>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">Continuous sync with Fleetio, Samsara, and Geotab auto-clears safety risks in real time as mechanics complete work orders[cite: 1].</p>
             </div>
           </div>
         </div>
@@ -595,7 +598,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
-            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono font-bold">Transparent Subscription Plans</h2>
+            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Transparent Subscription Plans</h2>
             <p className="text-xl sm:text-2xl font-extrabold text-white font-mono">Choose Your Loss Control Tier</p>
           </div>
 
