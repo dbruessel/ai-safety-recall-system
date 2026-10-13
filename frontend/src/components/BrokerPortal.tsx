@@ -11,8 +11,10 @@ import {
   X,
   CheckCircle2,
   Wrench,
-  Radio
+  Radio,
+  Plug
 } from "lucide-react";
+import { FleetioIntegrationModal } from "./FleetioIntegrationModal";
 
 interface ClientAccount {
   id: string;
@@ -32,11 +34,17 @@ interface ClientAccount {
   recallPenalty?: number;
   maintenancePenalty?: number;
   telematicsPenalty?: number;
+  connectedProviders?: string[];
 }
 
 export const BrokerPortal: React.FC = () => {
   const [clientAccounts, setClientAccounts] = useState<ClientAccount[]>([]);
   const [showScoreTooltip, setShowScoreTooltip] = useState<boolean>(false);
+  const [isFleetioModalOpen, setIsFleetioModalOpen] = useState<boolean>(false);
+  const [activeSelectedClient, setActiveSelectedClient] = useState<{ id: string; name: string }>({
+    id: "apex-logistics",
+    name: "Apex Logistics & Freight",
+  });
 
   useEffect(() => {
     const fetchBrokerPortfolio = async () => {
@@ -73,7 +81,8 @@ export const BrokerPortal: React.FC = () => {
               nuclearComponent: data.nuclear_liability_count > 0 ? "STEERING / BRAKE ASSEMBLY" : undefined,
               recallPenalty: data.breakdown?.recall_penalty ?? 7,
               maintenancePenalty: data.breakdown?.maintenance_penalty ?? 4,
-              telematicsPenalty: data.breakdown?.telematics_penalty ?? 0
+              telematicsPenalty: data.breakdown?.telematics_penalty ?? 0,
+              connectedProviders: client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
             };
           } catch (err) {
             return {
@@ -93,7 +102,8 @@ export const BrokerPortal: React.FC = () => {
               nuclearComponent: client.id === "apex-logistics" ? "STEERING AXLE DRAG LINK" : client.id === "titan-hauling" ? "AIR BRAKE ACTUATOR DIAPHRAGM" : undefined,
               recallPenalty: client.id === "apex-logistics" ? 11 : client.id === "titan-hauling" ? 28 : client.id === "metro-delivery" ? 2 : 0,
               maintenancePenalty: client.id === "apex-logistics" ? 7 : client.id === "titan-hauling" ? 14 : 0,
-              telematicsPenalty: 0
+              telematicsPenalty: 0,
+              connectedProviders: client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
             };
           }
         })
@@ -112,6 +122,11 @@ export const BrokerPortal: React.FC = () => {
   // Calculate weighted portfolio recall/maintenance deductions for macro tooltip
   const avgRecallDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.recallPenalty || 0), 0) / (clientAccounts.length || 1));
   const avgMaintDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.maintenancePenalty || 0), 0) / (clientAccounts.length || 1));
+
+  const handleOpenIntegrationModal = (clientId: string, clientName: string) => {
+    setActiveSelectedClient({ id: clientId, name: clientName });
+    setIsFleetioModalOpen(true);
+  };
 
   const getTierBadgeDetails = (score: number, hasNuclear: boolean) => {
     if (hasNuclear || score < 60) {
@@ -154,10 +169,18 @@ export const BrokerPortal: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-3">
+          <button 
+            onClick={() => handleOpenIntegrationModal("apex-logistics", "Apex Logistics & Freight")}
+            className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm shadow-cyan-950"
+          >
+            <Plug className="w-4 h-4 text-cyan-400" /> Connect Fleetio & Telematics
+          </button>
+          
           <button className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition">
             <Share2 className="w-4 h-4 text-cyan-400" /> Share Client Onboarding Link
           </button>
+          
           <button className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-cyan-900/40 transition">
             <FileText className="w-4 h-4" /> Export Portfolio Audit PDF
           </button>
@@ -304,7 +327,14 @@ export const BrokerPortal: React.FC = () => {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-lg font-bold text-white">{account.name}</h3>
-                    <span className="text-slate-400 text-xs font-mono uppercase">{account.tier}</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-slate-400 text-xs font-mono uppercase">{account.tier}</span>
+                      {account.connectedProviders && account.connectedProviders.map(p => (
+                        <span key={p} className="bg-cyan-950/80 border border-cyan-800 text-cyan-300 text-[10px] font-mono px-1.5 py-0.2 rounded uppercase">
+                          🔌 {p}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   
                   <div className="text-right">
@@ -358,7 +388,7 @@ export const BrokerPortal: React.FC = () => {
                       <div>
                         <span className="font-bold text-cyan-300">Actionable Underwriter ROI:</span>
                         <p className="text-slate-300 mt-0.5 leading-normal">
-                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>[cite: 9].
+                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>.
                         </p>
                       </div>
                     </div>
@@ -387,15 +417,31 @@ export const BrokerPortal: React.FC = () => {
                   <span className="text-xs text-slate-500 font-mono">
                     Partnered via Apex Risk Brokers
                   </span>
-                  <button className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition">
-                    Audit Client Workspace <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleOpenIntegrationModal(account.id, account.name)}
+                      className="text-xs font-medium text-slate-400 hover:text-cyan-300 border border-slate-800 px-2.5 py-1 rounded transition flex items-center gap-1"
+                    >
+                      <Plug className="w-3 h-3 text-cyan-400" /> Sync Fleetio
+                    </button>
+                    <button className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition">
+                      Audit Client Workspace <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* RENDER FLEETIO INTEGRATION MODAL */}
+      <FleetioIntegrationModal
+        isOpen={isFleetioModalOpen}
+        onClose={() => setIsFleetioModalOpen(false)}
+        organizationId={activeSelectedClient.id}
+        clientName={activeSelectedClient.name}
+      />
     </div>
   );
 };
