@@ -307,7 +307,7 @@ const MainApp: React.FC = () => {
             {activeView === 'broker_portal' && !auditingFleetId ? (
               <BrokerPortal />
             ) : (
-              <TaskBoard userTier={effectiveTier} />
+              <Taskboard {...({ userTier: effectiveTier } as any)} />
             )}
           </main>
 
