@@ -27,6 +27,7 @@ from app.routers import (
     sandbox,
     payment_router,
     stripe_router,
+    telematics_router,  # Telematics & Webhooks router for Phase 2
 )
 
 # Initialize Vertex AI before application construction if configured
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router.router, prefix="/api")
     app.include_router(sandbox.router, prefix="/api")
     app.include_router(payment_router.router, prefix="/api")
+    app.include_router(telematics_router.router, prefix="/api")  # Mounts /api/webhooks/samsara, /api/webhooks/geotab, /api/webhooks/test-event
     app.include_router(stripe_router.router)
     app.include_router(pdf_router)
     app.include_router(audit_router.router)

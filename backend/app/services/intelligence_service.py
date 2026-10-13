@@ -1,9 +1,22 @@
 import json
 import logging
 from typing import Dict, Any, List
-from app.engine import get_supabase
+import app.engine as engine
 
 logger = logging.getLogger(__name__)
+
+# Dynamic Database Resolver: Adapts seamlessly to whatever app/engine.py exports
+def _get_db():
+    if hasattr(engine, "get_supabase"):
+        return engine.get_supabase()
+    elif hasattr(engine, "get_supabase_client"):
+        return engine.get_supabase_client()
+    elif hasattr(engine, "supabase"):
+        return engine.supabase
+    else:
+        from supabase import create_client
+        from app.config import settings
+        return create_client(settings.supabase_url, settings.supabase_service_key)
 
 # Safely handle Vertex AI imports so missing packages never crash app boot
 try:
@@ -29,10 +42,10 @@ class ActuarialRiskEngine:
 
     @staticmethod
     def calculate_fleet_risk(organization_id: str) -> Dict[str, Any]:
-        supabase = get_supabase()
+        supabase_client = _get_db()
 
         # 1. Fetch all monitored vehicles for the organization
-        vehicles_res = supabase.table("monitored_vehicles") \
+        vehicles_res = supabase_client.table("monitored_vehicles") \
             .select("id, vin, make, model, fleetio_vehicle_id") \
             .eq("organization_id", organization_id) \
             .execute()
@@ -44,12 +57,12 @@ class ActuarialRiskEngine:
             return {
                 "organization_id": organization_id,
                 "safety_score": 100,
-                "risk_tier": "LOW",
+                "risk_tier": "PREFERRED",
                 "total_vins": 0,
                 "open_recalls": 0,
                 "nuclear_liability_count": 0,
                 "financial_exposure_usd": 0,
-                "underwriter_discount_eligibility": "10-15% Optimal Credit",
+                "underwriter_discount_eligibility": "12-15% Optimal Credit",
                 "breakdown": {
                     "recall_penalty": 0.0,
                     "maintenance_penalty": 0.0,
@@ -58,9 +71,10 @@ class ActuarialRiskEngine:
             }
 
         vehicle_ids = [v["id"] for v in vehicles]
+        vins = [v["vin"] for v in vehicles if v.get("vin")]
 
         # 2. Fetch all open recall tasks
-        tasks_res = supabase.table("recall_tasks") \
+        tasks_res = supabase_client.table("recall_tasks") \
             .select("*") \
             .in_("vehicle_id", vehicle_ids) \
             .eq("status", "open") \
@@ -90,8 +104,32 @@ class ActuarialRiskEngine:
         # 4. Compute Pillar 2: Deferred Maintenance Penalty (35% Weight - Fleetio Data)
         deferred_maint_penalty = (nuclear_count * 15.0 / total_vins) * 0.35
 
-        # 5. Compute Pillar 3: Telematics Behavioral Penalty (25% Weight - Samsara/Geotab)
+        # 5. Compute Pillar 3: Telematics & Driver Behavior Penalty (25% Weight - Samsara / Geotab)
         telematics_penalty = 0.0
+        if vins:
+            try:
+                events_res = supabase_client.table("telematics_events") \
+                    .select("event_type, severity, dtc_code") \
+                    .in_("vin", vins) \
+                    .execute()
+                
+                telematics_events = events_res.data or []
+                
+                harsh_events_count = sum(1 for e in telematics_events if e.get("event_type") in ["harsh_braking", "harsh_driving"])
+                speeding_events_count = sum(1 for e in telematics_events if e.get("event_type") == "speeding")
+                dtc_faults_count = sum(1 for e in telematics_events if e.get("event_type") == "dtc_fault")
+
+                # Mathematical Telematics Deductions:
+                # - 1.5 pts per harsh driving event
+                # - 2.5 pts per speeding event
+                # - 5.0 pts per active engine/ABS diagnostic fault code (DTC)
+                raw_telematics_points = (harsh_events_count * 1.5) + (speeding_events_count * 2.5) + (dtc_faults_count * 5.0)
+                
+                # Normalize Pillar 3 score weighted at 25%
+                telematics_penalty = (raw_telematics_points / total_vins) * 0.25
+            except Exception as e:
+                logger.warning(f"Could not query telematics_events table: {e}. Defaulting Pillar 3 to 0.0")
+                telematics_penalty = 0.0
 
         # Total Deductions
         total_deduction = normalized_recall_penalty + deferred_maint_penalty + telematics_penalty
@@ -101,13 +139,14 @@ class ActuarialRiskEngine:
         safety_score = max(0, min(100, round(raw_score)))
 
         # 6. Calculate Financial Exposure ($)
+        # $250,000 per nuclear liability vehicle + $50,000 per standard open recall
         financial_exposure = (nuclear_count * 250000) + (standard_recall_count * 50000)
 
         # Determine Underwriter Rating & Discount Status
-        if safety_score >= 85:
+        if safety_score >= 85 and nuclear_count == 0:
             risk_tier = "PREFERRED"
             discount_eligibility = "12-15% Underwriter Rate Discount"
-        elif safety_score >= 70:
+        elif safety_score >= 70 and nuclear_count == 0:
             risk_tier = "STANDARD"
             discount_eligibility = "5-10% Underwriter Credit"
         elif safety_score >= 50:
