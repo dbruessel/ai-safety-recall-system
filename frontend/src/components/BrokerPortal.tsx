@@ -265,7 +265,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects[cite: 1].
+                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects.
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -292,7 +292,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <div className="mt-3 p-2 bg-cyan-950/50 border border-cyan-800/60 rounded text-[11px] text-cyan-200">
-                💡 <strong>Underwriter Tip:</strong> Resolve 2 active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>[cite: 1].
+                💡 <strong>Underwriter Tip:</strong> Resolve 2 active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>.
               </div>
             </div>
           )}
@@ -328,7 +328,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls[cite: 1]. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties[cite: 1].
+                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties.
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -351,7 +351,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <div className="mt-3 p-2 bg-red-950/60 border border-red-800/80 rounded text-[11px] text-red-200">
-                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability[cite: 1].
+                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability.
               </div>
             </div>
           )}
@@ -441,7 +441,7 @@ export const BrokerPortal: React.FC = () => {
                       <div>
                         <span className="font-bold text-cyan-300">Actionable Underwriter ROI:</span>
                         <p className="text-slate-300 mt-0.5 leading-normal">
-                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>[cite: 1].
+                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>.
                         </p>
                       </div>
                     </div>
