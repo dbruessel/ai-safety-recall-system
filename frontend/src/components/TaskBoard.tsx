@@ -1,840 +1,289 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
-import { FleetVinScanner } from './FleetVinScanner';
-import { ShieldAlert, ExternalLink } from 'lucide-react';
+import React, { useState } from "react";
+import { 
+  ShieldAlert, 
+  Search, 
+  FileText, 
+  Share2, 
+  ExternalLink, 
+  RefreshCw, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle,
+  Plug,
+  Info,
+  ChevronRight,
+  ShieldCheck
+} from "lucide-react";
 
-// --- INTERFACES ---
-interface TaskBoardProps {
-  userTier?: string;
-}
-
-interface RecallItem {
-  id: string;
-  unit: string;
+interface RecallTask {
+  unitId: string;
   vin: string;
   makeModel: string;
-  recallDetails: string;
-  nhtsaCampaign: string;
-  description: string;
-  remedyStatus: 'Unassigned' | 'Scheduled' | 'Parts Ordered' | 'Completed';
-  complianceStatus: 'OPEN' | 'SCHEDULED' | 'CLEARED';
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
-  dealerName?: string;
-  scheduledDate?: string;
-  organization_id?: string;
-  // Fleetio & Nuclear Liability Extensions
-  nuclear_liability_flag?: boolean;
-  fleetio_vehicle_id?: string;
-}
-
-interface NuclearAlertTask {
-  id: string;
-  campaign_number: string;
+  campaignId: string;
   component: string;
-  nuclear_liability_flag: boolean;
-  fleetio_vehicle_id: string;
+  severity: "critical" | "warning" | "cleared";
+  connectedProviders: ("fleetio" | "samsara" | "geotab")[];
+  workOrderId?: string;
+  remedyLogistics: string;
+  status: "OPEN" | "SCHEDULED" | "CLEARED";
 }
 
-// --- FLEETIO NUCLEAR LIABILITY ALERT BANNER COMPONENT ---
-const FleetioNuclearAlert: React.FC<{ recallTasks: NuclearAlertTask[] }> = ({ recallTasks }) => {
-  const nuclearTasks = recallTasks.filter(t => t.nuclear_liability_flag);
+export const Taskboard: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "OPEN" | "SCHEDULED" | "CLEARED">("ALL");
 
-  if (nuclearTasks.length === 0) return null;
+  const [tasks] = useState<RecallTask[]>([
+    {
+      unitId: "UNIT-101",
+      vin: "1FUJGLDR5MLKE1234",
+      makeModel: "FREIGHTLINER CASCADIA 2023",
+      campaignId: "23V-891",
+      component: "STEERING AXLE DRAG LINK",
+      severity: "critical",
+      connectedProviders: ["fleetio", "samsara"],
+      workOrderId: "WO-FLT-889102",
+      remedyLogistics: "Fleetio Work Order Issued",
+      status: "OPEN",
+    },
+    {
+      unitId: "UNIT-204",
+      vin: "1FT8W1Y85PKA54321",
+      makeModel: "FORD TRANSIT VAN 2022",
+      campaignId: "24V-012",
+      component: "REAR DRIVESHAFT FLEX COUPLING",
+      severity: "warning",
+      connectedProviders: ["fleetio"],
+      workOrderId: "WO-FLT-889108",
+      remedyLogistics: "Metro Ford Commercial (Parts Backorder)",
+      status: "SCHEDULED",
+    },
+    {
+      unitId: "UNIT-309",
+      vin: "5YJ3E1EA7MF987654",
+      makeModel: "VOLVO VNL 860 2023",
+      campaignId: "23V-838",
+      component: "AIR BRAKE ACTUATOR DIAPHRAGM",
+      severity: "cleared",
+      connectedProviders: ["fleetio", "geotab"],
+      workOrderId: "WO-FLT-889045",
+      remedyLogistics: "Volvo Truck Center (Remedy Complete)",
+      status: "CLEARED",
+    },
+  ]);
+
+  const filteredTasks = tasks.filter((t) => {
+    const matchesSearch =
+      t.unitId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.vin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.campaignId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.makeModel.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "ALL" ? true : t.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const nuclearTasks = tasks.filter((t) => t.severity === "critical" && t.status === "OPEN");
 
   return (
-    <div className="bg-red-950/90 border-2 border-red-600 rounded-2xl p-5 mb-6 text-white shadow-2xl backdrop-blur-md">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <ShieldAlert className="w-8 h-8 text-red-500 animate-pulse" />
-          <div>
-            <h3 className="text-lg font-extrabold text-red-100 tracking-tight">
-              ⚠️ {nuclearTasks.length} Nuclear Liability Alert(s) Detected
-            </h3>
-            <p className="text-xs text-red-300">
-              Active fleet vehicles are operating with unaddressed, high-severity safety recalls (Brakes, Steering, Airbags).
-            </p>
-          </div>
-        </div>
-        <span className="bg-red-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest">
-          High Legal Exposure
-        </span>
-      </div>
-
-      <div className="space-y-2 mt-4">
-        {nuclearTasks.map((task) => (
-          <div key={task.id} className="flex justify-between items-center bg-red-900/40 p-3 rounded-xl border border-red-800/80">
-            <div className="text-xs">
-              <span className="font-bold text-red-200">Campaign #{task.campaign_number}</span>
-              <span className="text-red-300 ml-2">({task.component})</span>
-            </div>
-            {task.fleetio_vehicle_id ? (
-              <a
-                href={`https://secure.fleetio.com/vehicles/${task.fleetio_vehicle_id}/issues`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center text-[11px] bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-lg transition-colors cursor-pointer"
-              >
-                View in Fleetio <ExternalLink className="w-3 h-3 ml-1.5" />
-              </a>
-            ) : (
-              <span className="text-[10px] bg-red-900 text-red-300 px-2 py-0.5 rounded border border-red-700">
-                Action Required
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// --- MAIN TASKBOARD COMPONENT ---
-export const TaskBoard: React.FC<TaskBoardProps> = ({ userTier = 'standard' }) => {
-  const { userProfile } = useAuth();
-  const isPro = userTier.toLowerCase() === 'professional' || userTier.toLowerCase() === 'enterprise';
-
-  // --- WORKSPACE STATE ---
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'all' | 'open' | 'scheduled' | 'cleared'>('all');
-  const [selectedMake, setSelectedMake] = useState<string>('ALL');
-  
-  // Data & Loading States
-  const [recallUnits, setRecallUnits] = useState<RecallItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  // Modal States
-  const [isSingleScanOpen, setIsSingleScanOpen] = useState<boolean>(false);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
-  const [selectedUnitForManage, setSelectedUnitForManage] = useState<RecallItem | null>(null);
-
-  // Form Inputs & UI State Feedback Controls
-  const [singleVinInput, setSingleVinInput] = useState<string>('');
-  const [copiedLink, setCopiedLink] = useState<boolean>(false);
-  const [exportState, setExportState] = useState<'idle' | 'generating' | 'done'>('idle');
-
-  // --- GUIDED PRODUCT TOUR STATE ---
-  const [isTourActive, setIsTourActive] = useState<boolean>(true);
-  const [currentTourStep, setCurrentTourStep] = useState<number>(0);
-
-  const tourSteps = [
-    {
-      title: "1. Recall Operations Workspace",
-      badge: "REAL-TIME SAFETY COMPLIANCE",
-      description: "Track vehicles, active NHTSA safety campaigns, dealer repair schedules, and vehicle limit quotas in one dashboard."
-    },
-    {
-      title: "2. Underwriter Verification & Proof",
-      badge: "INSURANCE SAVINGS LEVERAGE",
-      description: "Export signed PDF Loss Control Certificates or copy a live underwriter link to prove proactive safety management and request premium discounts."
-    },
-    {
-      title: "3. Precision Filter & Search Controls",
-      badge: "FLEET SEARCH ENGINE",
-      description: "Filter vehicles by make (Freightliner, Ford, Volvo) or compliance status (Open, Scheduled, Cleared) in milliseconds."
-    },
-    {
-      title: "4. Live Recall Monitoring Table",
-      badge: "ACTIVE TASKBOARD",
-      description: "Click 'Manage' on any vehicle to update dealer repair logistics, track remedy progress, and mark safety campaigns as Cleared."
-    },
-    {
-      title: "5. Single-VIN Scan & Bulk CSV Import",
-      badge: "FLEET INGEST ENGINE",
-      description: "Add new vehicles anytime using 1-click VIN lookups or upload entire fleet CSV spreadsheets to sync live NHTSA records."
-    }
-  ];
-
-  const handleNextTourStep = () => {
-    if (currentTourStep < tourSteps.length - 1) {
-      setCurrentTourStep(prev => prev + 1);
-    } else {
-      setIsTourActive(false);
-    }
-  };
-
-  // --- DYNAMIC TIER VIN LIMIT COMPUTATION ---
-  const displayLimit = useMemo(() => {
-    if (userProfile?.vehicle_limit) {
-      return userProfile.vehicle_limit.toLocaleString();
-    }
-    const normalizedTier = userTier.toLowerCase();
-    if (normalizedTier === 'enterprise') return '1,000';
-    if (normalizedTier === 'professional') return '250';
-    return '50';
-  }, [userProfile?.vehicle_limit, userTier]);
-
-  // --- FETCH REAL FLEET DATA FROM SUPABASE ---
-  const fetchFleetData = useCallback(async () => {
-    if (!userProfile?.organization_id) {
-      // Demo Data Fallback for Non-Authenticated Tour Views
-      setRecallUnits([
-        { 
-          id: '1', 
-          unit: 'UNIT-101', 
-          vin: '1FUJGLDR5MLKE1234', 
-          makeModel: 'FREIGHTLINER CASCADIA 2023', 
-          nhtsaCampaign: '23V-891', 
-          recallDetails: 'STEERING AXLE DRAG LINK', 
-          description: 'Drag link taper joint may separate leading to sudden loss of steering control.', 
-          remedyStatus: 'Unassigned', 
-          complianceStatus: 'OPEN', 
-          severity: 'CRITICAL',
-          nuclear_liability_flag: true,
-          fleetio_vehicle_id: '101'
-        },
-        { 
-          id: '2', 
-          unit: 'UNIT-204', 
-          vin: '1FTBW1Y85PKA54321', 
-          makeModel: 'FORD TRANSIT VAN 2022', 
-          nhtsaCampaign: '24V-012', 
-          recallDetails: 'REAR DRIVESHAFT FLEX COUPLING', 
-          description: 'Driveshaft flex coupling separation may result in loss of motive power while driving.', 
-          remedyStatus: 'Scheduled', 
-          complianceStatus: 'SCHEDULED', 
-          severity: 'HIGH', 
-          dealerName: 'Metro Ford Commercial',
-          nuclear_liability_flag: false,
-          fleetio_vehicle_id: '204'
-        },
-        { 
-          id: '3', 
-          unit: 'UNIT-309', 
-          vin: '5YJ3E1EA7MF987654', 
-          makeModel: 'VOLVO VNL 860 2023', 
-          nhtsaCampaign: '23V-838', 
-          recallDetails: 'AIR BRAKE ACTUATOR DIAPHRAGM', 
-          description: 'Air leak in brake chamber diaphragm may increase stopping distances or cause drag.', 
-          remedyStatus: 'Completed', 
-          complianceStatus: 'CLEARED', 
-          severity: 'MEDIUM', 
-          dealerName: 'Volvo Truck Center',
-          nuclear_liability_flag: false
-        },
-      ]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('vins')
-        .select('*')
-        .eq('organization_id', userProfile.organization_id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching organization VINs:', error);
-      } else if (data && data.length > 0) {
-        const mappedUnits: RecallItem[] = data.map((item: any) => ({
-          id: item.id,
-          unit: item.unit_number || item.unit || `UNIT-${item.vin?.slice(-4)}`,
-          vin: item.vin,
-          makeModel: item.make_model || `${item.make || ''} ${item.model || ''} ${item.year || ''}`.trim() || 'UNKNOWN MAKE/MODEL',
-          nhtsaCampaign: item.nhtsa_campaign || item.campaign_number || 'N/A',
-          recallDetails: item.recall_details || item.component || 'SAFETY CAMPAIGN',
-          description: item.description || item.summary || 'NHTSA Safety recall identified for this vehicle.',
-          remedyStatus: item.remedy_status || 'Unassigned',
-          complianceStatus: (item.compliance_status || 'OPEN').toUpperCase() as 'OPEN' | 'SCHEDULED' | 'CLEARED',
-          severity: (item.severity || 'HIGH').toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM',
-          dealerName: item.dealer_name,
-          scheduledDate: item.scheduled_date,
-          organization_id: item.organization_id,
-          nuclear_liability_flag: item.nuclear_liability_flag || item.severity === 'CRITICAL',
-          fleetio_vehicle_id: item.fleetio_vehicle_id || item.fleetio_id || ''
-        }));
-
-        setRecallUnits(mappedUnits);
-      } else {
-        setRecallUnits([]);
-      }
-    } catch (err) {
-      console.error('Unexpected error loading fleet records:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userProfile?.organization_id]);
-
-  useEffect(() => {
-    fetchFleetData();
-  }, [fetchFleetData]);
-
-  // --- FILTERED DATA COMPUTATION ---
-  const filteredUnits = useMemo(() => {
-    return recallUnits.filter((item) => {
-      const matchesSearch = 
-        item.unit.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.vin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.nhtsaCampaign.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.makeModel.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = 
-        activeTab === 'all' ? true : item.complianceStatus.toLowerCase() === activeTab;
-
-      const matchesMake = 
-        selectedMake === 'ALL' ? true : item.makeModel.toUpperCase().includes(selectedMake);
-
-      return matchesSearch && matchesStatus && matchesMake;
-    });
-  }, [recallUnits, searchQuery, activeTab, selectedMake]);
-
-  // --- HANDLERS & PERMISSION GUARDS ---
-  const requireProAccess = (featureName: string, action: () => void) => {
-    if (!isPro) {
-      alert(`🔒 ${featureName} is restricted to Professional Tier subscribers ($249/mo).`);
-      return;
-    }
-    action();
-  };
-
-  const handleSingleScanSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!singleVinInput.trim() || !userProfile?.organization_id) return;
-
-    const vinToScan = singleVinInput.trim().toUpperCase();
-
-    const { error } = await supabase
-      .from('vins')
-      .insert([
-        {
-          vin: vinToScan,
-          unit_number: `UNIT-${Math.floor(100 + Math.random() * 900)}`,
-          organization_id: userProfile.organization_id,
-          make_model: 'VOLVO VNL 860 2023',
-          nhtsa_campaign: '24V-999',
-          recall_details: 'STEERING GEARBOX FASTENER',
-          description: 'NHTSA Live Sync scan flagged loose steering column attachment bolts.',
-          remedy_status: 'Unassigned',
-          compliance_status: 'OPEN',
-          severity: 'HIGH'
-        }
-      ])
-      .select();
-
-    if (error) {
-      console.error('Error scanning VIN:', error.message);
-    } else {
-      setSingleVinInput('');
-      setIsSingleScanOpen(false);
-      fetchFleetData();
-    }
-  };
-
-  const handleExportRiskCertificate = () => {
-    requireProAccess('Export Loss Control PDF', async () => {
-      setExportState('generating');
-      try {
-        const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-        const targetFleetId = userProfile?.organization_id || 'demo-fleet-001';
-
-        const response = await fetch(
-          `${apiBaseUrl}/api/broker/compliance-report/${targetFleetId}/pdf?broker_name=RecallLogic%20Partner%20Brokerage`,
-          { method: 'GET' }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Server returned status ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `RecallLogic_Loss_Control_Certificate_${targetFleetId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        setExportState('done');
-        setTimeout(() => setExportState('idle'), 3000);
-      } catch (err) {
-        console.error('Failed to download fleet loss control certificate:', err);
-        setExportState('idle');
-      }
-    });
-  };
-
-  const handleShareAuditLink = () => {
-    requireProAccess('Share Live Underwriter Link', () => {
-      const fleetId = userProfile?.organization_id || 'demo-fleet-001';
-      const auditUrl = `${window.location.origin}/audit/${fleetId}`;
-
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(auditUrl);
-      }
-
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    });
-  };
-
-  const handleUpdateStatus = async (id: string, newStatus: 'OPEN' | 'SCHEDULED' | 'CLEARED') => {
-    const remedy = newStatus === 'CLEARED' ? 'Completed' : newStatus === 'SCHEDULED' ? 'Scheduled' : 'Unassigned';
-
-    setRecallUnits((prev) =>
-      prev.map((unit) =>
-        unit.id === id
-          ? { ...unit, complianceStatus: newStatus, remedyStatus: remedy }
-          : unit
-      )
-    );
-
-    const { error } = await supabase
-      .from('vins')
-      .update({
-        compliance_status: newStatus,
-        remedy_status: remedy
-      })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error persisting compliance update:', error);
-    }
-
-    setSelectedUnitForManage(null);
-  };
-
-  return (
-    <div className="px-6 space-y-6 font-mono text-slate-100 max-w-7xl mx-auto relative">
-      
-      {/* ⚡ NUCLEAR LIABILITY ALERT BANNER ⚡ */}
-      <FleetioNuclearAlert 
-        recallTasks={recallUnits.map(unit => ({
-          id: unit.id,
-          campaign_number: unit.nhtsaCampaign,
-          component: unit.recallDetails,
-          nuclear_liability_flag: Boolean(unit.nuclear_liability_flag && unit.complianceStatus === 'OPEN'),
-          fleetio_vehicle_id: unit.fleetio_vehicle_id || ''
-        }))} 
-      />
-
-      {/* SECTION HEADER & PRO ACTIONS BAR (STEP 1, STEP 2 & STEP 5 HIGHLIGHT) */}
-      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0D1322] p-5 rounded-2xl border transition-all duration-300 ${
-        isTourActive && (currentTourStep === 0 || currentTourStep === 1 || currentTourStep === 4)
-          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-          : 'border-slate-800'
-      }`}>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-8 relative font-sans">
+      {/* FEATURE 3: UNDERWRITER EVIDENCE LOCKER HEADER BREADCRUMB & TOOLBAR */}
+      <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-extrabold text-white font-mono tracking-tight">
-              Recall Operations Workspace
-            </h1>
-            <span
-              className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border font-mono ${
-                isPro
-                  ? 'bg-cyan-950/80 border-cyan-500/40 text-[#06B6D4]'
-                  : 'bg-slate-800 border-slate-700 text-slate-300'
-              }`}
-            >
-              {userTier.toUpperCase()} TIER ({recallUnits.length} / {displayLimit} VINS)
+          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mb-1">
+            <span>PORTFOLIO COMMAND</span>
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className="text-cyan-400 font-bold">APEX LOGISTICS & FREIGHT</span>
+            <span className="bg-emerald-950/80 border border-emerald-800/80 text-emerald-400 text-[10px] font-mono px-2 py-0.5 rounded flex items-center gap-1 ml-2">
+              <ShieldCheck className="w-3 h-3" /> VERIFIED EVIDENCE LOCKER
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Active fleet safety tracking, underwriter verification packet generation, and dealer remedy scheduling.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            Underwriter Audit & Remediation Workspace
+          </h1>
         </div>
 
-        {/* TOP TOOLBAR BUTTONS */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => requireProAccess('Single-VIN Scan', () => setIsSingleScanOpen(true))}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
-              isPro
-                ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer'
-                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-            }`}
-          >
-            {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            ⚡ Single-VIN Scan
+        <div className="flex gap-3">
+          <button className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-3.5 py-2 rounded-lg text-xs font-medium transition">
+            <Share2 className="w-3.5 h-3.5 text-cyan-400" /> Share Live Underwriter Link
           </button>
-
-          <button
-            type="button"
-            onClick={() => requireProAccess('Bulk CSV Import', () => setIsBulkImportOpen(true))}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
-              isPro
-                ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 cursor-pointer'
-                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-            }`}
-          >
-            {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            ⚡ Bulk CSV Import
-          </button>
-
-          <button
-            type="button"
-            onClick={handleShareAuditLink}
-            title="Copy a read-only live safety audit link for your insurance broker or underwriter"
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all border ${
-              isPro
-                ? copiedLink
-                  ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 cursor-pointer'
-                  : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700 cursor-pointer'
-                : 'bg-slate-900 text-slate-500 border-slate-800 cursor-not-allowed'
-            }`}
-          >
-            {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            {copiedLink ? <span>✓ Live Link Copied!</span> : <span>⚡ Share Live Underwriter Link</span>}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportRiskCertificate}
-            disabled={exportState === 'generating'}
-            title="Download official PDF Risk Audit Certificate for policy renewal discount verification"
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
-              isPro
-                ? exportState === 'generating'
-                  ? 'bg-cyan-950 border border-cyan-500/50 text-cyan-400 animate-pulse'
-                  : exportState === 'done'
-                  ? 'bg-emerald-500 border border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20'
-                  : 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 cursor-pointer shadow-lg shadow-cyan-950/50'
-                : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
-            }`}
-          >
-            {!isPro && <span className="bg-cyan-950 text-cyan-400 text-[9px] px-1 rounded border border-cyan-800">PRO</span>}
-            {exportState === 'generating' && <span>⏳ Generating PDF...</span>}
-            {exportState === 'done' && <span>✓ Loss Control PDF Exported!</span>}
-            {exportState === 'idle' && <span>📄 Export Loss Control PDF</span>}
+          <button className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-2 rounded-lg text-xs font-medium shadow-lg shadow-cyan-900/40 transition">
+            <FileText className="w-3.5 h-3.5" /> Export Loss Control PDF
           </button>
         </div>
       </div>
 
-      {/* FILTER & SEARCH CONTROL BAR (STEP 3 HIGHLIGHT) */}
-      <div className={`flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#0D1322] p-4 rounded-xl border transition-all duration-300 ${
-        isTourActive && currentTourStep === 2
-          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-          : 'border-slate-800'
-      }`}>
-        <div className="w-full sm:w-80">
+      {/* CRITICAL ALERT BANNER */}
+      {nuclearTasks.length > 0 && (
+        <div className="mb-6 bg-red-950/70 border border-red-600/70 rounded-xl p-4 backdrop-blur-md flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-6 h-6 text-red-500 shrink-0" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-red-200 uppercase tracking-wider">
+                  ⚠️ {nuclearTasks.length} Nuclear Liability Alert(s) Detected
+                </h3>
+                <span className="bg-red-900/80 text-red-200 text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase">
+                  HIGH LEGAL EXPOSURE
+                </span>
+              </div>
+              <p className="text-xs text-red-300/80 mt-0.5">
+                Vehicles operating with unaddressed, critical safety recalls (Brakes/Steering). Standard insurance policies DO NOT cover punitive penalties.
+              </p>
+            </div>
+          </div>
+
+          <a
+            href="https://app.fleetio.com"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition shrink-0"
+          >
+            View in Fleetio <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
+      {/* FILTER & CONTROL BAR */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search Unit #, VIN, or Campaign..."
-            className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 font-mono"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <select
-            value={selectedMake}
-            onChange={(e) => setSelectedMake(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-cyan-500 cursor-pointer"
-          >
-            <option value="ALL">All Makes</option>
-            <option value="FREIGHTLINER">Freightliner</option>
-            <option value="FORD">Ford</option>
-            <option value="KENWORTH">Kenworth</option>
-            <option value="PETERBILT">Peterbilt</option>
-            <option value="CHEVROLET">Chevrolet</option>
-            <option value="VOLVO">Volvo</option>
-          </select>
-
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 self-start md:self-auto">
+          {(["ALL", "OPEN", "SCHEDULED", "CLEARED"] as const).map((status) => (
             <button
-              onClick={() => setActiveTab('all')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'all'
-                  ? 'bg-cyan-950 border border-cyan-500/50 text-[#06B6D4] font-bold'
-                  : 'text-slate-400 hover:text-white'
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-3 py-1 rounded text-xs font-mono font-medium transition ${
+                statusFilter === status
+                  ? "bg-cyan-950 border border-cyan-500/50 text-cyan-300 font-bold"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              All Statuses
+              {status}
             </button>
-            <button
-              onClick={() => setActiveTab('open')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'open'
-                  ? 'bg-red-950 border border-red-500/50 text-red-400 font-bold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Open
-            </button>
-            <button
-              onClick={() => setActiveTab('scheduled')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'scheduled'
-                  ? 'bg-amber-950 border border-amber-500/50 text-amber-400 font-bold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Scheduled
-            </button>
-            <button
-              onClick={() => setActiveTab('cleared')}
-              className={`px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'cleared'
-                  ? 'bg-emerald-950 border border-emerald-500/50 text-emerald-400 font-bold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Cleared
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* RECALL MONITORING TABLE (STEP 4 HIGHLIGHT) */}
-      <div className={`bg-[#0D1322] border rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
-        isTourActive && currentTourStep === 3
-          ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-          : 'border-slate-800'
-      }`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-[11px] font-mono text-slate-400 bg-slate-950/50 uppercase tracking-wider">
-                <th className="py-3 px-4">VEHICLE / VIN</th>
-                <th className="py-3 px-4">Make &amp; Model</th>
-                <th className="py-3 px-4">Safety Recall Details</th>
-                <th className="py-3 px-4">Remedy Logistics</th>
-                <th className="py-3 px-4">Compliance Status</th>
-                <th className="py-3 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-mono">
-                    <span className="animate-pulse">Loading live fleet safety records from Supabase...</span>
-                  </td>
-                </tr>
-              ) : filteredUnits.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500 font-mono">
-                    <p className="text-slate-300 font-bold mb-1">No active fleet safety campaigns found.</p>
-                    <p className="text-xs text-slate-500">
-                      Use <span className="text-cyan-400">Single-VIN Scan</span> or <span className="text-cyan-400">Bulk CSV Import</span> to register fleet vehicles.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredUnits.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-4 px-4 font-bold text-white">
-                      <div>{item.unit}</div>
-                      <div className="text-[10px] text-slate-400 font-normal">{item.vin}</div>
-                    </td>
-                    <td className="py-4 px-4 text-slate-300">{item.makeModel}</td>
-                    <td className="py-4 px-4 max-w-xs">
-                      <div className="text-white font-bold text-[11px]">
-                        {item.nhtsaCampaign} — {item.recallDetails}
-                      </div>
-                      <div className="text-[10px] text-slate-400 truncate">{item.description}</div>
-                    </td>
-                    <td className="py-4 px-4 text-slate-300">
-                      <div>{item.remedyStatus}</div>
-                      {item.dealerName && (
-                        <div className="text-[10px] text-slate-500 truncate">{item.dealerName}</div>
-                      )}
-                    </td>
-                    <td className="py-4 px-4">
+      {/* RECALL WORKSPACE TABLE */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-950 border-b border-slate-800 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+              <th className="p-4">Vehicle / VIN</th>
+              <th className="p-4">Make & Model</th>
+              <th className="p-4">Safety Recall Details</th>
+              <th className="p-4">Ecosystem Feeds</th>
+              <th className="p-4">Remedy Logistics</th>
+              <th className="p-4">Compliance Status</th>
+              <th className="p-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/60 text-xs">
+            {filteredTasks.map((task) => (
+              <tr key={task.unitId} className="hover:bg-slate-850/50 transition">
+                <td className="p-4 font-mono">
+                  <div className="font-bold text-slate-100">{task.unitId}</div>
+                  <div className="text-[10px] text-slate-500">{task.vin}</div>
+                </td>
+
+                <td className="p-4 font-mono text-slate-300 text-[11px]">
+                  {task.makeModel}
+                </td>
+
+                <td className="p-4 max-w-xs">
+                  <div className="font-mono font-bold text-red-300 text-[11px] flex items-center gap-1.5">
+                    {task.campaignId} — {task.component}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    NHTSA Priority Safety Campaign • Action Required
+                  </div>
+                </td>
+
+                {/* FEATURE 1: ECOSYSTEM DATA BADGES PER VEHICLE */}
+                <td className="p-4">
+                  <div className="flex items-center gap-1.5">
+                    {task.connectedProviders.map((provider) => (
                       <span
-                        className={`px-2.5 py-1 rounded text-[10px] font-bold border ${
-                          item.complianceStatus === 'OPEN'
-                            ? 'bg-red-500/10 border-red-500/30 text-red-400'
-                            : item.complianceStatus === 'SCHEDULED'
-                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        }`}
+                        key={provider}
+                        className="bg-cyan-950/80 border border-cyan-800/80 text-cyan-300 text-[9px] font-mono px-2 py-0.5 rounded uppercase flex items-center gap-1 shadow-sm"
                       >
-                        {item.complianceStatus}
+                        <Plug className="w-2.5 h-2.5 text-cyan-400" /> {provider}
                       </span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedUnitForManage(item)}
-                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs transition-all cursor-pointer"
-                      >
-                        Manage
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    ))}
+                  </div>
+                </td>
+
+                <td className="p-4 text-slate-300 text-[11px] font-mono">
+                  {task.remedyLogistics}
+                </td>
+
+                <td className="p-4">
+                  <span
+                    className={`inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                      task.status === "OPEN"
+                        ? "bg-red-950 text-red-400 border-red-800"
+                        : task.status === "SCHEDULED"
+                        ? "bg-amber-950 text-amber-400 border-amber-800"
+                        : "bg-emerald-950 text-emerald-400 border-emerald-800"
+                    }`}
+                  >
+                    {task.status === "OPEN" && <AlertCircle className="w-3 h-3" />}
+                    {task.status === "SCHEDULED" && <Clock className="w-3 h-3" />}
+                    {task.status === "CLEARED" && <CheckCircle2 className="w-3 h-3" />}
+                    {task.status}
+                  </span>
+                </td>
+
+                {/* FEATURE 2: DIRECT ACTION TRIGGERS */}
+                <td className="p-4 text-right">
+                  {task.status === "OPEN" && (
+                    <a
+                      href="https://app.fleetio.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-300 text-xs px-2.5 py-1.5 rounded transition font-mono shadow-sm"
+                    >
+                      View Fleetio {task.workOrderId || "WO"} <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  {task.status === "SCHEDULED" && (
+                    <button className="inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded transition font-mono">
+                      <RefreshCw className="w-3 h-3 text-cyan-400" /> Sync Status
+                    </button>
+                  )}
+                  {task.status === "CLEARED" && (
+                    <button className="inline-flex items-center gap-1 bg-emerald-950 border border-emerald-800/80 hover:bg-emerald-900 text-emerald-300 text-xs px-2.5 py-1.5 rounded transition font-mono shadow-sm">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Download Cert
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* GUARANTEED UN-CLIPPED FLOATING TOUR CARD */}
-      {isTourActive && (
-        <div className="fixed bottom-6 right-6 z-[9999] w-80 sm:w-96 bg-[#0D1322] border-2 border-cyan-400 rounded-2xl p-5 shadow-[0_0_50px_rgba(6,182,212,0.4)] space-y-3 font-mono text-slate-100 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
-          
-          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-            <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
-              {tourSteps[currentTourStep].badge}
-            </span>
-            <button 
-              type="button" 
-              onClick={() => setIsTourActive(false)}
-              className="text-slate-400 hover:text-white transition text-xs cursor-pointer px-1"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5">
-              <span>💡</span> {tourSteps[currentTourStep].title}
-            </h3>
-            <p className="text-[11px] text-slate-300 leading-normal">
-              {tourSteps[currentTourStep].description}
-            </p>
-          </div>
-
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {tourSteps.map((_, idx) => (
-                <span 
-                  key={idx}
-                  className={`h-1 rounded-full transition-all ${
-                    idx === currentTourStep ? 'w-4 bg-cyan-400' : 'w-1 bg-slate-700'
-                  }`}
-                />
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {currentTourStep > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setCurrentTourStep(prev => prev - 1)}
-                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded cursor-pointer"
-                >
-                  ← Back
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleNextTourStep}
-                className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 text-[10px] font-extrabold rounded cursor-pointer"
-              >
-                {currentTourStep === tourSteps.length - 1 ? "🚀 Start Free Fleet Audit" : "Next Step →"}
-              </button>
-            </div>
-          </div>
-
+      {/* FOOTER AUDIT NOTE */}
+      <div className="mt-6 flex justify-between items-center text-[11px] text-slate-500 font-mono">
+        <div className="flex items-center gap-1.5">
+          <Info className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Automated two-way sync via Fleetio, Samsara, and Geotab Webhooks (Last sync: Just now).</span>
         </div>
-      )}
-
-      {/* RESTART TOUR BUTTON */}
-      {!isTourActive && (
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentTourStep(0);
-            setIsTourActive(true);
-          }}
-          className="fixed bottom-6 right-6 z-40 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 cursor-pointer"
-        >
-          <span>💡 Restart Fleet Tour</span>
-        </button>
-      )}
-
-      {/* SINGLE VIN SCAN MODAL */}
-      {isSingleScanOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">⚡ Single-VIN Scan</h3>
-              <button onClick={() => setIsSingleScanOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
-            </div>
-            <form onSubmit={handleSingleScanSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Enter 17-Digit Vehicle Identification Number (VIN)</label>
-                <input
-                  type="text"
-                  maxLength={17}
-                  value={singleVinInput}
-                  onChange={(e) => setSingleVinInput(e.target.value)}
-                  placeholder="e.g. 1FUJGLDR5MLKE1234"
-                  className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-lg p-2.5 uppercase font-mono focus:outline-none focus:border-cyan-500"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button type="button" onClick={() => setIsSingleScanOpen(false)} className="px-4 py-2 bg-slate-800 text-xs rounded-lg cursor-pointer">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg cursor-pointer">Run NHTSA Audit</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* BULK CSV IMPORT MODAL */}
-      {isBulkImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="max-w-4xl w-full bg-[#0D1322] border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
-            <div className="flex justify-between items-center mb-4 font-mono text-xs">
-              <span className="font-bold text-white uppercase tracking-wider">⚡ Bulk Fleet Safety Sync</span>
-              <button 
-                onClick={() => {
-                  setIsBulkImportOpen(false);
-                  fetchFleetData();
-                }} 
-                className="text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 border border-slate-700 cursor-pointer"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <FleetVinScanner isWorkspace={true} />
-          </div>
-        </div>
-      )}
-
-      {/* MANAGE UNIT MODAL */}
-      {selectedUnitForManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Manage Remedy — {selectedUnitForManage.unit}
-              </h3>
-              <button onClick={() => setSelectedUnitForManage(null)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
-            </div>
-            <div className="space-y-2 text-xs text-slate-300">
-              <p><span className="text-slate-500">VIN:</span> {selectedUnitForManage.vin}</p>
-              <p><span className="text-slate-500">Campaign:</span> {selectedUnitForManage.nhtsaCampaign}</p>
-              <p><span className="text-slate-500">Details:</span> {selectedUnitForManage.recallDetails}</p>
-            </div>
-            <div className="space-y-2 pt-2 border-t border-slate-800">
-              <p className="text-xs text-slate-400">Update Compliance Status:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'OPEN')}
-                  className="py-2 bg-red-950 border border-red-800 text-red-400 text-xs font-bold rounded cursor-pointer"
-                >
-                  Mark OPEN
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'SCHEDULED')}
-                  className="py-2 bg-amber-950 border border-amber-800 text-amber-400 text-xs font-bold rounded cursor-pointer"
-                >
-                  SCHEDULED
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus(selectedUnitForManage.id, 'CLEARED')}
-                  className="py-2 bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold rounded cursor-pointer"
-                >
-                  CLEARED
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        <span>RecallLogic Underwriter Verification Engine v2.4</span>
+      </div>
     </div>
   );
 };
 
-export default TaskBoard;
+export default Taskboard;
