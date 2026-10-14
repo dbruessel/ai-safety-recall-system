@@ -204,7 +204,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {
               campaign_number: "23V-891 (1FUJGLDR5MLKE1234)",
               component: "STEERING AXLE DRAG LINK",
-              summary: "Drag link taper joint may separate leading to sudden loss of steering control. \$250,000 punitive exposure detected."
+              summary: "Drag link taper joint may separate leading to sudden loss of steering control. $250,000 punitive exposure detected."
             }
           ],
           status_label: "CRITICAL RISK • 1 NUCLEAR RECALL DETECTED",
@@ -735,49 +735,114 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* BROKER PARTNER MODAL */}
+      {/* BROKER PARTNER REQUEST ACCESS MODAL */}
       {isBrokerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#0D1322] border border-cyan-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono relative">
+            
+            {/* HEADER BAR */}
+            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Request Agency Partner Access</h3>
-                <p className="text-[11px] text-cyan-400 mt-0.5">Get a custom co-branded portal &amp; loss-control suite for your agency.</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-cyan-950 text-cyan-400 border border-cyan-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                    AGENCY DISTRIBUTION PARTNER
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Request Co-Branded Agency Portal
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  Protect portfolio loss ratios, prevent \$250k punitive claim spikes, and unlock 12–15% renewal credits across your commercial accounts[cite: 1].
+                </p>
               </div>
-              <button type="button" onClick={() => setIsBrokerModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
+              <button
+                type="button"
+                onClick={() => setIsBrokerModalOpen(false)}
+                className="text-slate-400 hover:text-white transition cursor-pointer text-sm p-1"
+              >
+                ✕
+              </button>
             </div>
 
             {brokerLeadSuccess ? (
               <div className="py-6 text-center space-y-3">
-                <h4 className="text-sm font-bold text-white">Partner Access Requested!</h4>
-                <p className="text-xs text-slate-400">Our partnership team will configure your agency portal and email <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.</p>
-                <button type="button" onClick={() => setIsBrokerModalOpen(false)} className="px-6 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded-lg mt-2">Close</button>
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto text-xl">
+                  ✓
+                </div>
+                <h4 className="text-sm font-bold text-white">Agency Access Requested!</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Our partnership team is configuring your agency's co-branded loss-control portal. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsBrokerModalOpen(false)}
+                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer mt-2"
+                >
+                  Close Window
+                </button>
               </div>
             ) : (
               <form onSubmit={handleBrokerLeadSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Work Email</label>
-                  <input type="email" required value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="broker@agency.com" />
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">Work Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={brokerEmail}
+                    onChange={(e) => setBrokerEmail(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
+                    placeholder="broker@agency.com"
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Brokerage / Agency Name</label>
-                  <input type="text" required value={brokerageName} onChange={(e) => setBrokerageName(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="e.g. Apex Risk Advisors" />
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">Brokerage / Agency Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={brokerageName}
+                    onChange={(e) => setBrokerageName(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
+                    placeholder="e.g. Apex Risk Advisors"
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Commercial Fleet Book Size</label>
-                  <select value={portfolioSize} onChange={(e) => setPortfolioSize(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]">
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">Commercial Fleet Book Size</label>
+                  <select
+                    value={portfolioSize}
+                    onChange={(e) => setPortfolioSize(e.target.value)}
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
+                  >
                     <option value="1-10">1 – 10 Commercial Accounts</option>
                     <option value="10-50">10 – 50 Commercial Accounts</option>
                     <option value="50-200">50 – 200 Commercial Accounts</option>
                     <option value="200+">200+ Accounts (Enterprise Agency)</option>
                   </select>
                 </div>
-                {brokerLeadError && <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">{brokerLeadError}</div>}
-                <button type="submit" disabled={isSubmittingBrokerLead} className="w-full py-2.5 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg font-mono">
-                  {isSubmittingBrokerLead ? 'Submitting...' : 'Request Agency Workspace →'}
-                </button>
+
+                {brokerLeadError && (
+                  <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
+                    {brokerLeadError}
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBrokerLead}
+                    className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer font-mono shadow-lg shadow-cyan-950"
+                  >
+                    {isSubmittingBrokerLead ? 'Configuring Agency Suite...' : 'Request Agency Portal & Demo Portfolio →'}
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-slate-500 text-center font-mono pt-1">
+                  Includes free portfolio risk benchmark audit for up to 50 accounts.
+                </p>
               </form>
             )}
+
           </div>
         </div>
       )}
