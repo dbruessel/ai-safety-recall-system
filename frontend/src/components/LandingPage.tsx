@@ -61,6 +61,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [authError, setAuthError] = useState<string>('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
+  // AUDIENCE PERSONA TOGGLE STATE ('broker' | 'fleet')
+  const [activePersona, setActivePersona] = useState<'broker' | 'fleet'>('broker');
+
   // DUAL-MODE VIN SCANNER STATE
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
   const [pastedText, setPastedText] = useState<string>('');
@@ -193,6 +196,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setIsAuditing(true);
     setAuditResult(null);
 
+    // DEMO FALLBACK: Guaranteed nuclear recall flag for sample demo VIN
     if (uniqueVins.includes("1FUJGLDR5MLKE1234")) {
       setTimeout(() => {
         setAuditResult({
@@ -430,7 +434,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             The Automated Loss Control Engine for Fleet Asset Risk
           </h1>
           <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed font-sans">
-            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line[cite: 1].
+            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line.
           </p>
         </div>
 
@@ -586,8 +590,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                   <div className="mt-4 pt-4 border-t border-red-900/60 flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
                     <div>
-                      <p className="text-xs font-bold text-white">Shield Punitive Risk &amp; Unlock 12–15% Premium Credit[cite: 1]</p>
-                      <p className="text-[11px] text-slate-400">Automate two-way Fleetio work orders to clear this recall and generate certified loss-control proof[cite: 1].</p>
+                      <p className="text-xs font-bold text-white">Shield Punitive Risk &amp; Unlock 12–15% Premium Credit</p>
+                      <p className="text-[11px] text-slate-400">Automate two-way Fleetio work orders to clear this recall and generate certified loss-control proof.</p>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
@@ -620,11 +624,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-emerald-300">
-                    Zero active safety recalls detected across audited units. Your fleet qualifies for Preferred Risk pricing[cite: 1].
+                    Zero active safety recalls detected across audited units. Your fleet qualifies for Preferred Risk pricing.
                   </p>
 
                   <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-2 bg-slate-950/80 p-3 rounded-xl border border-emerald-900/50">
-                    <span className="text-slate-300 text-xs font-bold">Lock in your 12–15% Underwriter Rate Credit[cite: 1]</span>
+                    <span className="text-slate-300 text-xs font-bold">Lock in your 12–15% Underwriter Rate Credit</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -687,114 +691,154 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <ul className="space-y-2 text-xs text-slate-200 font-mono">
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400">✓</span>
-                  <span><strong>Core Focus:</strong> OEM safety recalls, "Do Not Drive" notices, fire risks, mechanical defects[cite: 1].</span>
+                  <span><strong>Core Focus:</strong> OEM safety recalls, "Do Not Drive" notices, fire risks, mechanical defects.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400">✓</span>
-                  <span><strong>Legal Defense:</strong> Eliminates Negligent Maintenance &amp; \$250k punitive damages[cite: 1].</span>
+                  <span><strong>Legal Defense:</strong> Eliminates Negligent Maintenance &amp; \$250k punitive damages.</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-8 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center font-mono text-xs text-slate-300">
-            <strong>The Foundation:</strong> Both pillars connect directly to your system of record, like <strong className="text-cyan-400">Fleetio</strong>, to automatically trigger work orders, verify repairs, and generate clean loss control certificates for your insurance broker[cite: 1].
+          <div className="mt-8 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center font-mono text-xs text-slate-300 flex items-center justify-center gap-2">
+            <span className="text-cyan-400">⚡</span>
+            <span><strong>System of Record Integration:</strong> RecallLogic connects directly to <strong className="text-cyan-400">Fleetio</strong> to automatically trigger work orders, verify repairs, and generate clean loss control certificates for your insurance broker.</span>
           </div>
         </div>
       </section>
 
-      {/* SECTION 3: AUDIENCE-SPECIFIC VALUE PROPOSITIONS */}
-      <section className="py-12 bg-[#0B0F17]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-12">
-          {/* FOR BROKERS */}
-          <div className="grid md:grid-cols-12 gap-6 items-center">
-            <div className="md:col-span-5 space-y-3">
-              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest">FOR BROKERS &amp; UNDERWRITERS</span>
-              <h2 className="text-2xl font-bold text-white font-mono">Secure Your Book. Defend Against Nuclear Verdicts.</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Stop underwriting blind to mechanical risk[cite: 1]. Plaintiffs' attorneys actively seek out unrepaired vehicle safety recalls to claim "gross negligence" and secure punitive damages post-crash[cite: 1].
-              </p>
-            </div>
-            <div className="md:col-span-7 grid sm:grid-cols-3 gap-3 font-mono text-xs">
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Pre-Bind Risk Audits</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">Run prospective fleet VIN schedules through our engine to identify active fire, steering, and brake defects before binding[cite: 1].</p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Verified Certificates</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">Receive automated, time-stamped proof of remediation to justify premium credits and secure optimal renewal rates[cite: 1].</p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Continuous Surveillance</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">Monitor your entire book of business for new NHTSA/OEM defect bulletins in real-time[cite: 1].</p>
-              </div>
+      {/* SECTION 3: INTERACTIVE PERSONA TOGGLE TABS */}
+      <section className="py-14 bg-[#0B0F17]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+          <div className="text-center space-y-3">
+            <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">TAILORED SOLUTIONS</span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white font-mono">Built for Brokers, Underwriters &amp; Fleet Owners</h2>
+            
+            {/* SEGMENTED TOGGLE TAB */}
+            <div className="inline-flex p-1 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs mt-2">
+              <button
+                type="button"
+                onClick={() => setActivePersona('broker')}
+                className={`px-5 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePersona === 'broker' 
+                    ? 'bg-[#06B6D4] text-slate-950 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🛡️ For Brokers &amp; Underwriters
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePersona('fleet')}
+                className={`px-5 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                  activePersona === 'fleet' 
+                    ? 'bg-[#06B6D4] text-slate-950 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🚛 For Fleets &amp; Operations
+              </button>
             </div>
           </div>
 
-          <hr className="border-slate-800" />
+          {/* PERSONA CONTENT DISPLAY */}
+          {activePersona === 'broker' ? (
+            <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+              <div className="max-w-2xl space-y-2">
+                <h3 className="text-xl font-bold text-white font-mono">Secure Your Book. Defend Against Nuclear Verdicts.</h3>
+                <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                  Stop underwriting blind to mechanical risk. Plaintiffs' attorneys actively seek out unrepaired vehicle safety recalls to claim "gross negligence" and secure punitive damages post-crash.
+                </p>
+              </div>
 
-          {/* FOR FLEET OWNERS */}
-          <div className="grid md:grid-cols-12 gap-6 items-center">
-            <div className="md:col-span-5 space-y-3">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">FOR FLEETS &amp; OPERATIONS</span>
-              <h2 className="text-2xl font-bold text-white font-mono">Turn Compliance into an Underwriting Advantage</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Don't let a buried manufacturer notice ground your fleet or void your insurance coverage[cite: 1]. RecallLogic automates the busywork of recall management[cite: 1].
-              </p>
-            </div>
-            <div className="md:col-span-7 grid sm:grid-cols-3 gap-3 font-mono text-xs">
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Zero Data Friction</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">No heavy hardware or driver surveillance required[cite: 1]. Just sync your VIN list and we do the rest[cite: 1].</p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Fleetio Integration</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">We inject open recalls directly into your Fleetio dashboard, turning alerts into actionable work orders[cite: 1].</p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                <h3 className="font-bold text-white">Lower Insurance Costs</h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">Use Verified Remediation Certificates to prove proactive safety and unlock loss-control premium credits[cite: 1].</p>
+              <div className="grid md:grid-cols-3 gap-4 font-mono text-xs">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-sm">🔍</div>
+                  <h4 className="font-bold text-white">Pre-Bind Risk Audits</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Run prospective fleet VIN schedules through our engine to identify active fire, steering, and brake defects before binding a policy.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">📜</div>
+                  <h4 className="font-bold text-white">Verified Certificates</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Receive automated, time-stamped proof of remediation to justify premium credits and secure optimal renewal rates.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">📡</div>
+                  <h4 className="font-bold text-white">Continuous Surveillance</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Monitor your entire book of business for new NHTSA/OEM defect bulletins in real-time across all client accounts.</p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+              <div className="max-w-2xl space-y-2">
+                <h3 className="text-xl font-bold text-white font-mono">Turn Compliance into an Underwriting Advantage</h3>
+                <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                  Don't let a buried manufacturer notice ground your fleet or void your insurance coverage. RecallLogic automates the busywork of recall management.
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4 font-mono text-xs">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">⚡</div>
+                  <h4 className="font-bold text-white">Zero Data Friction</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">No heavy hardware or driver surveillance required. Just sync your VIN list and we do the rest automatically.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">🔌</div>
+                  <h4 className="font-bold text-white">Fleetio Integration</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">We automatically inject open recalls directly into your Fleetio dashboard, turning safety alerts into actionable work orders.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">💵</div>
+                  <h4 className="font-bold text-white">Lower Insurance Costs</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Use Verified Remediation Certificates to prove your proactive safety culture to your broker, unlocking loss-control credits at renewal.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* SECTION 4: HOW IT WORKS INTEGRATION LOOP */}
-      <section className="py-12 bg-slate-950/60 border-t border-slate-800/80">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
+      {/* SECTION 4: VISUAL CLOSED-LOOP WORKFLOW DIAGRAM */}
+      <section className="py-14 bg-slate-950/80 border-t border-slate-800/80">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">FRICTIONLESS WORKFLOW</span>
-            <h2 className="text-2xl font-bold text-white font-mono">The Closed-Loop Remediation Sequence</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white font-mono">The Closed-Loop Remediation Sequence</h2>
           </div>
 
-          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-              <span className="text-cyan-400 font-bold">STEP 1: DETECT</span>
-              <h3 className="font-bold text-white">Continuous Sync</h3>
-              <p className="text-slate-400 text-[11px]">Syncs with Fleetio and monitors VINs against NHTSA, CPSC, and OEM defect databases[cite: 1].</p>
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs relative">
+            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
+              <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-bold">STEP 1</span>
+              <h3 className="font-bold text-white text-sm pt-1">Detect &amp; Sync</h3>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Syncs with Fleetio and continuously scans VINs against NHTSA, CPSC, and OEM defect databases.</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-              <span className="text-amber-400 font-bold">STEP 2: TRIAGE</span>
-              <h3 className="font-bold text-white">Automated Alerting</h3>
-              <p className="text-slate-400 text-[11px]">Instantly flags high-severity defects and creates actionable work orders in Fleetio[cite: 1].</p>
+
+            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
+              <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">STEP 2</span>
+              <h3 className="font-bold text-white text-sm pt-1">Triage &amp; Alert</h3>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Instantly flags high-severity defects and pushes priority repair tickets into Fleetio work orders.</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-              <span className="text-cyan-400 font-bold">STEP 3: REMEDIATE</span>
-              <h3 className="font-bold text-white">Shop Completion</h3>
-              <p className="text-slate-400 text-[11px]">Maintenance teams complete repairs at authorized dealers inside standard work order flows[cite: 1].</p>
+
+            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
+              <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-bold">STEP 3</span>
+              <h3 className="font-bold text-white text-sm pt-1">Shop Remediation</h3>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Maintenance teams complete repairs at authorized dealers inside standard Fleetio repair flows.</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-              <span className="text-emerald-400 font-bold">STEP 4: CERTIFY</span>
-              <h3 className="font-bold text-white">Underwriter Defense</h3>
-              <p className="text-slate-400 text-[11px]">Ingests closed work orders and archives Verified Loss Control Certificates for brokers[cite: 1].</p>
+
+            <div className="p-5 rounded-xl bg-slate-900/80 border border-emerald-800/80 bg-emerald-950/10 space-y-2 shadow-lg relative">
+              <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold">STEP 4</span>
+              <h3 className="font-bold text-white text-sm pt-1">Certify &amp; Defend</h3>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Ingests closed work orders and archives Verified Loss Control Certificates for underwriter renewal.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* PRICING GRID */}
-      <section id="pricing" className="relative z-10 py-12 bg-slate-950/80 border-t border-slate-800/80">
+      <section id="pricing" className="relative z-10 py-12 bg-slate-950 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
             <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Transparent Subscription Plans</h2>
@@ -840,7 +884,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* SECTION 5: TRUST BANNER / FOOTER TAGLINE */}
+      {/* TRUST BANNER / FOOTER TAGLINE */}
       <section className="py-10 bg-[#070B14] border-t border-slate-800 text-center px-4">
         <blockquote className="max-w-4xl mx-auto font-mono text-xs sm:text-sm text-cyan-300/90 leading-relaxed">
           "You manage your drivers with telematics. You manage your maintenance with Fleetio. You secure your mechanical liability with RecallLogic."
@@ -862,7 +906,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Request Co-Branded Agency Portal
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Protect portfolio loss ratios, prevent \$250k punitive claim spikes, and unlock 12–15% renewal credits across your commercial accounts[cite: 1].
+                  Protect portfolio loss ratios, prevent \$250k punitive claim spikes, and unlock 12–15% renewal credits across your commercial accounts.
                 </p>
               </div>
               <button
@@ -881,7 +925,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <h4 className="text-sm font-bold text-white">Agency Access Requested!</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Our partnership team is configuring your agency's co-branded loss-control portal[cite: 6]. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly[cite: 6].
+                  Our partnership team is configuring your agency's co-branded loss-control portal. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
                 </p>
                 <button
                   type="button"
