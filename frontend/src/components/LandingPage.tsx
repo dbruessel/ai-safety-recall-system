@@ -54,7 +54,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // AUTH MODAL STATES
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
-  const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('standard');
+  const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
@@ -197,7 +197,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     if (uniqueVins.includes("1FUJGLDR5MLKE1234")) {
       setTimeout(() => {
         setAuditResult({
-          vin: `3 Power Unit(s) Audited (KE1234, A54321, 987654)`,
+          vin: "3 Power Unit(s) Audited (KE1234, A54321, 987654)",
           has_open_recall: true,
           recall_count: 1,
           recalls: [
@@ -545,33 +545,98 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {scanError && <p className="text-red-400 text-xs font-mono">{scanError}</p>}
 
+          {/* AUDIT RESULT CARD WITH HIGH-CONVERTING CTA BAR */}
           {auditResult && (
-            <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
-              auditResult.has_open_recall ? 'bg-red-950/20 border-red-800/80 text-red-200' : 'bg-emerald-950/20 border-emerald-800/80 text-emerald-200'
+            <div className={`p-5 rounded-xl border text-xs font-mono space-y-4 shadow-2xl transition-all ${
+              auditResult.has_open_recall 
+                ? 'bg-red-950/30 border-red-600/80 text-red-200' 
+                : 'bg-emerald-950/30 border-emerald-600/80 text-emerald-200'
             }`}>
-              <div className="flex justify-between items-center font-bold">
-                <span>{auditResult.vin}</span>
-                <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[10px]">
+              <div className="flex justify-between items-center font-bold border-b border-slate-800/80 pb-3">
+                <span className="text-white text-sm">{auditResult.vin}</span>
+                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                  auditResult.has_open_recall
+                    ? 'bg-red-900/80 text-red-100 border border-red-500/50'
+                    : 'bg-emerald-900/80 text-emerald-100 border border-emerald-500/50'
+                }`}>
                   {auditResult.status_label}
                 </span>
               </div>
+
               {auditResult.has_open_recall ? (
-                <div className="space-y-2 pt-1">
-                  <p className="text-[11px] text-red-300">Found {auditResult.recall_count} active safety recall(s) creating uninsurable legal exposure:</p>
+                <div className="space-y-3">
+                  <p className="text-xs text-red-300 font-medium">
+                    ⚠️ Detected <strong className="text-white">{auditResult.recall_count} active safety recall(s)</strong> creating up to <strong className="text-red-400">\$250,000 in uninsurable punitive exposure</strong>:
+                  </p>
+
                   {auditResult.recalls.map((r, idx) => (
-                    <div key={idx} className="bg-slate-950 p-2.5 rounded-lg border border-red-900/50 text-slate-300">
-                      <strong className="text-white">Campaign #{r.campaign_number}</strong> — {r.component}
-                      <p className="text-slate-400 text-[11px] mt-1">{r.summary}</p>
+                    <div key={idx} className="bg-slate-950/90 p-3 rounded-lg border border-red-900/60 text-slate-300 space-y-1">
+                      <div className="font-bold text-red-300 flex items-center justify-between">
+                        <span>Campaign #{r.campaign_number}</span>
+                        <span className="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded border border-red-800">
+                          ACTION REQUIRED
+                        </span>
+                      </div>
+                      <div className="font-semibold text-white">{r.component}</div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">{r.summary}</p>
                     </div>
                   ))}
-                  <div className="mt-2 text-[10px] text-cyan-400 font-bold border-t border-slate-800 pt-2">
-                    💡 Connect Fleetio Work Orders to resolve open recalls and unlock 12–15% underwriter rate credits[cite: 1].
+
+                  {/* ACTION BAR TRIGGER */}
+                  <div className="mt-4 pt-4 border-t border-red-900/60 flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+                    <div>
+                      <p className="text-xs font-bold text-white">Shield Punitive Risk &amp; Unlock 12–15% Premium Credit[cite: 1]</p>
+                      <p className="text-[11px] text-slate-400">Automate two-way Fleetio work orders to clear this recall and generate certified loss-control proof[cite: 1].</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier('professional');
+                          setIsSignUp(true);
+                          setIsAuthModalOpen(true);
+                        }}
+                        className="flex-1 md:flex-none px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition shadow-lg shadow-cyan-950 flex items-center justify-center gap-1.5 font-mono cursor-pointer"
+                      >
+                        <span>🔌 Connect Fleetio to Fix</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier('professional');
+                          setIsSignUp(true);
+                          setIsAuthModalOpen(true);
+                        }}
+                        className="flex-1 md:flex-none px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 font-mono cursor-pointer"
+                      >
+                        <span>📄 Underwriter Cert</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-[11px] text-emerald-300">
-                  Zero active safety recalls detected. Fleet is in Preferred Risk Tier (Eligible for 15% rate credit)[cite: 1].
-                </p>
+                <div className="space-y-3">
+                  <p className="text-xs text-emerald-300">
+                    Zero active safety recalls detected across audited units. Your fleet qualifies for Preferred Risk pricing[cite: 1].
+                  </p>
+
+                  <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-2 bg-slate-950/80 p-3 rounded-xl border border-emerald-900/50">
+                    <span className="text-slate-300 text-xs font-bold">Lock in your 12–15% Underwriter Rate Credit[cite: 1]</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTier('professional');
+                        setIsSignUp(true);
+                        setIsAuthModalOpen(true);
+                      }}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono cursor-pointer w-full sm:w-auto"
+                    >
+                      Claim Rate Credit Certificate →
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -582,7 +647,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-3">
             <div>
               <p className="text-xs font-bold text-slate-200 font-mono">Commercial Auto Broker or Risk Manager?</p>
-              <p className="text-[11px] text-slate-400">Access co-branded portfolio safety scoring, generate Underwriter Loss Control Certificates, and protect book loss ratios.</p>
+              <p className="text-[11px] text-slate-400">Access co-branded portfolio safety scoring, generate Underwriter Loss Control Certificates, and protect book loss ratios[cite: 1].</p>
             </div>
           </div>
           <button 
@@ -601,7 +666,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
             <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase">Broker &amp; Agency Distribution Wedge</span>
             <h2 className="text-xl sm:text-2xl font-bold text-white font-mono">Co-Branded Loss Control Solutions</h2>
-            <p className="text-slate-400 text-xs">Drive client retention, optimize policy renewals, and eliminate uninsurable lawsuit penalties across your portfolio.</p>
+            <p className="text-slate-400 text-xs">Drive client retention, optimize policy renewals, and eliminate uninsurable lawsuit penalties across your portfolio[cite: 1].</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
