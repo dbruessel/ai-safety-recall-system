@@ -305,67 +305,67 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const activeBrokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
 
   // INSURTECH REPOSITIONED PRICING TIERS
-  const pricingTiers: PricingTier[] = [
-    {
-      id: 'standard',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
-      name: 'Standard',
-      subtitle: 'Operational Compliance Baseline',
-      price: '\$99',
-      billing: 'per month',
-      badge: 'COMPLIANCE SHIELD',
-      color: 'border-slate-800 bg-slate-900/50',
-      buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
-      features: [
-        'Up to 50 Vehicles Monitored',
-        'Continuous Active NHTSA & CPSC Ingestion',
-        'Remediation Taskboard Workspace',
-        'Punitive Exposure Threshold Alerts',
-        'Standard Recall Compliance Summaries'
-      ]
-    },
-    {
-      id: 'professional',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
-      name: 'Professional',
-      subtitle: 'Underwriter Loss-Control Engine',
-      price: '\$249',
-      billing: 'per month',
-      badge: 'RECOMMENDED FOR FLEETS',
-      popular: true,
-      color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
-      buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
-      features: [
-        'Everything in Standard, plus:',
-        'Up to 250 Monitored Power Units',
-        'Automated 2-Way Fleetio Fix-It Loop & Webhooks',
-        'Signed Underwriter Compliance Certificates (PDF)',
-        'Shareable Read-Only Underwriter Audit Links',
-        '12–15% Premium Credit Evidence Locker',
-        'Eliminates \$250k Punitive Lawsuit Exposure'
-      ]
-    },
-    {
-      id: 'enterprise',
-      stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
-      name: 'Enterprise',
-      subtitle: 'Agency Distribution License',
-      price: '\$499',
-      billing: 'per month',
-      badge: 'FOR BROKERS & AGENCIES',
-      color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
-      buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
-      features: [
-        'Everything in Professional, plus:',
-        'Unlimited Vehicles & Accounts (or \$1.50 / VIN)',
-        'Co-Branded Agency Broker Portal',
-        'Multi-Telematics Ingestion (Samsara, Geotab, Motive)',
-        'Actuarial Book-of-Business Safety Analytics',
-        'Custom Underwriter Carrier SLAs & QBRs',
-        'Dedicated Loss Control Advisor'
-      ]
-    }
-  ];
+ const pricingTiers: PricingTier[] = [
+  {
+    id: 'standard',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
+    name: 'Standard',
+    subtitle: 'Automated Compliance Baseline',
+    price: '$99',
+    billing: 'per month',
+    badge: 'COMPLIANCE SHIELD',
+    color: 'border-slate-800 bg-slate-900/50',
+    buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
+    features: [
+      'Up to 50 Monitored Power Units',
+      'Continuous Active NHTSA & OEM Hazard Ingestion',
+      'Automated Hazard Detection Alerts',
+      'Punitive Exposure Threshold Tracking ($250k Shield)',
+      'Standard Underwriter Audit Export'
+    ]
+  },
+  {
+    id: 'professional',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
+    name: 'Professional',
+    subtitle: 'Underwriter Loss-Control Engine',
+    price: '$249',
+    billing: 'per month',
+    badge: 'RECOMMENDED FOR FLEETS',
+    popular: true,
+    color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
+    buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
+    features: [
+      'Everything in Standard, plus:',
+      'Up to 250 Monitored Power Units',
+      'Automated 2-Way Fleetio Work Order Fix-It Loop',
+      'Signed Underwriter Compliance Certificates (PDF)',
+      'Shareable Read-Only Underwriter Audit Links',
+      '12–15% Premium Credit Evidence Locker',
+      'Eliminates $250k Punitive Lawsuit Exposure'
+    ]
+  },
+  {
+    id: 'enterprise',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
+    name: 'Enterprise',
+    subtitle: 'Agency Distribution License',
+    price: '$499',
+    billing: 'per month',
+    badge: 'FOR BROKERS & AGENCIES',
+    color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
+    buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
+    features: [
+      'Everything in Professional, plus:',
+      'Unlimited Vehicles & Accounts (or $1.50 / VIN)',
+      'Co-Branded Agency Broker Portal',
+      'Multi-Telematics Ingestion (Samsara, Geotab, Motive)',
+      'Actuarial Book-of-Business Safety Analytics',
+      'Custom Underwriter Carrier SLAs & QBRs',
+      'Dedicated Loss Control Advisor'
+    ]
+  }
+];
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black overflow-x-hidden relative">
