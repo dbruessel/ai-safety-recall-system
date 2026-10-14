@@ -424,20 +424,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
-          {/* ECOSYSTEM BADGES WITH NEON STATUS DOTS */}
-          <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-400">
-            <span className="text-slate-500 font-bold uppercase text-[10px]">Connected Feeds:</span>
-            <span className="bg-slate-900 border border-cyan-800/80 text-cyan-300 px-2 py-0.5 rounded flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span> Fleetio
+          {/* ECOSYSTEM BADGES WITH LAUNCH STATUS FLAGS */}
+          <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-400 flex-wrap">
+            <span className="text-slate-500 font-bold uppercase text-[10px]">Connected Systems:</span>
+            
+            <span className="bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-sm shadow-cyan-950 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              Fleetio <span className="text-[9px] bg-cyan-900/80 text-cyan-200 px-1 rounded uppercase">LIVE</span>
             </span>
-            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Samsara
+
+            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
+              Samsara <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
             </span>
-            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Geotab
+
+            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
+              Geotab <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
             </span>
-            <span className="bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Motive
+
+            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
+              Motive <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
             </span>
           </div>
 
