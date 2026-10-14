@@ -304,63 +304,64 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const activeBrokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
 
+  // INSURTECH REPOSITIONED PRICING TIERS
   const pricingTiers: PricingTier[] = [
     {
       id: 'standard',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
       name: 'Standard',
-      subtitle: 'Fleet Loss Control Baseline',
+      subtitle: 'Operational Compliance Baseline',
       price: '\$99',
       billing: 'per month',
-      badge: 'ESSENTIAL SHIELD',
+      badge: 'COMPLIANCE SHIELD',
       color: 'border-slate-800 bg-slate-900/50',
       buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
       features: [
         'Up to 50 Vehicles Monitored',
-        'Continuous NHTSA Recall Ingestion',
+        'Continuous Active NHTSA & CPSC Ingestion',
         'Remediation Taskboard Workspace',
         'Punitive Exposure Threshold Alerts',
-        'Standard Underwriter Compliance Export'
+        'Standard Recall Compliance Summaries'
       ]
     },
     {
       id: 'professional',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
       name: 'Professional',
-      subtitle: 'Underwriter & Risk Intelligence',
+      subtitle: 'Underwriter Loss-Control Engine',
       price: '\$249',
       billing: 'per month',
-      badge: 'MOST POPULAR',
+      badge: 'RECOMMENDED FOR FLEETS',
       popular: true,
       color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
       buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
       features: [
         'Everything in Standard, plus:',
-        'Up to 250 Monitored VINs',
-        'Automated Fleetio & Telematics Webhook Sync',
-        'Two-Way Fleetio Work Order Fix-It Loop',
+        'Up to 250 Monitored Power Units',
+        'Automated 2-Way Fleetio Fix-It Loop & Webhooks',
         'Signed Underwriter Compliance Certificates (PDF)',
-        'Shareable Broker Audit Links',
-        '12–15% Premium Credit Evidence Locker'
+        'Shareable Read-Only Underwriter Audit Links',
+        '12–15% Premium Credit Evidence Locker',
+        'Eliminates \$250k Punitive Lawsuit Exposure'
       ]
     },
     {
       id: 'enterprise',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
       name: 'Enterprise',
-      subtitle: 'Multi-Fleet Broker Command',
+      subtitle: 'Agency Distribution License',
       price: '\$499',
       billing: 'per month',
-      badge: 'TOTAL AUTOMATION',
+      badge: 'FOR BROKERS & AGENCIES',
       color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
       buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
       features: [
         'Everything in Professional, plus:',
-        'Unlimited Monitored Vehicles',
-        'Co-Branded Broker Command Center',
-        'Samsara, Geotab & Motive ELD Ingestion',
-        'Actuarial Book Safety Score Analytics',
-        'Custom Carrier Underwriter SLAs',
+        'Unlimited Vehicles & Accounts (or \$1.50 / VIN)',
+        'Co-Branded Agency Broker Portal',
+        'Multi-Telematics Ingestion (Samsara, Geotab, Motive)',
+        'Actuarial Book-of-Business Safety Analytics',
+        'Custom Underwriter Carrier SLAs & QBRs',
         'Dedicated Loss Control Advisor'
       ]
     }
@@ -688,7 +689,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* PRICING GRID */}
+      {/* REPOSITIONED PRICING GRID */}
       <section id="pricing" className="relative z-10 py-8 bg-slate-950/80 border-t border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-6 space-y-1">
@@ -771,7 +772,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <h4 className="text-sm font-bold text-white">Agency Access Requested!</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Our partnership team is configuring your agency's co-branded loss-control portal. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
+                  Our partnership team is configuring your agency's co-branded loss-control portal[cite: 6]. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly[cite: 6].
                 </p>
                 <button
                   type="button"
