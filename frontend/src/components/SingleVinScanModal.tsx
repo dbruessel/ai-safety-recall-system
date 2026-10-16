@@ -111,7 +111,7 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
           },
         ]);
 
-      // 3. Fallback to "monitored_vehicles" if fleet_assets fails or isn't targeted
+      // 3. Fallback to "monitored_vehicles" if fleet_assets fails
       if (insertError) {
         console.warn('fleet_assets insert failed, falling back to monitored_vehicles:', insertError);
         
@@ -148,7 +148,7 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
           onSuccess(newAsset);
         }
         onClose();
-      }, 1000);
+      }, 800);
 
     } catch (err: any) {
       console.error('Database save error:', err);
