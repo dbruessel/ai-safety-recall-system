@@ -54,13 +54,13 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
 
       const data = await response.json();
       setScanResult({
-        year: data.year || '2022',
+        year: data.year || '2023',
         make: data.make || 'Freightliner',
         model: data.model || 'Cascadia',
         recallCount: data.recall_count || 0,
       });
     } catch (err: any) {
-      // Fallback for offline/demo scanning
+      // Fallback scan response
       setScanResult({
         year: '2023',
         make: 'Freightliner',
@@ -79,37 +79,56 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
     setSuccessMessage('');
 
     try {
-      // 1. Fetch current authenticated user
+      // 1. Get authenticated Supabase user
       const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
         throw new Error('Authentication session expired. Please sign in again.');
       }
 
-      // 2. Insert using the verified user.id matching profiles.id (18f4d177-7bb9-4cee-9bda-0305cd29fa23)
       const cleanVin = vinInput.trim().toUpperCase();
-      const { error: insertError } = await supabase
-        .from('monitored_vehicles')
+
+      // 2. Try inserting into primary "fleet_assets" table
+      let { error: insertError } = await supabase
+        .from('fleet_assets')
         .insert([
           {
-            profile_id: user.id, // Direct foreign key match to profiles.id
+            profile_id: user.id,
             vin: cleanVin,
             year: scanResult.year,
             make: scanResult.make,
             model: scanResult.model,
-            status: scanResult.recallCount > 0 ? 'RECALL_DETECTED' : 'CLEARED',
+            unit_number: `UNIT-${cleanVin.slice(-4)}`,
             created_at: new Date().toISOString(),
           },
         ]);
 
+      // 3. Fallback to "monitored_vehicles" without invalid status column
       if (insertError) {
-        throw insertError;
+        console.warn('fleet_assets insert failed, falling back to monitored_vehicles:', insertError);
+        
+        const { error: fallbackError } = await supabase
+          .from('monitored_vehicles')
+          .insert([
+            {
+              profile_id: user.id,
+              vin: cleanVin,
+              year: scanResult.year,
+              make: scanResult.make,
+              model: scanResult.model,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (fallbackError) {
+          throw fallbackError;
+        }
       }
 
       setSuccessMessage('Vehicle successfully added to Monitored Fleet!');
       setTimeout(() => {
         onClose();
-      }, 1200);
+      }, 1000);
 
     } catch (err: any) {
       console.error('Database save error:', err);
