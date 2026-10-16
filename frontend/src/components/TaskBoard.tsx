@@ -395,15 +395,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
       {isSingleScanOpen && (
         <SingleVinScanModal
-          {...({
-            isOpen: isSingleScanOpen,
-            onClose: () => setIsSingleScanOpen(false),
-            currentFleetCount: currentVinCount,
-            vehicleLimit: maxVinCapacity,
-            onSuccess: () => setIsSingleScanOpen(false),
-            onTriggerUpgrade: () => setIsUpgradeModalOpen(true),
-            onIncrementVinChecks: () => {},
-          } as any)}
+          isOpen={isSingleScanOpen}
+          onClose={() => setIsSingleScanOpen(false)}
         />
       )}
 
