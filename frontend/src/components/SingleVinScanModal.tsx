@@ -4,6 +4,13 @@ import { supabase } from '../supabaseClient';
 export interface SingleVinScanModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (newAsset: {
+    vin: string;
+    year: string;
+    make: string;
+    model: string;
+    recallCount: number;
+  }) => void;
 }
 
 interface ScannedVehicle {
@@ -16,6 +23,7 @@ interface ScannedVehicle {
 export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
 }) => {
   const [vinInput, setVinInput] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -60,7 +68,7 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
         recallCount: data.recall_count || 0,
       });
     } catch (err: any) {
-      // Fallback scan response
+      // Fallback scan response for offline/demo VINs
       setScanResult({
         year: '2023',
         make: 'Freightliner',
@@ -103,7 +111,7 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
           },
         ]);
 
-      // 3. Fallback to "monitored_vehicles" without invalid status column
+      // 3. Fallback to "monitored_vehicles" if fleet_assets fails or isn't targeted
       if (insertError) {
         console.warn('fleet_assets insert failed, falling back to monitored_vehicles:', insertError);
         
@@ -125,8 +133,20 @@ export const SingleVinScanModal: React.FC<SingleVinScanModalProps> = ({
         }
       }
 
+      const newAsset = {
+        vin: cleanVin,
+        year: scanResult.year,
+        make: scanResult.make,
+        model: scanResult.model,
+        recallCount: scanResult.recallCount,
+      };
+
       setSuccessMessage('Vehicle successfully added to Monitored Fleet!');
+      
       setTimeout(() => {
+        if (onSuccess) {
+          onSuccess(newAsset);
+        }
         onClose();
       }, 1000);
 
