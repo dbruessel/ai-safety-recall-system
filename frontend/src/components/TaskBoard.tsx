@@ -40,7 +40,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'SCHEDULED' | 'CLEARED'>('ALL');
 
   // MOCK FLEET DATA (Default Baseline)
-  const [tasks] = useState<FleetTask[]>([
+  const [tasks, setTasks] = useState<FleetTask[]>([
     {
       id: 'task-1',
       unit_number: 'UNIT-101',
@@ -384,7 +384,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         </div>
       </main>
 
-      {/* RESTORED MODAL COMPONENTS */}
+      {/* RESTORED MODAL COMPONENTS WITH DYNAMIC STATE CALLBACKS */}
       {isBulkImportOpen && (
         <BulkCsvImportModal
           isOpen={isBulkImportOpen}
@@ -397,6 +397,32 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         <SingleVinScanModal
           isOpen={isSingleScanOpen}
           onClose={() => setIsSingleScanOpen(false)}
+          onSuccess={(newAsset) => {
+            if (newAsset) {
+              setTasks((prev) => [
+                ...prev,
+                {
+                  id: `task-${Date.now()}`,
+                  unit_number: `UNIT-${newAsset.vin.slice(-4)}`,
+                  vin: newAsset.vin,
+                  make_model: `${newAsset.year} ${newAsset.make} ${newAsset.model}`.toUpperCase(),
+                  campaign_number:
+                    newAsset.recallCount > 0
+                      ? '23V-891 — STEERING AXLE DRAG LINK'
+                      : 'NHTSA MONITORED • ZERO OPEN RECALLS',
+                  component:
+                    newAsset.recallCount > 0
+                      ? 'NHTSA Priority Safety Campaign • Action Required'
+                      : 'Continuous Safety Ingestion Active',
+                  severity: newAsset.recallCount > 0 ? 'NUCLEAR' : 'LOW',
+                  ecosystem_feeds: ['RECALLLOGIC'],
+                  remedy_logistics: 'Active Monitoring Ingested',
+                  compliance_status: newAsset.recallCount > 0 ? 'OPEN' : 'CLEARED',
+                },
+              ]);
+            }
+            setIsSingleScanOpen(false);
+          }}
         />
       )}
 
