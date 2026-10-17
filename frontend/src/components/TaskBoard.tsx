@@ -252,7 +252,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             <div className="space-y-1 flex-1">
               <div className="flex items-center justify-between gap-3 font-bold">
                 <span className="text-white">Monitored Fleet Capacity</span>
-                <span className="text-cyan-400">
+                <span className={currentVinCount >= maxVinCapacity ? "text-red-400" : "text-cyan-400"}>
                   {currentVinCount} / {maxVinCapacity} Units ({userTier.toUpperCase()})
                 </span>
               </div>
@@ -272,7 +272,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
             <button
               type="button"
-              onClick={() => setIsSingleScanOpen(true)}
+              onClick={() => {
+                if (currentVinCount >= maxVinCapacity) {
+                  setIsUpgradeModalOpen(true);
+                } else {
+                  setIsSingleScanOpen(true);
+                }
+              }}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold rounded-lg transition font-mono cursor-pointer"
             >
               + Single VIN Scan
@@ -430,13 +436,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         </div>
       </main>
 
-      {/* RESTORED MODAL COMPONENTS WITH DYNAMIC RELOAD CALLBACKS */}
+      {/* RESTORED MODAL COMPONENTS WITH STRICT TIER ENFORCEMENT */}
       {isBulkImportOpen && (
         <BulkCsvImportModal
           isOpen={isBulkImportOpen}
           onClose={() => setIsBulkImportOpen(false)}
+          currentFleetCount={currentVinCount}
+          maxCapacity={maxVinCapacity}
+          onUpgradeTrigger={() => {
+            setIsBulkImportOpen(false);
+            setIsUpgradeModalOpen(true);
+          }}
           onSuccess={() => {
-            loadMonitoredVehicles(); // INSTANT AUTOMATIC RELOAD OF CAPACITY & TABLE
+            loadMonitoredVehicles();
             setIsBulkImportOpen(false);
           }}
         />
@@ -447,7 +459,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           isOpen={isSingleScanOpen}
           onClose={() => setIsSingleScanOpen(false)}
           onSuccess={() => {
-            loadMonitoredVehicles(); // INSTANT AUTOMATIC RELOAD OF CAPACITY & TABLE
+            loadMonitoredVehicles();
             setIsSingleScanOpen(false);
           }}
         />
