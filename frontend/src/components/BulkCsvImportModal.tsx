@@ -51,14 +51,13 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
     const foundVins = extractVinsFromText(rawDataToParse);
 
     if (foundVins.length === 0) {
-      setError('No valid 17-character VINs detected. Please check formatting.');
+      setError('No valid 17-character VINs detected. (Note: Valid VINs cannot contain the letters I, O, or Q).');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // 1. Get active user session
       const {
         data: { user },
         error: authError,
@@ -68,25 +67,21 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
         throw new Error('User session expired. Please sign in again.');
       }
 
-      // 2. Fetch existing VINs for this user profile to prevent duplicate key errors
       const { data: existingRecords } = await supabase
         .from('monitored_vehicles')
         .select('vin')
         .eq('profile_id', user.id);
 
       const existingVinSet = new Set((existingRecords || []).map((r) => r.vin));
-      
-      // Filter out VINs that are already registered under this user account
       const uniqueNewVins = foundVins.filter((vin) => !existingVinSet.has(vin));
 
       if (uniqueNewVins.length === 0) {
-        setSuccessMessage(`All ${foundVins.length} VIN(s) in this file are already monitored in your fleet.`);
+        setSuccessMessage(`All ${foundVins.length} VIN(s) in this list are already monitored in your fleet.`);
         setIsProcessing(false);
         setTimeout(() => onClose(), 1500);
         return;
       }
 
-      // 3. Prepare payload for new unique VINs
       const rowsToInsert = uniqueNewVins.map((vin) => ({
         profile_id: user.id,
         vin: vin,
@@ -97,7 +92,6 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
         created_at: new Date().toISOString(),
       }));
 
-      // 4. Try inserting into fleet_assets with UPSERT on duplicate conflict
       let { error: insertError } = await supabase
         .from('fleet_assets')
         .upsert(rowsToInsert, { onConflict: 'profile_id, vin', ignoreDuplicates: true });
@@ -130,7 +124,7 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
       setTimeout(() => {
         if (onSuccess) onSuccess(uniqueNewVins.length);
         onClose();
-      }, 1000);
+      }, 1200);
 
     } catch (err: any) {
       console.error('Bulk ingestion error:', err);
@@ -250,8 +244,8 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
           )}
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-950/40 border border-red-800/80 text-red-300 text-xs">
-              {error}
+            <div className="p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs leading-relaxed flex items-center justify-between gap-2">
+              <span>⚠️ {error}</span>
             </div>
           )}
 
