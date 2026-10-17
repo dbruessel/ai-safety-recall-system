@@ -51,13 +51,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [brokerLeadSuccess, setBrokerLeadSuccess] = useState<boolean>(false);
   const [brokerLeadError, setBrokerLeadError] = useState<string>('');
 
-  // AUTH MODAL STATES
+  // AUTH / CERTIFICATE MODAL STATES
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
   const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
+  const [selectedFeed, setSelectedFeed] = useState<string>('fleetio');
   const [authError, setAuthError] = useState<string>('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
@@ -121,61 +120,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setIsSubmittingAuth(true);
 
     try {
-      if (isSignUp) {
-        const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
-        const referredBrokerId = sessionStorage.getItem('broker_id') || 'direct';
-        const referredBrokerName = sessionStorage.getItem('broker_name') || '';
+      const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-        const { data, error } = await supabase.auth.signUp({
+      // Save lead / prospect record directly to Supabase leads table
+      await supabase.from('leads').insert([
+        {
           email: email.trim(),
-          password: password,
-          options: {
-            data: {
-              company_name: finalCompanyName,
-              subscription_tier: selectedTier,
-              selected_tier: selectedTier,
-              broker_id: referredBrokerId,
-              referred_by_broker: referredBrokerId,
-              broker_name: referredBrokerName,
-            },
-          },
-        });
+          company_name: finalCompanyName,
+          selected_tier: selectedTier,
+          primary_feed: selectedFeed,
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
-        if (error) throw error;
+      setIsSubmittingAuth(false);
+      setIsAuthModalOpen(false);
 
-        if (data.user) {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            email: data.user.email,
-            company_name: finalCompanyName,
-            role: 'admin',
-          });
-        }
-
-        setIsAuthModalOpen(false);
-        await supabase.auth.signOut();
-
-        if (onSelectTier) {
-          onSelectTier(selectedTier, email.trim(), finalCompanyName);
-        } else {
-          onSignIn();
-        }
+      if (onSelectTier) {
+        onSelectTier(selectedTier, email.trim(), finalCompanyName);
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password,
-        });
-
-        if (error) throw error;
-
-        if (data.session) {
-          setIsAuthModalOpen(false);
-          onSignIn();
-        }
+        onSignIn();
       }
     } catch (err: any) {
-      setAuthError(err.message || 'An error occurred during authentication.');
-    } finally {
+      setAuthError(err.message || 'An error occurred during certificate generation.');
       setIsSubmittingAuth(false);
     }
   };
@@ -196,7 +163,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setIsAuditing(true);
     setAuditResult(null);
 
-    // DEMO FALLBACK: Guaranteed nuclear recall flag for sample demo VIN
     if (uniqueVins.includes("1FUJGLDR5MLKE1234")) {
       setTimeout(() => {
         setAuditResult({
@@ -300,12 +266,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const handleTierCheckout = async (tier: PricingTier) => {
     setSelectedTier(tier.id);
-    setIsSignUp(true);
     setAuthError('');
     setIsAuthModalOpen(true);
   };
-
-  const activeBrokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
 
   const pricingTiers: PricingTier[] = [
     {
@@ -414,7 +377,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setIsSignUp(false); setSelectedTier('standard'); setIsAuthModalOpen(true); }}
+              onClick={() => { setSelectedTier('standard'); setIsAuthModalOpen(true); }}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
               Sign In
@@ -599,7 +562,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedTier('professional');
-                          setIsSignUp(true);
                           setIsAuthModalOpen(true);
                         }}
                         className="flex-1 md:flex-none px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition shadow-lg shadow-cyan-950 flex items-center justify-center gap-1.5 font-mono cursor-pointer"
@@ -611,7 +573,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedTier('professional');
-                          setIsSignUp(true);
                           setIsAuthModalOpen(true);
                         }}
                         className="flex-1 md:flex-none px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 font-mono cursor-pointer"
@@ -633,7 +594,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       type="button"
                       onClick={() => {
                         setSelectedTier('professional');
-                        setIsSignUp(true);
                         setIsAuthModalOpen(true);
                       }}
                       className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono cursor-pointer w-full sm:w-auto"
@@ -1000,41 +960,93 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       )}
 
-      {/* AUTHENTICATION MODAL */}
+      {/* REFACTORED HIGH-CONVERTING CERTIFICATE CLAIM MODAL */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div className="bg-[#0D1322] border border-cyan-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono relative">
+            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-white uppercase">{isSignUp ? `Create Account (${selectedTier.toUpperCase()})` : 'Sign In'}</h3>
-                {isSignUp && activeBrokerName && (
-                  <p className="text-[11px] text-cyan-400 mt-1">
-                    🛡️ Linked to Broker: {activeBrokerName}
-                  </p>
-                )}
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                    PREFERRED RISK CERTIFICATE
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Claim Loss Control Certificate
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  Enter your fleet details to generate your signed Loss Control Certificate PDF and connect your maintenance or telematics feed.
+                </p>
               </div>
-              <button type="button" onClick={() => setIsAuthModalOpen(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
+              <button 
+                type="button" 
+                onClick={() => setIsAuthModalOpen(false)} 
+                className="text-slate-400 hover:text-white text-sm p-1"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Email Address</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="name@company.com" />
+                <label className="block text-xs text-slate-400 mb-1 font-bold">Work Email</label>
+                <input 
+                  type="email" 
+                  required 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
+                  placeholder="cfo@company.com" 
+                />
               </div>
-              {isSignUp && (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Company / Fleet Name</label>
-                  <input type="text" required={isSignUp} value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="e.g. Apex Freight Logistics" />
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1 font-bold">Company / Fleet Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={companyName} 
+                  onChange={(e) => setCompanyName(e.target.value)} 
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
+                  placeholder="e.g. Apex Freight Logistics" 
+                />
+              </div>
+
+              {/* ECOSYSTEM PROVIDER SELECTOR */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1 font-bold">Primary Maintenance / Telematics Feed</label>
+                <select 
+                  value={selectedFeed}
+                  onChange={(e) => setSelectedFeed(e.target.value)}
+                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
+                >
+                  <option value="fleetio">🔌 Fleetio (Live 2-Way Work Order Sync)</option>
+                  <option value="samsara">📡 Samsara Telematics (Coming Soon)</option>
+                  <option value="geotab">📡 Geotab Telemetry (Coming Soon)</option>
+                  <option value="motive">📡 Motive ELD (Coming Soon)</option>
+                  <option value="other">📋 Standalone / Manual CSV Export</option>
+                </select>
+              </div>
+
+              {authError && (
+                <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
+                  {authError}
                 </div>
               )}
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Password</label>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" placeholder="••••••••" />
+
+              <div className="pt-2">
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingAuth} 
+                  className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono shadow-lg shadow-cyan-950 cursor-pointer"
+                >
+                  {isSubmittingAuth ? 'Generating Certificate...' : 'Generate PDF Certificate & Connect Feed →'}
+                </button>
               </div>
-              {authError && <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">{authError}</div>}
-              <button type="submit" disabled={isSubmittingAuth} className="w-full py-2.5 bg-[#06B6D4] text-slate-950 font-bold text-xs rounded-lg font-mono">
-                {isSubmittingAuth ? 'Processing...' : isSignUp ? 'Continue to Checkout' : 'Sign In'}
-              </button>
+
+              <p className="text-[10px] text-slate-500 text-center">
+                Instant PDF delivery to your inbox • Free 14-day integration trial
+              </p>
             </form>
           </div>
         </div>
