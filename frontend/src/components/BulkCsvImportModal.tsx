@@ -51,9 +51,7 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
     const foundVins = extractVinsFromText(rawDataToParse);
 
     if (foundVins.length === 0) {
-      setError(
-        'No valid 17-character VINs detected. Please check formatting.'
-      );
+      setError('No valid 17-character VINs detected. Please check formatting.');
       return;
     }
 
@@ -70,8 +68,26 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
         throw new Error('User session expired. Please sign in again.');
       }
 
-      // 2. Prepare bulk insert payload
-      const rowsToInsert = foundVins.map((vin) => ({
+      // 2. Fetch existing VINs for this user profile to prevent duplicate key errors
+      const { data: existingRecords } = await supabase
+        .from('monitored_vehicles')
+        .select('vin')
+        .eq('profile_id', user.id);
+
+      const existingVinSet = new Set((existingRecords || []).map((r) => r.vin));
+      
+      // Filter out VINs that are already registered under this user account
+      const uniqueNewVins = foundVins.filter((vin) => !existingVinSet.has(vin));
+
+      if (uniqueNewVins.length === 0) {
+        setSuccessMessage(`All ${foundVins.length} VIN(s) in this file are already monitored in your fleet.`);
+        setIsProcessing(false);
+        setTimeout(() => onClose(), 1500);
+        return;
+      }
+
+      // 3. Prepare payload for new unique VINs
+      const rowsToInsert = uniqueNewVins.map((vin) => ({
         profile_id: user.id,
         vin: vin,
         year: '2023',
@@ -81,13 +97,13 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
         created_at: new Date().toISOString(),
       }));
 
-      // 3. Insert into fleet_assets with monitored_vehicles fallback
+      // 4. Try inserting into fleet_assets with UPSERT on duplicate conflict
       let { error: insertError } = await supabase
         .from('fleet_assets')
-        .insert(rowsToInsert);
+        .upsert(rowsToInsert, { onConflict: 'profile_id, vin', ignoreDuplicates: true });
 
       if (insertError) {
-        const fallbackRows = foundVins.map((vin) => ({
+        const fallbackRows = uniqueNewVins.map((vin) => ({
           profile_id: user.id,
           vin: vin,
           year: 2023,
@@ -98,21 +114,24 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
 
         const { error: fallbackError } = await supabase
           .from('monitored_vehicles')
-          .insert(fallbackRows);
+          .upsert(fallbackRows, { onConflict: 'profile_id, vin', ignoreDuplicates: true });
 
         if (fallbackError) {
           throw fallbackError;
         }
       }
 
+      const skippedCount = foundVins.length - uniqueNewVins.length;
       setSuccessMessage(
-        `Successfully ingested ${foundVins.length} power unit(s) into Monitored Fleet!`
+        `Successfully ingested ${uniqueNewVins.length} new power unit(s)!` +
+        (skippedCount > 0 ? ` (${skippedCount} duplicate VINs skipped)` : '')
       );
 
       setTimeout(() => {
-        if (onSuccess) onSuccess(foundVins.length);
+        if (onSuccess) onSuccess(uniqueNewVins.length);
         onClose();
-      }, 1000);
+      }, 1200);
+
     } catch (err: any) {
       console.error('Bulk ingestion error:', err);
       setError(err.message || 'Failed to process bulk fleet ingestion.');
@@ -201,8 +220,7 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
                 className="w-full bg-[#070B14] border border-slate-800 rounded-xl p-3 text-xs text-white uppercase font-mono placeholder-slate-600 focus:outline-none focus:border-[#06B6D4] transition"
               />
               <p className="text-[10px] text-slate-500">
-                Accepts raw VIN lists, comma-separated lists, or multi-line
-                fleet dumps.
+                Accepts raw VIN lists, comma-separated lists, or multi-line fleet dumps.
               </p>
             </div>
           ) : (
