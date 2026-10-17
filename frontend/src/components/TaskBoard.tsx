@@ -81,48 +81,48 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     },
   ]);
 
-  // FETCH PERSISTED MONITORED VEHICLES FROM SUPABASE ON MOUNT
-  useEffect(() => {
-    async function loadMonitoredVehicles() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  // HELPER FUNCTION TO RELOAD VEHICLES FROM SUPABASE DYNAMICALLY
+  const loadMonitoredVehicles = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        const { data: dbVehicles, error } = await supabase
-          .from('monitored_vehicles')
-          .select('*')
-          .eq('profile_id', user.id);
+      const { data: dbVehicles, error } = await supabase
+        .from('monitored_vehicles')
+        .select('*')
+        .eq('profile_id', user.id);
 
-        if (error || !dbVehicles) return;
+      if (error || !dbVehicles) return;
 
-        const dbTasks: FleetTask[] = dbVehicles.map((v) => ({
-          id: v.id,
-          unit_number: `UNIT-${v.vin.slice(-4)}`,
-          vin: v.vin,
-          make_model: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.toUpperCase().trim() || 'AUDITED VEHICLE UNIT',
-          campaign_number: v.vin === '1FUJGLDR5MLKE1234' 
-            ? '23V-891 — STEERING AXLE DRAG LINK' 
-            : 'NHTSA MONITORED • ZERO OPEN RECALLS',
-          component: v.vin === '1FUJGLDR5MLKE1234'
-            ? 'NHTSA Priority Safety Campaign • Action Required'
-            : 'Continuous Safety Ingestion Active',
-          severity: v.vin === '1FUJGLDR5MLKE1234' ? 'NUCLEAR' : 'LOW',
-          ecosystem_feeds: ['RECALLLOGIC'],
-          remedy_logistics: 'Active Monitoring Ingested',
-          compliance_status: v.vin === '1FUJGLDR5MLKE1234' ? 'OPEN' : 'CLEARED',
-        }));
+      const dbTasks: FleetTask[] = dbVehicles.map((v) => ({
+        id: v.id,
+        unit_number: `UNIT-${v.vin.slice(-4)}`,
+        vin: v.vin,
+        make_model: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.toUpperCase().trim() || 'AUDITED VEHICLE UNIT',
+        campaign_number: v.vin === '1FUJGLDR5MLKE1234' 
+          ? '23V-891 — STEERING AXLE DRAG LINK' 
+          : 'NHTSA MONITORED • ZERO OPEN RECALLS',
+        component: v.vin === '1FUJGLDR5MLKE1234'
+          ? 'NHTSA Priority Safety Campaign • Action Required'
+          : 'Continuous Safety Ingestion Active',
+        severity: v.vin === '1FUJGLDR5MLKE1234' ? 'NUCLEAR' : 'LOW',
+        ecosystem_feeds: ['RECALLLOGIC'],
+        remedy_logistics: 'Active Monitoring Ingested',
+        compliance_status: v.vin === '1FUJGLDR5MLKE1234' ? 'OPEN' : 'CLEARED',
+      }));
 
-        // Merge DB rows with default demo baseline (avoiding duplicate VIN entries)
-        setTasks((prev) => {
-          const existingVins = new Set(prev.map((t) => t.vin));
-          const uniqueNewTasks = dbTasks.filter((t) => !existingVins.has(t.vin));
-          return [...prev, ...uniqueNewTasks];
-        });
-      } catch (err) {
-        console.warn('Could not fetch monitored vehicles from Supabase:', err);
-      }
+      // Merge DB rows with default demo baseline avoiding duplicate VINs
+      setTasks((prev) => {
+        const existingVins = new Set(prev.map((t) => t.vin));
+        const uniqueNewTasks = dbTasks.filter((t) => !existingVins.has(t.vin));
+        return [...prev, ...uniqueNewTasks];
+      });
+    } catch (err) {
+      console.warn('Could not fetch monitored vehicles:', err);
     }
+  };
 
+  useEffect(() => {
     loadMonitoredVehicles();
   }, []);
 
@@ -430,12 +430,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         </div>
       </main>
 
-      {/* RESTORED MODAL COMPONENTS WITH DYNAMIC STATE CALLBACKS */}
+      {/* RESTORED MODAL COMPONENTS WITH DYNAMIC RELOAD CALLBACKS */}
       {isBulkImportOpen && (
         <BulkCsvImportModal
           isOpen={isBulkImportOpen}
           onClose={() => setIsBulkImportOpen(false)}
-          onSuccess={() => setIsBulkImportOpen(false)}
+          onSuccess={() => {
+            loadMonitoredVehicles(); // INSTANT AUTOMATIC RELOAD OF CAPACITY & TABLE
+            setIsBulkImportOpen(false);
+          }}
         />
       )}
 
@@ -443,30 +446,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         <SingleVinScanModal
           isOpen={isSingleScanOpen}
           onClose={() => setIsSingleScanOpen(false)}
-          onSuccess={(newAsset) => {
-            if (newAsset) {
-              setTasks((prev) => [
-                ...prev,
-                {
-                  id: `task-${Date.now()}`,
-                  unit_number: `UNIT-${newAsset.vin.slice(-4)}`,
-                  vin: newAsset.vin,
-                  make_model: `${newAsset.year} ${newAsset.make} ${newAsset.model}`.toUpperCase(),
-                  campaign_number:
-                    newAsset.recallCount > 0
-                      ? '23V-891 — STEERING AXLE DRAG LINK'
-                      : 'NHTSA MONITORED • ZERO OPEN RECALLS',
-                  component:
-                    newAsset.recallCount > 0
-                      ? 'NHTSA Priority Safety Campaign • Action Required'
-                      : 'Continuous Safety Ingestion Active',
-                  severity: newAsset.recallCount > 0 ? 'NUCLEAR' : 'LOW',
-                  ecosystem_feeds: ['RECALLLOGIC'],
-                  remedy_logistics: 'Active Monitoring Ingested',
-                  compliance_status: newAsset.recallCount > 0 ? 'OPEN' : 'CLEARED',
-                },
-              ]);
-            }
+          onSuccess={() => {
+            loadMonitoredVehicles(); // INSTANT AUTOMATIC RELOAD OF CAPACITY & TABLE
             setIsSingleScanOpen(false);
           }}
         />

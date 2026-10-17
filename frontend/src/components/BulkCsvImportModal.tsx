@@ -130,7 +130,7 @@ export const BulkCsvImportModal: React.FC<BulkCsvImportModalProps> = ({
       setTimeout(() => {
         if (onSuccess) onSuccess(uniqueNewVins.length);
         onClose();
-      }, 1200);
+      }, 1000);
 
     } catch (err: any) {
       console.error('Bulk ingestion error:', err);
