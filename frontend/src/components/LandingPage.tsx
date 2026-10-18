@@ -51,10 +51,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [brokerLeadSuccess, setBrokerLeadSuccess] = useState<boolean>(false);
   const [brokerLeadError, setBrokerLeadError] = useState<string>('');
 
-  // AUTH / CERTIFICATE MODAL STATES
+  // AUTH & CERTIFICATE MODAL STATES
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'claim'>('claim'); // 'signin' for clients, 'claim' for leads
   const [selectedTier, setSelectedTier] = useState<'standard' | 'professional' | 'enterprise'>('professional');
   const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [selectedFeed, setSelectedFeed] = useState<string>('fleetio');
   const [authError, setAuthError] = useState<string>('');
@@ -120,29 +122,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setIsSubmittingAuth(true);
 
     try {
-      const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
-
-      // Save lead record into Supabase leads table
-      await supabase.from('leads').insert([
-        {
+      if (authMode === 'signin') {
+        // CLIENT SIGN IN WITH PASSWORD
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
-          company_name: finalCompanyName,
-          selected_tier: selectedTier,
-          primary_feed: selectedFeed,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+          password: password,
+        });
 
-      setIsSubmittingAuth(false);
-      setIsAuthModalOpen(false);
+        if (error) throw error;
 
-      if (onSelectTier) {
-        onSelectTier(selectedTier, email.trim(), finalCompanyName);
+        if (data.session) {
+          setIsAuthModalOpen(false);
+          onSignIn();
+        }
       } else {
-        onSignIn();
+        // PROSPECT LEAD CLAIM MODAL
+        const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
+
+        await supabase.from('leads').insert([
+          {
+            email: email.trim(),
+            company_name: finalCompanyName,
+            selected_tier: selectedTier,
+            primary_feed: selectedFeed,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+        setIsSubmittingAuth(false);
+        setIsAuthModalOpen(false);
+
+        if (onSelectTier) {
+          onSelectTier(selectedTier, email.trim(), finalCompanyName);
+        } else {
+          onSignIn();
+        }
       }
     } catch (err: any) {
-      setAuthError(err.message || 'An error occurred during certificate generation.');
+      setAuthError(err.message || 'An error occurred during authentication.');
       setIsSubmittingAuth(false);
     }
   };
@@ -264,7 +281,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // DIRECT STRIPE CHECKOUT SESSION REDIRECT
   const handleTierCheckout = async (tier: PricingTier) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -279,7 +295,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         body: JSON.stringify({
           email: userEmail,
           customer_email: userEmail,
-          tier: tier.id, // "standard" | "professional" | "enterprise"
+          tier: tier.id,
           company_name: finalCompanyName,
           success_url: `${window.location.origin}/taskboard/demo?checkout=success`,
           cancel_url: `${window.location.origin}?checkout=cancel`,
@@ -301,6 +317,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     } catch (err: any) {
       console.warn('Stripe Checkout Fallback:', err.message);
       setSelectedTier(tier.id);
+      setAuthMode('claim');
       setIsAuthModalOpen(true);
     }
   };
@@ -412,7 +429,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setSelectedTier('standard'); setIsAuthModalOpen(true); }}
+              onClick={() => { 
+                setAuthMode('signin'); 
+                setAuthError(''); 
+                setIsAuthModalOpen(true); 
+              }}
               className="px-4 py-1.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg shadow-md shadow-cyan-500/10 transition-all cursor-pointer font-mono whitespace-nowrap"
             >
               Sign In
@@ -432,7 +453,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             The Automated Loss Control Engine for Fleet Asset Risk
           </h1>
           <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed font-sans">
-            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line[cite: 1].
+            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line.
           </p>
         </div>
 
@@ -597,6 +618,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedTier('professional');
+                          setAuthMode('claim');
                           setIsAuthModalOpen(true);
                         }}
                         className="flex-1 md:flex-none px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition shadow-lg shadow-cyan-950 flex items-center justify-center gap-1.5 font-mono cursor-pointer"
@@ -608,6 +630,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         type="button"
                         onClick={() => {
                           setSelectedTier('professional');
+                          setAuthMode('claim');
                           setIsAuthModalOpen(true);
                         }}
                         className="flex-1 md:flex-none px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 font-mono cursor-pointer"
@@ -629,6 +652,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       type="button"
                       onClick={() => {
                         setSelectedTier('professional');
+                        setAuthMode('claim');
                         setIsAuthModalOpen(true);
                       }}
                       className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono cursor-pointer w-full sm:w-auto"
@@ -995,73 +1019,101 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       )}
 
-      {/* REFACTORED HIGH-CONVERTING CERTIFICATE CLAIM MODAL */}
+      {/* DYNAMIC MODAL: CLIENT SIGN IN VS. PROSPECT LEAD CERTIFICATE CLAIM */}
       {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0D1322] border border-cyan-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm font-mono">
+          <div className="bg-[#0D1322] border border-cyan-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 relative">
+            
+            {/* MODAL HEADER WITH MODE TABS */}
             <div className="flex justify-between items-start border-b border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
-                    PREFERRED RISK CERTIFICATE
-                  </span>
+                  {authMode === 'signin' ? (
+                    <span className="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                      CLIENT ACCESS PORTAL
+                    </span>
+                  ) : (
+                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] px-2 py-0.5 rounded font-bold uppercase">
+                      PREFERRED RISK CERTIFICATE
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Claim Loss Control Certificate
+                  {authMode === 'signin' ? 'Sign In to RecallLogic' : 'Claim Loss Control Certificate'}
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Enter your fleet details to generate your signed Loss Control Certificate PDF and connect your maintenance or telematics feed.
+                  {authMode === 'signin'
+                    ? 'Enter your account credentials to access your active fleet workspace.'
+                    : 'Enter your fleet details to generate your signed Loss Control Certificate PDF and connect your feed.'}
                 </p>
               </div>
               <button 
                 type="button" 
                 onClick={() => setIsAuthModalOpen(false)} 
-                className="text-slate-400 hover:text-white text-sm p-1"
+                className="text-slate-400 hover:text-white text-sm p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
+            {/* FORM BODY */}
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1 font-bold">Work Email</label>
+                <label className="block text-xs text-slate-400 mb-1 font-bold">Email Address</label>
                 <input 
                   type="email" 
                   required 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
-                  placeholder="cfo@company.com" 
+                  placeholder={authMode === 'signin' ? "name@company.com" : "cfo@company.com"} 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1 font-bold">Company / Fleet Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={companyName} 
-                  onChange={(e) => setCompanyName(e.target.value)} 
-                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
-                  placeholder="e.g. Apex Freight Logistics" 
-                />
-              </div>
+              {authMode === 'signin' ? (
+                /* PASSWORD INPUT FOR EXISTING CLIENT SIGN IN */
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">Password</label>
+                  <input 
+                    type="password" 
+                    required 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
+                    placeholder="••••••••" 
+                  />
+                </div>
+              ) : (
+                /* LEAD CAPTURE FIELDS FOR NEW PROSPECTS */
+                <>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1 font-bold">Company / Fleet Name</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={companyName} 
+                      onChange={(e) => setCompanyName(e.target.value)} 
+                      className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4]" 
+                      placeholder="e.g. Apex Freight Logistics" 
+                    />
+                  </div>
 
-              {/* ECOSYSTEM PROVIDER SELECTOR */}
-              <div>
-                <label className="block text-xs text-slate-400 mb-1 font-bold">Primary Maintenance / Telematics Feed</label>
-                <select 
-                  value={selectedFeed}
-                  onChange={(e) => setSelectedFeed(e.target.value)}
-                  className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
-                >
-                  <option value="fleetio">🔌 Fleetio (Live 2-Way Work Order Sync)</option>
-                  <option value="samsara">📡 Samsara Telematics (Coming Soon)</option>
-                  <option value="geotab">📡 Geotab Telemetry (Coming Soon)</option>
-                  <option value="motive">📡 Motive ELD (Coming Soon)</option>
-                  <option value="other">📋 Standalone / Manual CSV Export</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1 font-bold">Primary Maintenance / Telematics Feed</label>
+                    <select 
+                      value={selectedFeed}
+                      onChange={(e) => setSelectedFeed(e.target.value)}
+                      className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
+                    >
+                      <option value="fleetio">🔌 Fleetio (Live 2-Way Work Order Sync)</option>
+                      <option value="samsara">📡 Samsara Telematics (Coming Soon)</option>
+                      <option value="geotab">📡 Geotab Telemetry (Coming Soon)</option>
+                      <option value="motive">📡 Motive ELD (Coming Soon)</option>
+                      <option value="other">📋 Standalone / Manual CSV Export</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               {authError && (
                 <div className="p-2.5 rounded bg-red-950/40 border border-red-800/80 text-red-300 text-xs font-mono">
@@ -1075,13 +1127,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   disabled={isSubmittingAuth} 
                   className="w-full py-2.5 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition font-mono shadow-lg shadow-cyan-950 cursor-pointer"
                 >
-                  {isSubmittingAuth ? 'Generating Certificate...' : 'Generate PDF Certificate & Connect Feed →'}
+                  {isSubmittingAuth 
+                    ? 'Processing...' 
+                    : authMode === 'signin' 
+                    ? 'Sign In to Workspace →' 
+                    : 'Generate PDF Certificate & Connect Feed →'}
                 </button>
               </div>
 
-              <p className="text-[10px] text-slate-500 text-center">
-                Instant PDF delivery to your inbox • Free 14-day integration trial
-              </p>
+              {/* MODE SWITCH FOOTER */}
+              <div className="text-center pt-1 border-t border-slate-800/80">
+                {authMode === 'signin' ? (
+                  <p className="text-[11px] text-slate-400">
+                    Need a fleet risk audit certificate?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode('claim'); setAuthError(''); }}
+                      className="text-cyan-400 font-bold hover:underline cursor-pointer ml-1"
+                    >
+                      Claim Certificate
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Already an active client?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode('signin'); setAuthError(''); }}
+                      className="text-cyan-400 font-bold hover:underline cursor-pointer ml-1"
+                    >
+                      Sign In Here
+                    </button>
+                  </p>
+                )}
+              </div>
             </form>
           </div>
         </div>
