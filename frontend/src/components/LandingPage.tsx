@@ -122,7 +122,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     try {
       const finalCompanyName = companyName.trim() || `${email.split('@')[0].toUpperCase()} Fleet Co.`;
 
-      // Save lead / prospect record directly to Supabase leads table
+      // Save lead record into Supabase leads table
       await supabase.from('leads').insert([
         {
           email: email.trim(),
@@ -184,7 +184,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://recalllogic-api.onrender.com';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
 
       const apiPromises = uniqueVins.map(vin =>
         fetch(`${apiBaseUrl}/api/audit/verify-vin`, {
@@ -264,10 +264,45 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
+  // DIRECT STRIPE CHECKOUT SESSION REDIRECT
   const handleTierCheckout = async (tier: PricingTier) => {
-    setSelectedTier(tier.id);
-    setAuthError('');
-    setIsAuthModalOpen(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = email.trim() || user?.email || 'admin@fleet.com';
+      const finalCompanyName = companyName.trim() || 'My Fleet Co.';
+
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+
+      const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          customer_email: userEmail,
+          tier: tier.id, // "standard" | "professional" | "enterprise"
+          company_name: finalCompanyName,
+          success_url: `${window.location.origin}/taskboard/demo?checkout=success`,
+          cancel_url: `${window.location.origin}?checkout=cancel`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ detail: 'Checkout session creation failed' }));
+        throw new Error(errData.detail || `Server returned ${response.status}`);
+      }
+
+      const session = await response.json();
+
+      if (session.url) {
+        window.location.href = session.url;
+      } else {
+        throw new Error('Stripe URL not returned from backend.');
+      }
+    } catch (err: any) {
+      console.warn('Stripe Checkout Fallback:', err.message);
+      setSelectedTier(tier.id);
+      setIsAuthModalOpen(true);
+    }
   };
 
   const pricingTiers: PricingTier[] = [
@@ -397,7 +432,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             The Automated Loss Control Engine for Fleet Asset Risk
           </h1>
           <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed font-sans">
-            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line.
+            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line[cite: 1].
           </p>
         </div>
 
