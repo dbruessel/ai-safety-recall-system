@@ -25,8 +25,8 @@ class StripeCheckoutRequest(BaseModel):
     customer_email: Optional[str] = None
     tier: Optional[str] = "professional"
     company_name: Optional[str] = "My Fleet Co."
-    success_url: Optional[str] = "https://recalllogic.ai?checkout=success"
-    cancel_url: Optional[str] = "https://recalllogic.ai?checkout=cancel"
+    success_url: Optional[str] = "https://recalllogic.ai/taskboard/demo?checkout=success"
+    cancel_url: Optional[str] = "https://recalllogic.ai/taskboard/demo?checkout=cancel"
 
 class StripePortalRequest(BaseModel):
     email: Optional[str] = None
@@ -35,7 +35,7 @@ class StripePortalRequest(BaseModel):
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(payload: StripeCheckoutRequest):
-    # Dynamically fetch & sanitize API Key inside request to avoid trailing spaces/quotes
+    # Dynamically fetch & sanitize API Key inside request
     secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     if not secret_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
@@ -45,24 +45,34 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
     tier = (payload.tier or "professional").lower().strip()
     company_name = (payload.company_name or "My Fleet Co.").strip()
 
-    # Look up environment price IDs and clean any surrounding whitespace
+    # Look up environment price IDs matching Render environment keys
     price_map = {
-        "standard": (os.getenv("STRIPE_PRICE_STANDARD") or os.getenv("VITE_STRIPE_PRICE_STANDARD") or "").strip(),
-        "professional": (os.getenv("STRIPE_PRICE_PROFESSIONAL") or os.getenv("STRIPE_PRICE_PRO") or os.getenv("VITE_STRIPE_PRICE_PRO") or "").strip(),
-        "enterprise": (os.getenv("STRIPE_PRICE_ENTERPRISE") or os.getenv("VITE_STRIPE_PRICE_ENTERPRISE") or "").strip(),
+        "standard": (
+            os.getenv("STRIPE_PRICE_STANDARD") or 
+            os.getenv("VITE_STRIPE_PRICE_STANDARD") or ""
+        ).strip(),
+        "professional": (
+            os.getenv("STRIPE_PRICE_PROFESSIONAL") or 
+            os.getenv("STRIPE_PRICE_PRO") or 
+            os.getenv("VITE_STRIPE_PRICE_PRO") or ""
+        ).strip(),
+        "enterprise": (
+            os.getenv("STRIPE_PRICE_ENTERPRISE") or 
+            os.getenv("VITE_STRIPE_PRICE_ENTERPRISE") or ""
+        ).strip(),
     }
 
     price_id = price_map.get(tier)
 
     try:
-        # Search or create customer to ensure session links cleanly
+        # Search or create customer in Stripe
         customers = stripe.Customer.list(email=target_email, limit=1)
         customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
 
         if price_id and price_id.startswith("price_"):
             line_items = [{"price": price_id, "quantity": 1}]
         else:
-            # Inline price fallback if explicit price_... ID is missing
+            # Inline price fallback if price ID string is missing
             tier_amounts = {"standard": 9900, "professional": 24900, "enterprise": 49900}
             line_items = [{
                 "price_data": {
@@ -86,8 +96,8 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
                 "tier": tier,
                 "company_name": company_name,
             },
-            success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
-            cancel_url=payload.cancel_url or "https://recalllogic.ai?checkout=cancel",
+            success_url=payload.success_url or "https://recalllogic.ai/taskboard/demo?checkout=success",
+            cancel_url=payload.cancel_url or "https://recalllogic.ai/taskboard/demo?checkout=cancel",
         )
 
         return {"url": session.url, "sessionId": session.id}
