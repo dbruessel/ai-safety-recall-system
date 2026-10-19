@@ -35,7 +35,6 @@ class StripePortalRequest(BaseModel):
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(payload: StripeCheckoutRequest):
-    # Dynamically fetch & sanitize API Key inside request
     secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
     if not secret_key:
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
@@ -63,16 +62,18 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
     }
 
     price_id = price_map.get(tier)
+    print(f"DEBUG: Creating checkout for email='{target_email}', tier='{tier}', price_id='{price_id}'")
 
     try:
         # Search or create customer in Stripe
         customers = stripe.Customer.list(email=target_email, limit=1)
         customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
 
+        # Verify price ID format
         if price_id and price_id.startswith("price_"):
             line_items = [{"price": price_id, "quantity": 1}]
         else:
-            # Inline price fallback if price ID string is missing
+            # Inline price_data fallback for test mode or missing price IDs
             tier_amounts = {"standard": 9900, "professional": 24900, "enterprise": 49900}
             line_items = [{
                 "price_data": {
@@ -101,8 +102,13 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
         )
 
         return {"url": session.url, "sessionId": session.id}
+
+    except stripe.error.StripeError as e:
+        error_msg = e.user_message or str(e)
+        print(f"⚠️ Stripe API Error: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"Stripe API Error: {error_msg}")
     except Exception as e:
-        print(f"⚠️ Stripe Checkout Error: {str(e)}")
+        print(f"⚠️ General Checkout Error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/create-portal-session")
