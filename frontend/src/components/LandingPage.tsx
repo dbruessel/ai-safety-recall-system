@@ -469,7 +469,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </div>
                   <div className="flex justify-between text-red-400 font-bold">
                     <span>Est. Out-of-Pocket Risk:</span>
-                    <span>\${(estimatedMacroExposureUsd).toLocaleString()} USD</span>
+                    <span>\${estimatedMacroExposureUsd.toLocaleString()} USD</span>
                   </div>
                 </div>
               </div>
@@ -510,7 +510,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             The Automated Loss Control Engine for Fleet Asset Risk
           </h1>
           <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed font-sans">
-            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line.
+            Bridging the gap between fleet operations and commercial auto underwriting. RecallLogic automates OEM safety defect monitoring, closed-loop remediation, and compliance tracking to eliminate catastrophic mechanical liabilities and protect your bottom line[cite: 1].
           </p>
         </div>
 
