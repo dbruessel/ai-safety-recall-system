@@ -81,9 +81,9 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
                 detail=f"Stripe Price ID for tier '{tier}' is missing or invalid in server environment variables."
             )
 
+        # Removed 'payment_method_types' to use Stripe Dynamic Payment Methods
         session = stripe.checkout.Session.create(
             customer=customer_id,
-            payment_method_types=["card"],
             mode="subscription",
             line_items=line_items,
             metadata={
