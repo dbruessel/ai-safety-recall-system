@@ -119,7 +119,6 @@ async def create_checkout_session(req: CheckoutRequest):
             customer_id = customers.data[0].id if customers.data else None
 
         checkout_kwargs = {
-            "payment_method_types": ["card"],
             "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription",
             "allow_promotion_codes": True,  # Enables the coupon/promo code input field in Stripe Checkout

@@ -201,7 +201,6 @@ def create_app() -> FastAPI:
             # 3. Create Checkout Session
             checkout_session = stripe.checkout.Session.create(
                 customer=customer_id,
-                payment_method_types=["card"],
                 line_items=line_items,
                 mode="subscription",
                 success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
