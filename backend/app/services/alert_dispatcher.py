@@ -1,36 +1,57 @@
 import os
 import logging
 import requests
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# Automatically find and load the .env file from the backend root
+current_file_path = Path(__file__).resolve()
+backend_root_dir = current_file_path.parents[2]  # Navigates up from app/services/ to backend root
+env_file_path = backend_root_dir / ".env"
+
+if env_file_path.exists():
+    load_dotenv(dotenv_path=env_file_path)
+else:
+    load_dotenv()  # Fallback to current working directory
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Initialize Supabase Service Client
-SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
-SUPABASE_SERVICE_KEY = (
-    os.getenv("SUPABASE_SERVICE_KEY") 
-    or os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
-    or os.getenv("SUPABASE_KEY") 
+SUPABASE_URL = (
+    os.getenv("SUPABASE_URL") 
+    or os.getenv("VITE_SUPABASE_URL") 
     or ""
-).strip()
+).strip()[cite: 29]
+
+SUPABASE_SERVICE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_SERVICE_KEY")
+    or os.getenv("SUPABASE_KEY")
+    or ""
+).strip()[cite: 29]
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-    raise ValueError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables.")
+    raise ValueError(
+        f"Missing Supabase credentials. Checked path '{env_file_path}'. "
+        "Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY) are set in .env."
+    )
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)[cite: 29]
 
 # Email Dispatch Configuration
-RESEND_API_KEY = (os.getenv("RESEND_API_KEY") or "").strip()
+RESEND_API_KEY = (os.getenv("RESEND_API_KEY") or "").strip()[cite: 29]
 ALERT_FROM_EMAIL = (os.getenv("ALERT_FROM_EMAIL") or "RecallLogic Alerts <alerts@recalllogic.ai>").strip()
 
 
-def fetch_new_recall_tasks(days_back: int = 1) -> List[Dict[str, Any]]:
+def fetch_new_recall_tasks(days_back: int = 30) -> List[Dict[str, Any]]:
     """
-    Fetches open recall tasks detected or updated within the last N days.
+    Fetches recall tasks detected or updated within the last N days.
+    Default set to 30 days to catch demo and recently uploaded vehicles.
     """
     cutoff_time = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
     logger.info(f"Scanning for recall tasks recorded since {cutoff_time}...")
@@ -80,7 +101,7 @@ def get_vehicle_and_recipient(vehicle_id: str) -> Optional[Dict[str, Any]]:
             logger.warning(f"No asset record or profile_id found for vehicle_id: {vehicle_id}")
             return None
 
-        # Fetch profile email & fleet name
+        # Fetch profile email & company name
         profile_res = (
             supabase.table("profiles")
             .select("email, company_name")
@@ -110,7 +131,7 @@ def send_hazard_alert_email(recipient_email: str, company_name: str, vehicle_nam
     Dispatches an underwriter loss-control early-warning notice via Resend API.
     """
     if not RESEND_API_KEY:
-        logger.error("RESEND_API_KEY is missing. Alert email skipped.")
+        logger.error("RESEND_API_KEY is missing from environment variables. Email dispatch aborted.")
         return False
 
     campaign = task.get("campaign_number") or "NHTSA Recall"
@@ -119,7 +140,7 @@ def send_hazard_alert_email(recipient_email: str, company_name: str, vehicle_nam
     severity_score = float(task.get("severity_score") or 5.0)
 
     is_nuclear = severity_score >= 8.0 or any(kw in component.lower() for kw in ["steering", "brake", "fire"])
-    exposure_amount = "$250,000" if is_nuclear else "$50,000"
+    exposure_amount = "$250,000" if is_nuclear else "$50,000"[cite: 1]
 
     subject = f"🚨 {'CRITICAL NUCLEAR DEFECT' if is_nuclear else 'SAFETY RECALL'}: {campaign} on {vin[-6:]}"
 
@@ -204,17 +225,17 @@ def send_hazard_alert_email(recipient_email: str, company_name: str, vehicle_nam
         return False
 
 
-def process_daily_alerts():
+def process_daily_alerts(days_back: int = 30):
     """
     Scans for recently generated recall tasks, aggregates asset records,
     and dispatches underwriter hazard notices to fleet administrators.
     """
     logger.info("Starting automated hazard detection alert cycle...")
 
-    tasks = fetch_new_recall_tasks(days_back=1)
+    tasks = fetch_new_recall_tasks(days_back=days_back)
 
     if not tasks:
-        logger.info("No active recall tasks generated in the last 24 hours. No alerts required.")
+        logger.info(f"No active recall tasks found in the last {days_back} days. No alerts to send.")
         return
 
     critical_count = sum(1 for t in tasks if (t.get("severity_score") or 0) >= 8.0)
