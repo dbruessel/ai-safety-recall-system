@@ -33,7 +33,7 @@ SUPABASE_SERVICE_KEY = (
     or os.getenv("SUPABASE_SERVICE_KEY")
     or os.getenv("SUPABASE_KEY")
     or ""
-).strip()[cite: 29]
+).strip()
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise ValueError(
@@ -41,10 +41,10 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         "Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY) are set in .env."
     )
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)[cite: 29]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # Email Dispatch Configuration
-RESEND_API_KEY = (os.getenv("RESEND_API_KEY") or "").strip()[cite: 29]
+RESEND_API_KEY = (os.getenv("RESEND_API_KEY") or "").strip()
 ALERT_FROM_EMAIL = (os.getenv("ALERT_FROM_EMAIL") or "RecallLogic Alerts <alerts@recalllogic.ai>").strip()
 
 
@@ -140,7 +140,7 @@ def send_hazard_alert_email(recipient_email: str, company_name: str, vehicle_nam
     severity_score = float(task.get("severity_score") or 5.0)
 
     is_nuclear = severity_score >= 8.0 or any(kw in component.lower() for kw in ["steering", "brake", "fire"])
-    exposure_amount = "$250,000" if is_nuclear else "$50,000"[cite: 1]
+    exposure_amount = "$250,000" if is_nuclear else "$50,000"
 
     subject = f"🚨 {'CRITICAL NUCLEAR DEFECT' if is_nuclear else 'SAFETY RECALL'}: {campaign} on {vin[-6:]}"
 
