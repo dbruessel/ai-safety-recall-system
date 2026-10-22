@@ -26,7 +26,7 @@ SUPABASE_URL = (
     os.getenv("SUPABASE_URL") 
     or os.getenv("VITE_SUPABASE_URL") 
     or ""
-).strip()[cite: 29]
+).strip()
 
 SUPABASE_SERVICE_KEY = (
     os.getenv("SUPABASE_SERVICE_ROLE_KEY")
