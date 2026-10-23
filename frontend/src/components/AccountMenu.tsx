@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { exportLossControlPdf } from '../utils/exportLossControlPdf';
@@ -37,7 +38,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   const [newOrgName, setNewOrgName] = useState(orgName);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Dynamic feedback states for menu quick tools
   const [copiedState, setCopiedState] = useState(false);
   const [downloadingState, setDownloadingState] = useState(false);
 
@@ -52,7 +52,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   const normalizedRole = (userRole || 'admin').toString().toLowerCase();
   const isAdmin = normalizedRole === 'admin';
 
-  // Professional and Enterprise Tier Validation
   const normalizedTier = (subscriptionTier || '').toString().toLowerCase();
   const isProOrEnterprise = normalizedTier === 'professional' || normalizedTier === 'enterprise';
 
@@ -112,7 +111,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
     }, 1500);
   };
 
-  // Direct Execution of the Gold-Standard Loss Control PDF Engine
   const handleDownloadClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setDownloadingState(true);
@@ -169,7 +167,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             </div>
 
-            {/* SINGLE-FLEET ADMINISTRATION (HIDDEN IN BROKER PORTAL) */}
+            {/* SINGLE-FLEET ADMINISTRATION */}
             {isAdmin && !isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">Administration</p>
@@ -269,7 +267,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   Underwriter Quick Tools
                 </p>
                 
-                {/* TIER-GATED: ONLY SHOWN FOR PROFESSIONAL & ENTERPRISE */}
                 {isProOrEnterprise && (
                   <button
                     type="button"
@@ -285,7 +282,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   </button>
                 )}
 
-                {/* AVAILABLE TO ALL TIERS: DIRECT CALL TO EXPORT ENGINE */}
                 <button
                   type="button"
                   onClick={handleDownloadClick}
@@ -320,15 +316,19 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
         </>
       )}
 
-      {/* EDIT AGENCY / FLEET NAME MODAL */}
-      {isOrgModalOpen && (
+      {/* EDIT AGENCY / FLEET NAME MODAL (PORTALED TO ESCAPE NAVBAR STACKING CONTEXT) */}
+      {isOrgModalOpen && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 font-mono text-slate-100">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                 ⚙️ {isBrokerPortal ? 'Agency Settings' : 'Organization Settings'}
               </h3>
-              <button onClick={() => setIsOrgModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button 
+                type="button"
+                onClick={() => setIsOrgModalOpen(false)} 
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
                 ✕
               </button>
             </div>
@@ -366,7 +366,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
