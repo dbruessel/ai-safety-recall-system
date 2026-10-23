@@ -52,6 +52,10 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   const normalizedRole = (userRole || 'admin').toString().toLowerCase();
   const isAdmin = normalizedRole === 'admin';
 
+  // Professional and Enterprise Tier Validation
+  const normalizedTier = (subscriptionTier || '').toString().toLowerCase();
+  const isProOrEnterprise = normalizedTier === 'professional' || normalizedTier === 'enterprise';
+
   const handleSaveOrgName = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newOrgName.trim();
@@ -252,26 +256,30 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
               </div>
             )}
 
-            {/* STANDARD FLEET QUICK TOOLS (ONLY SHOWN TO DIRECT FLEETS) */}
+            {/* DIRECT FLEET QUICK TOOLS */}
             {!isBrokerPortal && (
               <div className="space-y-1 border-t border-slate-800/80 pt-2">
                 <p className="text-[9px] text-slate-500 uppercase font-bold px-1 tracking-wider">
                   Underwriter Quick Tools
                 </p>
                 
-                <button
-                  type="button"
-                  onClick={handleShareClick}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                    copiedState
-                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
-                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  <span>{copiedState ? '✓ Link Copied!' : '🔗 Share Live Underwriter Link'}</span>
-                  <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
-                </button>
+                {/* TIER-GATED: ONLY SHOWN FOR PROFESSIONAL & ENTERPRISE */}
+                {isProOrEnterprise && (
+                  <button
+                    type="button"
+                    onClick={handleShareClick}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                      copiedState
+                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 font-bold'
+                        : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <span>{copiedState ? '✓ Link Copied!' : '🔗 Share Live Underwriter Link'}</span>
+                    <span className="text-slate-500">{copiedState ? '✓' : '📋'}</span>
+                  </button>
+                )}
 
+                {/* AVAILABLE TO ALL TIERS */}
                 <button
                   type="button"
                   onClick={handleDownloadClick}
