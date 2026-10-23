@@ -15,7 +15,7 @@ export interface AccountMenuProps {
   onOpenTeamModal: () => void;
   onOpenUpgradeModal: () => void;
   onCopyUnderwriterLink: () => void;
-  onDownloadRiskCard: () => void;
+  onDownloadRiskCard?: () => void;
   onSignOut: () => void;
 }
 
@@ -28,7 +28,6 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   onOpenTeamModal,
   onOpenUpgradeModal,
   onCopyUnderwriterLink,
-  //onDownloadRiskCard,
   onSignOut,
 }) => {
   const { refreshProfile } = useAuth();
@@ -113,6 +112,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
     }, 1500);
   };
 
+  // Direct Execution of the Gold-Standard Loss Control PDF Engine
   const handleDownloadClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setDownloadingState(true);
@@ -285,7 +285,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                   </button>
                 )}
 
-                {/* AVAILABLE TO ALL TIERS */}
+                {/* AVAILABLE TO ALL TIERS: DIRECT CALL TO EXPORT ENGINE */}
                 <button
                   type="button"
                   onClick={handleDownloadClick}
@@ -296,8 +296,8 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
                       : 'hover:bg-slate-800 text-slate-300 hover:text-white'
                   }`}
                 >
-                  <span>{downloadingState ? '⏳ Exporting PDF...' : '📄 Export Loss Control PDF'}</span>
-                  <span className="text-slate-500">{downloadingState ? '⏳' : '⬇️'}</span>
+                  <span>{downloadingState ? '⏳ Generating Certificate...' : '📄 Export Loss Control PDF'}</span>
+                  <span className="text-slate-500">{downloadingState ? '⏳' : '↗'}</span>
                 </button>
               </div>
             )}
