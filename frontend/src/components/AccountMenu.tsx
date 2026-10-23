@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { exportLossControlPdf } from '../utils/exportLossControlPdf';
 
 export type UserRole = 'admin' | 'mechanic' | 'viewer' | string;
 export type SubscriptionTier = 'free' | 'standard' | 'professional' | 'enterprise' | string;
@@ -27,7 +28,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   onOpenTeamModal,
   onOpenUpgradeModal,
   onCopyUnderwriterLink,
-  onDownloadRiskCard,
+  //onDownloadRiskCard,
   onSignOut,
 }) => {
   const { refreshProfile } = useAuth();
@@ -115,9 +116,14 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({
   const handleDownloadClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setDownloadingState(true);
-    await onDownloadRiskCard();
-    setDownloadingState(false);
-    setIsOpen(false);
+    try {
+      await exportLossControlPdf(displayTitle);
+    } catch (err) {
+      console.error('PDF export error:', err);
+    } finally {
+      setDownloadingState(false);
+      setIsOpen(false);
+    }
   };
 
   return (
