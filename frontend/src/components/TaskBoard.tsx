@@ -26,9 +26,7 @@ interface FleetTask {
 }
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({
-  onSignOut,
   userCompany = 'Standard Fleet Co.',
-  userRole = 'Fleet Manager',
   userTier = 'standard',
 }) => {
   // MODAL STATES
@@ -174,36 +172,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black">
-      {/* TOP WORKSPACE NAVIGATION */}
-      <nav className="border-b border-slate-800 bg-[#0B0F17]/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3 font-mono">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="font-extrabold text-white text-sm tracking-wide">RECALLLOGIC WORKSPACE</span>
-            <span className="text-slate-600 text-xs">|</span>
-            <span className="text-xs text-slate-400">Safety Intelligence System</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-white font-bold">{userCompany}</span>
-              <span className="text-slate-400 text-[10px] uppercase">({userRole})</span>
-              <span className="text-slate-500 text-[10px] uppercase">[{userTier}]</span>
-            </div>
-
-            {onSignOut && (
-              <button
-                type="button"
-                onClick={onSignOut}
-                className="text-xs text-slate-400 hover:text-white transition cursor-pointer"
-              >
-                Sign Out
-              </button>
-            )}
-          </div>
-        </div>
-      </nav>
-
       <main className="max-w-7xl mx-auto p-6 space-y-6">
         {/* HEADER TITLE BAR */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
@@ -376,7 +344,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                       setIsBulkImportOpen(true);
                     }
                   }}
-                  className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold rounded transition shadow-md shadow-cyan-950 font-bold cursor-pointer text-[10px]"
+                  className="px-3 py-1 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold rounded transition shadow-md shadow-cyan-950 cursor-pointer text-[10px]"
                 >
                   + Import (.CSV)
                 </button>
