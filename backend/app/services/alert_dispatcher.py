@@ -45,7 +45,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # Email Dispatch Configuration
 RESEND_API_KEY = (os.getenv("RESEND_API_KEY") or "").strip()
-ALERT_FROM_EMAIL = (os.getenv("ALERT_FROM_EMAIL") or "RecallLogic Alerts <alerts@recalllogic.ai>").strip()
+ALERT_FROM_EMAIL = (os.getenv("ALERT_FROM_EMAIL") or "RecallLogic Alerts <onboarding@resend.dev>").strip()
 
 
 def fetch_new_recall_tasks(days_back: int = 30) -> List[Dict[str, Any]]:
