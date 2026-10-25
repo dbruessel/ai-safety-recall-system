@@ -7,6 +7,8 @@ import AcceptInvite from './components/AcceptInvite';
 import Footer from './components/Footer';
 import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
+import { ShareUnderwriterModal } from './components/ShareUnderwriterModal';
+import { UnderwriterReportView } from './components/UnderwriterReportView';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -20,9 +22,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const MainApp: React.FC = () => {
   const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
 
-  // Standalone Subpath Route Checks
+  // Standalone Subpath Route Checks (Bypasses Fleet/Broker Authentication)
   const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
   const isAcceptInvitePath = window.location.pathname.toLowerCase().startsWith('/accept-invite');
+  const isUnderwriterPortalPath = window.location.pathname.toLowerCase().startsWith('/portal/audit');
 
   // Track DEMO routes for Fleet & Broker outreach
   const isFleetDemoPath = window.location.pathname.toLowerCase().includes('/taskboard/demo') || new URLSearchParams(window.location.search).get('role') === 'fleet';
@@ -120,6 +123,11 @@ const MainApp: React.FC = () => {
 
     handlePostCheckoutSync();
   }, [user, companyName]);
+
+  // UNRESTRICTED PUBLIC ACCESS: TOKENIZED UNDERWRITER AUDIT PORTAL
+  if (isUnderwriterPortalPath) {
+    return <UnderwriterReportView />;
+  }
 
   if (isSignupPath) {
     return <BrokerSignup />;
@@ -265,7 +273,7 @@ const MainApp: React.FC = () => {
                   onSignOut={signOut}
                 />
               ) : (
-                /* STANDARD FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
+                /* STANDARD & PRO FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
                 <AccountMenu
                   userEmail={currentEmail}
                   orgName={getUserOrgName()}
@@ -307,7 +315,11 @@ const MainApp: React.FC = () => {
             {activeView === 'broker_portal' && !auditingFleetId ? (
               <BrokerPortal />
             ) : (
-              <Taskboard {...({ userTier: effectiveTier } as any)} />
+              <Taskboard
+                userCompany={getUserOrgName()}
+                userRole={userRole || 'admin'}
+                userTier={effectiveTier as any}
+              />
             )}
           </main>
 
@@ -335,13 +347,21 @@ const MainApp: React.FC = () => {
         />
       )}
 
-      {/* SHARE / BROKER LINK MODAL */}
+      {/* SHARE / UNDERWRITER LINK MODAL */}
       {isShareModalOpen && (
-        <BrokerShareModal
-          isOpen={isShareModalOpen}
-          shareUrl={window.location.href}
-          onClose={() => setIsShareModalOpen(false)}
-        />
+        isBrokerUser || isBrokerDemoPath ? (
+          <BrokerShareModal
+            isOpen={isShareModalOpen}
+            shareUrl={window.location.href}
+            onClose={() => setIsShareModalOpen(false)}
+          />
+        ) : (
+          <ShareUnderwriterModal
+            isOpen={isShareModalOpen}
+            userCompany={getUserOrgName()}
+            onClose={() => setIsShareModalOpen(false)}
+          />
+        )
       )}
     </div>
   );
