@@ -319,6 +319,7 @@ const MainApp: React.FC = () => {
                 userCompany={getUserOrgName()}
                 userRole={userRole || 'admin'}
                 userTier={effectiveTier as any}
+                onOpenShareModal={handleCopyUnderwriterLink}
               />
             )}
           </main>
