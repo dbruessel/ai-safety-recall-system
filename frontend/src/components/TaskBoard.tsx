@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { BulkCsvImportModal } from './BulkCsvImportModal';
 import { SingleVinScanModal } from './SingleVinScanModal';
 import { PricingUpgradeModal } from './PricingUpgradeModal';
+import { ShareUnderwriterModal } from './ShareUnderwriterModal';
 import { exportLossControlPdf } from '../utils/exportLossControlPdf';
 
 export interface TaskBoardProps {
@@ -10,6 +11,7 @@ export interface TaskBoardProps {
   userCompany?: string;
   userRole?: string;
   userTier?: 'standard' | 'professional' | 'enterprise';
+  onOpenShareModal?: () => void;
 }
 
 interface FleetTask {
@@ -29,11 +31,13 @@ interface FleetTask {
 export const TaskBoard: React.FC<TaskBoardProps> = ({
   userCompany = 'Standard Fleet Co.',
   userTier = 'standard',
+  onOpenShareModal,
 }) => {
   // MODAL STATES
   const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
   const [isSingleScanOpen, setIsSingleScanOpen] = useState<boolean>(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
 
   // SEARCH AND FILTER STATES
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -124,11 +128,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     loadMonitoredVehicles();
   }, []);
 
-  // CAPACITY LIMITS BASED ON TIER
   const maxVinCapacity = userTier === 'standard' ? 50 : userTier === 'professional' ? 250 : 9999;
   const currentVinCount = tasks.length;
 
-  // DYNAMIC PUNITIVE EXPOSURE ENGINE ($250k SHIELD)
   const exposureMetrics = useMemo(() => {
     let exposure = 0;
     let nuclearBreaches = 0;
@@ -171,6 +173,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   const nuclearAlerts = tasks.filter((t) => t.severity === 'NUCLEAR' && t.compliance_status === 'OPEN');
 
+  const handleOpenShare = () => {
+    if (onOpenShareModal) {
+      onOpenShareModal();
+    } else {
+      setIsShareModalOpen(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 font-sans selection:bg-[#06B6D4] selection:text-black">
       <main className="max-w-7xl mx-auto p-6 space-y-6">
@@ -195,7 +205,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             {userTier !== 'standard' && (
               <button
                 type="button"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold rounded-lg transition cursor-pointer flex items-center gap-2"
+                onClick={handleOpenShare}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold rounded-lg transition cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 <span>🔗 Share Live Underwriter Link</span>
               </button>
@@ -248,9 +259,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </div>
         )}
 
-        {/* METRICS GRID: CAPACITY & LEGAL DEFENSE SHIELD */}
+        {/* METRICS GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* CARD 1: PUNITIVE LIABILITY SHIELD */}
           <div
             className={`p-4 rounded-xl border flex flex-col justify-between gap-3 font-mono text-xs shadow-lg transition-all ${
               exposureMetrics.isShieldActive
@@ -312,7 +322,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             </div>
           </div>
 
-          {/* CARD 2: MONITORED FLEET CAPACITY */}
           <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between gap-3 font-mono text-xs shadow-lg">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -471,7 +480,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                               : '✓ CLEARED'}
                           </span>
 
-                          {/* ROW-LEVEL PUNITIVE LIABILITY IMPACT */}
                           {task.compliance_status === 'OPEN' ? (
                             <span className="text-[9px] font-bold text-red-400 bg-red-950/60 px-1.5 py-0.5 rounded border border-red-900/60">
                               {task.severity === 'NUCLEAR' ? '+$250k Exposure' : '+$50k Exposure'}
@@ -529,6 +537,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       </main>
 
       {/* MODAL COMPONENTS */}
+      {isShareModalOpen && (
+        <ShareUnderwriterModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          userCompany={userCompany}
+        />
+      )}
+
       {isBulkImportOpen && (
         <BulkCsvImportModal
           isOpen={isBulkImportOpen}
