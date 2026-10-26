@@ -25,6 +25,8 @@ class StripeCheckoutRequest(BaseModel):
     customer_email: Optional[str] = None
     tier: Optional[str] = "professional"
     company_name: Optional[str] = "My Fleet Co."
+    user_id: Optional[str] = None
+    profile_id: Optional[str] = None
     success_url: Optional[str] = "https://recalllogic.ai/taskboard/demo?checkout=success"
     cancel_url: Optional[str] = "https://recalllogic.ai/taskboard/demo?checkout=cancel"
 
@@ -41,12 +43,19 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
         raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is missing on server.")
     stripe.api_key = secret_key
 
-    target_email = (payload.email or payload.customer_email or "admin@fleet.com").strip()
+    # Check for placeholder emails so we never lock checkout to admin@fleet.com
+    raw_email = (payload.email or payload.customer_email or "").strip()
+    ignored_placeholders = {"admin@fleet.com", "test@test.com", "user@example.com", ""}
+    
+    target_email = None
+    if raw_email and raw_email.lower() not in ignored_placeholders and not raw_email.lower().startswith("demo-"):
+        target_email = raw_email
     
     # Normalize tier name aliases ("pro" -> "professional")
     raw_tier = (payload.tier or "professional").lower().strip()
     tier = "professional" if raw_tier in ["pro", "professional"] else raw_tier
     company_name = (payload.company_name or "My Fleet Co.").strip()
+    profile_id = (payload.profile_id or payload.user_id or "").strip()
 
     # Match exact environment keys across Render / .env
     price_map = {
@@ -66,33 +75,35 @@ async def create_checkout_session(payload: StripeCheckoutRequest):
     }
 
     price_id = price_map.get(tier)
-    print(f"DEBUG: Initiating Stripe Checkout for email='{target_email}', tier='{tier}', price_id='{price_id}'")
+    print(f"DEBUG: Initiating Stripe Checkout for email='{target_email or 'unspecified (editable)'}', tier='{tier}', price_id='{price_id}'")
+
+    if not price_id or not price_id.startswith("price_"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Stripe Price ID for tier '{tier}' is missing or invalid in server environment variables."
+        )
 
     try:
-        # Search or create customer in Stripe
-        customers = stripe.Customer.list(email=target_email, limit=1)
-        customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
-
-        if price_id and price_id.startswith("price_"):
-            line_items = [{"price": price_id, "quantity": 1}]
-        else:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Stripe Price ID for tier '{tier}' is missing or invalid in server environment variables."
-            )
-
-        session = stripe.checkout.Session.create(
-            customer=customer_id,
-            payment_method_types=["card"],
-            mode="subscription",
-            line_items=line_items,
-            metadata={
+        # Base session configuration
+        session_params = {
+            "payment_method_types": ["card"],
+            "mode": "subscription",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "metadata": {
                 "tier": tier,
                 "company_name": company_name,
+                "profile_id": profile_id,
             },
-            success_url=payload.success_url or "https://recalllogic.ai/taskboard/demo?checkout=success",
-            cancel_url=payload.cancel_url or "https://recalllogic.ai/taskboard/demo?checkout=cancel",
-        )
+            "success_url": payload.success_url or "https://recalllogic.ai/taskboard/demo?checkout=success",
+            "cancel_url": payload.cancel_url or "https://recalllogic.ai/taskboard/demo?checkout=cancel",
+        }
+
+        # If a real email was supplied, prefill customer_email (allows editing in Checkout).
+        # We deliberately DO NOT pass `customer=customer_id` because passing `customer` locks the email field.
+        if target_email:
+            session_params["customer_email"] = target_email
+
+        session = stripe.checkout.Session.create(**session_params)
 
         return {"url": session.url, "sessionId": session.id}
 
@@ -162,6 +173,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         metadata = session.get("metadata", {})
         tier = metadata.get("tier", "professional").lower().strip()
         company_name = metadata.get("company_name", "My Fleet Co.").strip()
+        profile_id = metadata.get("profile_id", "").strip()
 
         tier_vehicle_limits = {
             "standard": 50,
@@ -170,27 +182,32 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         }
         vehicle_limit = tier_vehicle_limits.get(tier, 50)
 
-        if customer_email:
-            supabase_admin = get_supabase_admin()
+        supabase_admin = get_supabase_admin()
 
-            org_res = supabase_admin.table("organizations").upsert(
-                {"name": company_name, "subscription_tier": tier},
-                on_conflict="name"
-            ).execute()
-            
-            org_id = org_res.data[0]["id"] if org_res.data else None
+        org_res = supabase_admin.table("organizations").upsert(
+            {"name": company_name, "subscription_tier": tier},
+            on_conflict="name"
+        ).execute()
+        
+        org_id = org_res.data[0]["id"] if org_res.data else None
 
-            supabase_admin.table("profiles").update({
-                "stripe_customer_id": stripe_customer_id,
-                "stripe_subscription_id": stripe_subscription_id,
-                "subscription_status": "active",
-                "status": "active",
-                "subscription_tier": tier,
-                "vehicle_limit": vehicle_limit,
-                "company_name": company_name,
-                "organization_id": org_id,
-            }).eq("email", customer_email.strip()).execute()
+        update_payload = {
+            "stripe_customer_id": stripe_customer_id,
+            "stripe_subscription_id": stripe_subscription_id,
+            "subscription_status": "active",
+            "status": "active",
+            "subscription_tier": tier,
+            "vehicle_limit": vehicle_limit,
+            "company_name": company_name,
+            "organization_id": org_id,
+        }
 
-            print(f"✅ Webhook successfully provisioned active {tier} tier ({vehicle_limit} VINs) for {customer_email}")
+        # If profile_id was passed in metadata, update directly by ID
+        if profile_id:
+            supabase_admin.table("profiles").update(update_payload).eq("id", profile_id).execute()
+            print(f"✅ Webhook provisioned active {tier} tier ({vehicle_limit} VINs) for profile ID {profile_id}")
+        elif customer_email:
+            supabase_admin.table("profiles").update(update_payload).eq("email", customer_email.strip()).execute()
+            print(f"✅ Webhook provisioned active {tier} tier ({vehicle_limit} VINs) for {customer_email}")
 
     return {"status": "success"}
