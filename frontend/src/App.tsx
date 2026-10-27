@@ -303,6 +303,7 @@ const MainApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {/* CONDITIONAL MAIN VIEW */}
       {!isAuthenticated ? (
         <LandingPage
           onSignIn={signInDemo}
@@ -421,10 +422,11 @@ const MainApp: React.FC = () => {
               />
             )}
           </main>
-
-          <Footer />
         </>
       )}
+
+      {/* UNIVERSAL SITE FOOTER (Rendered universally across all pages) */}
+      <Footer />
 
       {/* TEAM MANAGEMENT MODAL */}
       {activeAdminModal === 'team' && (
