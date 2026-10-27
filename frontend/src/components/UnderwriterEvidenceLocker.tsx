@@ -87,19 +87,26 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
     (item) => filterTerminal === 'ALL' || item.terminal.includes(filterTerminal)
   );
 
-  // Generate an institutional audit reference number instead of exposing raw base64 tokens
   const certRefId = `CERT-2026-RL-${(token.length > 8 ? token.slice(-6) : '8842').toUpperCase()}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 md:p-12 print:p-0 print:bg-white print:text-black">
       <div className="max-w-6xl mx-auto space-y-8">
-        {/* Top Institutional Control Bar */}
+        {/* Top Floating Control Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-5 py-3.5 shadow-lg gap-3 print:hidden">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
-              Continuous Underwriting Audit Ledger • Cryptographically Verified
-            </span>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/recall-logo.png" 
+              alt="RecallLogic" 
+              className="h-7 w-auto object-contain hidden sm:inline-block"
+              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+            />
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
+                Continuous Risk Defense Ledger • Cryptographically Verified
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-mono">
@@ -127,7 +134,7 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           </div>
         </div>
 
-        {/* White-Label Co-Branded Certificate Card */}
+        {/* Co-Branded Certificate Card (Page 1 in Print) */}
         <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden print:border-none print:shadow-none print:bg-white print:p-4">
           <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none print:hidden" />
 
@@ -244,8 +251,8 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           </div>
         </div>
 
-        {/* Audit Evidence Table */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-xl print:border-slate-300 print:bg-white">
+        {/* Audit Evidence Table: Clean Page Break on Print */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-xl print:border-slate-300 print:bg-white print:break-before-page">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-mono tracking-wider text-slate-400 print:bg-slate-100 print:text-slate-700 print:border-slate-300">
@@ -296,14 +303,14 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
 
         {/* Official Audit Seal & Legal Attestation */}
         <div className="text-center pt-4 pb-12 text-xs font-mono text-slate-500 space-y-1 print:text-slate-600 print:pb-4">
-          <div className="font-bold tracking-wider text-slate-400 print:text-black">
+          <div className="font-bold tracking-wider text-slate-300 print:text-black">
             RECALLLOGIC™ CONTINUOUS RISK DEFENSE PLATFORM • IMMUTABLE LOSS CONTROL AUDIT RECORD
           </div>
           <div>
-            Data sourced live via official NHTSA API endpoints, OEM manufacturer direct telematics, and active Fleetio maintenance work orders.
+            Continuous data orchestration via official NHTSA API endpoints, OEM telemetry feeds, and active Fleetio maintenance work orders.
           </div>
-          <div className="text-[11px] text-slate-600 print:text-slate-500">
-            Certified for submission to commercial auto insurance underwriters, excess surplus lines, and state compliance boards.
+          <div className="text-[11px] text-slate-500 print:text-slate-500">
+            Certified for loss-control credit evaluation by commercial auto underwriting teams, excess surplus lines, and actuarial audit boards.
           </div>
         </div>
       </div>
