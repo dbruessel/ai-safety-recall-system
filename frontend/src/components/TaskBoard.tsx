@@ -43,7 +43,7 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 250000,
     ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
     remedy_logistics: 'Fleetio Work Order Issued',
-    work_order_id: 'WO-FLT-889102',
+    work_order_id: 'WO #22',
   },
   {
     id: 'veh-2',
