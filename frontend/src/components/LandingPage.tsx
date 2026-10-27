@@ -964,9 +964,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* TRUST BANNER / FOOTER TAGLINE */}
       <section className="py-10 bg-[#070B14] border-t border-slate-800 text-center px-4">
-        <blockquote className="max-w-4xl mx-auto font-mono text-xs sm:text-sm text-cyan-300/90 leading-relaxed">
-          "You manage your drivers with telematics. You manage your maintenance with Fleetio. You secure your mechanical liability with RecallLogic."
-        </blockquote>
+       <div className="py-12 bg-black/60 border-t border-slate-900 text-center px-4">
+       <p className="font-mono text-cyan-400 text-sm sm:text-base max-w-3xl mx-auto leading-relaxed">
+       "You manage your drivers with telematics. You manage your maintenance with Fleetio. You defend your risk and underwriter rate credits with RecallLogic Continuous Risk Defense Platform."
+        </p>
+    </div>
       </section>
 
       {/* BROKER PARTNER REQUEST ACCESS MODAL */}
