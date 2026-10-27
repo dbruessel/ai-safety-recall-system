@@ -345,9 +345,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 md:p-8">
+    <div className="w-full text-slate-100 font-sans space-y-6">
       {/* Top Header & Breadcrumbs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tracking-wider uppercase mb-1">
             {onNavigatePortfolio && (
@@ -365,6 +365,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             <span className="text-cyan-300 font-bold">{userCompany}</span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase">
               Role: {userRole}
+            </span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 uppercase">
+              Continuous Risk Defense Active
             </span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 uppercase">
               Verified Evidence Locker
@@ -386,7 +389,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
           <button
             type="button"
-            onClick={() => alert('Generating tamper-proof Loss Control Certificate PDF for underwriters...')}
+            onClick={() => window.print()}
             className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs transition cursor-pointer shadow-md shadow-cyan-950/50"
           >
             <span>📄</span> Export Loss Control PDF
@@ -407,13 +410,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
       {/* Critical Defect Exposure Alert Banner */}
       {filteredCriticalCount > 0 && (
-        <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-red-950/60 via-red-900/30 to-slate-900/80 border border-red-800/70 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="p-4 rounded-xl bg-gradient-to-r from-red-950/60 via-red-900/30 to-slate-900/80 border border-red-800/70 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="text-2xl mt-0.5">⚠️</span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold text-sm text-red-200 font-mono tracking-wide">
-                  {filteredCriticalCount} NUCLEAR DEFECT ALERT(S) DETECTED
+                  {filteredCriticalCount} CRITICAL DEFECT ALERT(S) DETECTED
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-red-950 text-red-400 border border-red-700/80 rounded">
                   Critical Hazard
@@ -439,13 +442,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       )}
 
       {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Card 1: Loss Control Shield */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">
-                <span>🚨</span> INSURTECH LOSS CONTROL SHIELD
+                <span>🛡️</span> CONTINUOUS LOSS CONTROL SHIELD
               </div>
               {filteredCriticalCount > 0 ? (
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-red-950/80 text-red-400 border border-red-800 rounded">
@@ -532,14 +535,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
-            <span>Real-time NHTSA & OEM Ingestion</span>
+            <span>Continuous NHTSA & Telematics Sync</span>
             <span className="text-slate-300">{availableSlots.toLocaleString()} slots available</span>
           </div>
         </div>
       </div>
 
       {/* Control Bar: Search + Terminal Selector + Status Tabs */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         {/* Search Input */}
         <div className="relative flex-1">
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-xs">
@@ -848,7 +851,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
             />
 
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex items-between justify-between mt-4">
               <span className="text-[11px] text-slate-500 font-mono">
                 Enterprise capacity: {availableSlots.toLocaleString()} remaining
               </span>
@@ -880,7 +883,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <span className="text-[10px] font-mono uppercase text-cyan-400 font-bold tracking-wider">
-                  Enterprise Insurtech White-Label
+                  Continuous Risk Defense Platform
                 </span>
                 <h3 className="text-lg font-extrabold text-white">
                   Co-Branded Underwriter Evidence Locker

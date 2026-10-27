@@ -274,26 +274,41 @@ const MainApp: React.FC = () => {
         />
       ) : (
         <>
-          {/* TOP GLOBAL HEADER */}
-          <header className="border-b border-slate-800/80 bg-[#070B14]/90 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-3 flex items-center justify-between">
+          {/* TOP GLOBAL HEADER WITH BRAND LOGO */}
+          <header className="border-b border-slate-800/80 bg-[#070B14]/95 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-[#06B6D4] font-extrabold tracking-wider font-mono text-sm sm:text-base">
-                RECALLLOGIC WORKSPACE
-              </span>
-              <span className="hidden sm:inline-block text-slate-600">|</span>
-              <span className="hidden sm:inline-block text-slate-400 font-mono text-xs">
+              <a href="/" className="flex items-center gap-3 hover:opacity-95 transition">
+                <img 
+                  src="/recall-logo.png" 
+                  alt="RecallLogic Continuous Risk Defense" 
+                  className="h-9 w-auto object-contain"
+                  onError={(e) => {
+                    // Fallback to stylized text badge if logo file is loading
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <div className="flex flex-col">
+                  <span className="text-[#06B6D4] font-extrabold tracking-wider font-mono text-sm sm:text-base leading-none">
+                    RECALLLOGIC
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono tracking-widest uppercase mt-0.5">
+                    Continuous Risk Defense Platform
+                  </span>
+                </div>
+              </a>
+              <span className="hidden md:inline-block text-slate-700 mx-1">|</span>
+              <span className="hidden md:inline-block text-slate-400 font-mono text-xs">
                 {isBrokerDemoPath
                   ? 'BROKER AUDIT DEMO MODE'
                   : isFleetDemoPath
                   ? 'FLEET AUDIT DEMO MODE'
-                  : 'Safety Intelligence System'}
+                  : 'Enterprise Loss Control System'}
               </span>
             </div>
 
             {/* UNIFIED ROLE-BASED HEADER INDICATOR & ACCOUNT MENU */}
             <div className="flex items-center gap-3">
               {isBrokerUser || isBrokerDemoPath ? (
-                /* BROKER PERSONA WITH BROKER-SPECIFIC ACCOUNT MENU */
                 <AccountMenu
                   userEmail={currentEmail}
                   orgName={getUserOrgName()}
@@ -307,7 +322,6 @@ const MainApp: React.FC = () => {
                   onSignOut={signOut}
                 />
               ) : (
-                /* STANDARD & PRO FLEET PERSONA WITH FULL ACCOUNT DROPDOWN */
                 <AccountMenu
                   userEmail={currentEmail}
                   orgName={getUserOrgName()}
@@ -326,7 +340,7 @@ const MainApp: React.FC = () => {
 
           {/* ACTIVE CLIENT AUDIT BREADCRUMB BANNER */}
           {auditingFleetId && (
-            <div className="bg-cyan-950/40 border-b border-cyan-500/30 px-6 py-2 flex items-center justify-between text-xs font-mono text-cyan-300">
+            <div className="bg-cyan-950/40 border-b border-cyan-500/30 px-6 py-2.5 flex items-center justify-between text-xs font-mono text-cyan-300">
               <div className="flex items-center gap-2">
                 <span>🏛️ Portfolio Command &gt;</span>
                 <span className="font-bold text-white">🚚 Auditing: {auditingFleetId} [Read-Only Mode]</span>
@@ -344,8 +358,8 @@ const MainApp: React.FC = () => {
             </div>
           )}
 
-          {/* MAIN CONTENT ROUTER */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+          {/* MAIN CONTENT ROUTER: EXPANSIVE CONTAINER (max-w-[1680px]) */}
+          <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1680px] mx-auto w-full">
             {activeView === 'broker_portal' && !auditingFleetId ? (
               <BrokerPortal />
             ) : (
