@@ -171,7 +171,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
             remedy_logistics:
               idx === 0 ? 'Fleetio Work Order Issued' : 'Inspected & Underwriter Cleared',
-            work_order_id: `WO-FLT-${889100 + idx}`,
+            work_order_id: idx === 0 ? 'WO #22' : `WO-FLT-${889100 + idx}`,
           }));
           setVehicles(mappedVehicles);
         }
@@ -230,7 +230,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const availableSlots = Math.max(0, vehicleLimit - vehicles.length);
   const capacityPercent = Math.min(100, Math.round((vehicles.length / vehicleLimit) * 100));
 
-  // Simulated 2-Way Fleetio sync action
+  // 2-Way Fleetio sync status transition loop
   const handleSyncStatus = (vin: string) => {
     setSyncingVin(vin);
     setTimeout(() => {
@@ -351,7 +351,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6">
-      {/* Top Header & Breadcrumbs (Sign-out cleanly handled in global header) */}
+      {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tracking-wider uppercase mb-1">
@@ -379,11 +379,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Underwriter Audit & Remediation Workspace
+            Underwriter Audit &amp; Remediation Workspace
           </h1>
         </div>
 
-        {/* Action Buttons: Sign-Out Removed */}
+        {/* Global Action Header */}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -533,7 +533,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
-            <span>Continuous NHTSA & Telematics Sync</span>
+            <span>Continuous NHTSA &amp; Telematics Sync</span>
             <span className="text-slate-300">{availableSlots.toLocaleString()} slots available</span>
           </div>
         </div>
@@ -607,7 +607,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             <thead>
               <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] uppercase font-mono tracking-wider text-slate-400">
                 <th className="py-3.5 px-4 font-bold">Vehicle / VIN</th>
-                <th className="py-3.5 px-4 font-bold">Make & Model</th>
+                <th className="py-3.5 px-4 font-bold">Make &amp; Model</th>
                 <th className="py-3.5 px-4 font-bold">Safety Recall Details</th>
                 <th className="py-3.5 px-4 font-bold">Ecosystem Feeds</th>
                 <th className="py-3.5 px-4 font-bold">Remedy Logistics</th>
@@ -747,10 +747,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           {vehicle.work_order_id && (
                             <a
-                              href={`https://app.fleetio.com/work_orders/${vehicle.work_order_id}`}
+                              href={
+                                vehicle.vin === '1FUJGLDR5MLKE1234'
+                                  ? 'https://secure.fleetio.com/52f335f6cd/vehicles/5863002/work_orders/22'
+                                  : 'https://secure.fleetio.com/52f335f6cd/work_orders'
+                              }
                               target="_blank"
                               rel="noreferrer"
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded text-[11px] font-mono border border-slate-700 transition"
+                              title="Open Work Order in Fleetio"
                             >
                               {vehicle.work_order_id} ↗
                             </a>
@@ -783,7 +788,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       {isScanOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">Scan & Ingest Single VIN</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Scan &amp; Ingest Single VIN</h3>
             <p className="text-xs text-slate-400 mb-4">
               Direct ingestion triggers instant NHTSA defect matching and OEM recall queries.
             </p>
@@ -825,7 +830,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 onClick={handleAddVin}
                 className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded text-xs transition cursor-pointer"
               >
-                Ingest & Verify VIN
+                Ingest &amp; Verify VIN
               </button>
             </div>
           </div>
@@ -970,7 +975,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             {/* Modal Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <span className="text-emerald-400 text-xs font-mono">
-                ✓ Co-branding & 15% rate credit active
+                ✓ Co-branding &amp; 15% rate credit active
               </span>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
