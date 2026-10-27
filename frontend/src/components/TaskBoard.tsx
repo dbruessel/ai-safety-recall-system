@@ -23,7 +23,6 @@ interface TaskBoardProps {
   userCompany?: string;
   userTier?: string;
   userRole?: string;
-  onSignOut?: () => void;
   onNavigatePortfolio?: () => void;
   onOpenShareModal?: () => void;
 }
@@ -110,7 +109,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   userCompany = 'Dennis Enterprise Fleet',
   userTier = 'enterprise',
   userRole = 'admin',
-  onSignOut,
   onNavigatePortfolio,
   onOpenShareModal,
 }) => {
@@ -139,7 +137,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   useEffect(() => {
     const fetchMonitoredVehicles = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         const { data, error } = await supabase
@@ -271,7 +271,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       make: 'FREIGHTLINER',
       model: 'CASCADIA',
       year: 2024,
-      terminal: scanTerminalInput.trim() || (selectedTerminal !== 'ALL' ? selectedTerminal : 'Dallas Hub (TX)'),
+      terminal:
+        scanTerminalInput.trim() ||
+        (selectedTerminal !== 'ALL' ? selectedTerminal : 'Dallas Hub (TX)'),
       division: 'Southwest Division',
       campaign_id: 'CLEAN',
       safety_recall_details: 'No Open NHTSA Defect Campaigns',
@@ -299,7 +301,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       if (parts[0] && parts[0].length >= 11) {
         const vin = parts[0].toUpperCase();
         const unit = parts[1] || `UNIT-${vehicles.length + idx + 101}`;
-        const terminal = parts[2] || (selectedTerminal !== 'ALL' ? selectedTerminal : 'Dallas Hub (TX)');
+        const terminal =
+          parts[2] || (selectedTerminal !== 'ALL' ? selectedTerminal : 'Dallas Hub (TX)');
         const division = parts[3] || 'Southwest Division';
 
         imported.push({
@@ -330,7 +333,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   const handleCopyUnderwriterLink = () => {
-    const bearerUrl = `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(userCompany).slice(0, 16)}`;
+    const bearerUrl = `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(
+      userCompany
+    ).slice(0, 16)}`;
     navigator.clipboard.writeText(bearerUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -346,7 +351,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6">
-      {/* Top Header & Breadcrumbs */}
+      {/* Top Header & Breadcrumbs (Sign-out cleanly handled in global header) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tracking-wider uppercase mb-1">
@@ -378,6 +383,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </h1>
         </div>
 
+        {/* Action Buttons: Sign-Out Removed */}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -394,17 +400,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           >
             <span>📄</span> Export Loss Control PDF
           </button>
-
-          {onSignOut && (
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-red-950/50 border border-slate-800 hover:border-red-800/80 rounded-lg text-xs font-semibold text-slate-400 hover:text-red-300 transition cursor-pointer"
-              title={`Sign out of ${userCompany} (${userRole})`}
-            >
-              <span>🚪</span> Sign Out
-            </button>
-          )}
         </div>
       </div>
 
@@ -426,7 +421,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1">
-                Vehicles operating with unaddressed, critical safety recalls (Brakes/Steering). Standard commercial policies exclude punitive damages under Negligent Maintenance doctrines.
+                Vehicles operating with unaddressed, critical safety recalls (Brakes/Steering).
+                Standard commercial policies exclude punitive damages under Negligent Maintenance doctrines.
               </p>
             </div>
           </div>
@@ -486,7 +482,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 : `Filtered Scope: ${selectedTerminal}`}
             </span>
             <span className="text-cyan-400 font-medium">
-              {filteredExposure > 0 ? 'Remediate in Fleetio to defend loss ratio' : 'Underwriter audit certified ✓'}
+              {filteredExposure > 0
+                ? 'Remediate in Fleetio to defend loss ratio'
+                : 'Underwriter audit certified ✓'}
             </span>
           </div>
         </div>
@@ -851,7 +849,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
             />
 
-            <div className="flex items-between justify-between mt-4">
+            <div className="flex items-center justify-between mt-4">
               <span className="text-[11px] text-slate-500 font-mono">
                 Enterprise capacity: {availableSlots.toLocaleString()} remaining
               </span>
@@ -963,7 +961,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 Immutable Read-Only Underwriter Token Link
               </label>
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-[11px] text-cyan-300 break-all select-all">
-                https://recalllogic.ai/audit/evidence-locker?token=rl_live_{btoa(userCompany).slice(0, 16)}
+                https://recalllogic.ai/audit/evidence-locker?token=rl_live_{btoa(
+                  userCompany
+                ).slice(0, 16)}
               </div>
             </div>
 
@@ -985,7 +985,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                   type="button"
                   onClick={() => {
                     window.open(
-                      `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(userCompany).slice(0, 16)}`,
+                      `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(
+                        userCompany
+                      ).slice(0, 16)}`,
                       '_blank'
                     );
                   }}
