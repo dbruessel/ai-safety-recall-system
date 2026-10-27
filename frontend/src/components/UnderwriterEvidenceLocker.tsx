@@ -9,6 +9,8 @@ interface UnderwriterEvidenceLockerProps {
   riskOfficerEmail?: string;
   riskOfficerPhone?: string;
   token?: string;
+  dotNumber?: string;
+  policyPeriod?: string;
   onClosePreview?: () => void;
 }
 
@@ -75,6 +77,8 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
   riskOfficerEmail = 'safety@dennisfleet.com',
   riskOfficerPhone = '(214) 555-0144',
   token = 'rl_live_RGVubmlzIEVudGVycA',
+  dotNumber = 'USDOT #3940192 • MC-881290',
+  policyPeriod = '2026–2027 Policy Term',
   onClosePreview,
 }) => {
   const [filterTerminal, setFilterTerminal] = useState<string>('ALL');
@@ -83,27 +87,39 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
     (item) => filterTerminal === 'ALL' || item.terminal.includes(filterTerminal)
   );
 
+  // Generate an institutional audit reference number instead of exposing raw base64 tokens
+  const certRefId = `CERT-2026-RL-${(token.length > 8 ? token.slice(-6) : '8842').toUpperCase()}`;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 md:p-12">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 md:p-12 print:p-0 print:bg-white print:text-black">
       <div className="max-w-6xl mx-auto space-y-8">
-        {/* Top Floating Control Bar */}
-        <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-5 py-3 shadow-lg">
-          <div className="flex items-center gap-2">
+        {/* Top Institutional Control Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-5 py-3.5 shadow-lg gap-3 print:hidden">
+          <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
-              Cryptographically Verified Underwriter Bearer Token
+            <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
+              Continuous Underwriting Audit Ledger • Cryptographically Verified
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-cyan-400 hidden sm:inline">
-              Token ID: {token.slice(0, 18)}...
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <span className="text-slate-400 hidden md:inline">
+              Audit Ref: <strong className="text-cyan-400 font-mono">{certRefId}</strong>
             </span>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-medium rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+            >
+              <span>🖨️</span> Print / Save PDF
+            </button>
+
             {onClosePreview && (
               <button
                 type="button"
                 onClick={onClosePreview}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono rounded border border-slate-700 transition cursor-pointer"
+                className="px-2.5 py-1.5 text-slate-400 hover:text-slate-200 text-xs font-mono cursor-pointer transition border border-transparent hover:border-slate-800 rounded-lg"
               >
                 Close Preview ✕
               </button>
@@ -111,26 +127,28 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           </div>
         </div>
 
-        {/* White-Label Co-Branded Certificate Header */}
-        <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+        {/* White-Label Co-Branded Certificate Card */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden print:border-none print:shadow-none print:bg-white print:p-4">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none print:hidden" />
 
-          {/* Co-Branded Partners Strip */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
-            {/* Left: Fleet & Broker */}
+          {/* Co-Branded Entities Strip */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800/80 print:border-slate-300">
+            {/* Insured Fleet Entity & Broker Representation */}
             <div>
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-wider mb-1">
-                <span>Insured Fleet Entity</span>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">
+                <span>Insured Commercial Entity</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-cyan-400 font-bold">Placed by {brokerName}</span>
+                <span className="text-cyan-400 font-bold print:text-black">Placed by {brokerName}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400 font-mono">{dotNumber}</span>
               </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight print:text-black">
                 {fleetName}
               </h1>
             </div>
 
-            {/* Right: Lead Carrier Co-Branding */}
-            <div className="flex items-center gap-4 bg-slate-950/80 border border-slate-800 px-5 py-3 rounded-xl">
+            {/* Lead Carrier Audit Co-Branding */}
+            <div className="flex items-center gap-4 bg-slate-950/80 border border-slate-800 px-5 py-3 rounded-xl print:bg-slate-100 print:border-slate-300">
               {carrierLogoUrl ? (
                 <img
                   src={carrierLogoUrl}
@@ -138,15 +156,15 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
                   className="h-9 w-auto object-contain rounded"
                 />
               ) : (
-                <div className="w-9 h-9 rounded bg-cyan-950 border border-cyan-800/80 flex items-center justify-center font-bold font-mono text-cyan-400 text-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-800/80 flex items-center justify-center font-bold font-mono text-cyan-400 text-base print:bg-slate-200">
                   🛡️
                 </div>
               )}
               <div>
-                <div className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">
+                <div className="text-[10px] font-mono uppercase text-slate-400 tracking-wider print:text-slate-600">
                   Audited Underwriting Carrier
                 </div>
-                <div className="text-sm font-bold text-slate-200">{carrierName}</div>
+                <div className="text-sm font-bold text-slate-200 print:text-black">{carrierName}</div>
               </div>
             </div>
           </div>
@@ -154,60 +172,69 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           {/* Certificate Title & Status */}
           <div className="mt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-950/90 text-emerald-300 border border-emerald-800/90 uppercase tracking-wider mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-950/90 text-emerald-300 border border-emerald-800/90 uppercase tracking-wider mb-2 print:bg-emerald-100 print:text-emerald-800">
                 ✓ Loss Control Standard Compliant
               </div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-white print:text-black">
                 Certificate of Verified Safety Recall Remediation & Loss Control
               </h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-                Continuous telematics verification via RecallLogic. Proves active loss control protocol to defeat plaintiff negligent maintenance claims and defend underwriter rate credits.
+              <p className="text-xs text-slate-400 mt-1 max-w-2xl print:text-slate-600">
+                Continuous telematics and work order synchronization via RecallLogic™. Establishes a verifiable chain of custody to eliminate plaintiff punitive exposure under negligent maintenance doctrines and defend underwriter rate credits.
               </p>
             </div>
 
-            {/* Underwriter Rate Credit Pill */}
-            <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-xl p-4 text-right flex-shrink-0">
-              <div className="text-xs font-mono text-emerald-400 font-bold uppercase">
-                Underwriter Status
+            {/* Actuarial Rate Credit Box */}
+            <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-xl p-4 text-right flex-shrink-0 print:bg-emerald-50 print:border-emerald-300">
+              <div className="text-xs font-mono text-emerald-400 font-bold uppercase print:text-emerald-800">
+                Actuarial Rating Status
               </div>
-              <div className="text-2xl font-extrabold font-mono text-white mt-0.5">
+              <div className="text-2xl font-extrabold font-mono text-white mt-0.5 print:text-black">
                 15% Optimal Credit
               </div>
-              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+              <div className="text-[10px] text-slate-400 font-mono mt-0.5 print:text-slate-600">
                 Punitive Liability Defended: $0
               </div>
             </div>
           </div>
 
-          {/* Designated Risk Officer & Safety Contact */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+          {/* Risk Officer & Direct Underwriter Verification Contacts */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono print:border-slate-300">
             <div>
               <span className="text-slate-500 uppercase">Designated Risk Contact</span>
-              <div className="text-slate-200 font-bold mt-0.5">{riskOfficerName}</div>
+              <div className="text-slate-200 font-bold mt-0.5 print:text-black">{riskOfficerName}</div>
             </div>
             <div>
               <span className="text-slate-500 uppercase">Audit Contact Email</span>
-              <div className="text-cyan-400 mt-0.5">{riskOfficerEmail}</div>
+              <div className="text-cyan-400 mt-0.5 font-bold print:text-black">{riskOfficerEmail}</div>
             </div>
             <div>
               <span className="text-slate-500 uppercase">Direct Safety Line</span>
-              <div className="text-slate-200 mt-0.5">{riskOfficerPhone}</div>
+              <div className="text-slate-200 mt-0.5 print:text-black">{riskOfficerPhone}</div>
+            </div>
+            <div>
+              <span className="text-slate-500 uppercase">Coverage Term</span>
+              <div className="text-slate-200 mt-0.5 font-bold print:text-black">{policyPeriod}</div>
             </div>
           </div>
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-base font-bold text-white font-mono tracking-wide">
-            Power Unit Compliance Ledger ({filtered.length} Units Audited)
-          </h3>
+        {/* Operating Yard Roster Header & Filter */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-white font-mono tracking-wide print:text-black">
+              Power Unit Compliance Ledger ({filtered.length} Units Audited)
+            </h3>
+            <p className="text-xs text-slate-400 font-mono print:text-slate-600">
+              Immutable SHA-256 integrity logs matched against active NHTSA campaign databases.
+            </p>
+          </div>
 
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 print:hidden">
             <span className="text-[11px] font-mono text-slate-500 uppercase">Operating Yard:</span>
             <select
               value={filterTerminal}
               onChange={(e) => setFilterTerminal(e.target.value)}
-              className="bg-transparent text-xs text-cyan-400 font-bold focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs text-cyan-400 font-bold focus:outline-none cursor-pointer pr-1"
             >
               <option value="ALL" className="bg-slate-950 text-slate-200">All Locations</option>
               <option value="Dallas" className="bg-slate-950 text-slate-200">Dallas Hub (TX)</option>
@@ -217,11 +244,11 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           </div>
         </div>
 
-        {/* Roster Evidence Ledger Table */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        {/* Audit Evidence Table */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-xl print:border-slate-300 print:bg-white">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-mono tracking-wider text-slate-400">
+              <tr className="bg-slate-950 border-b border-slate-800 text-[10px] uppercase font-mono tracking-wider text-slate-400 print:bg-slate-100 print:text-slate-700 print:border-slate-300">
                 <th className="py-3.5 px-4 font-bold">Unit / VIN</th>
                 <th className="py-3.5 px-4 font-bold">Power Unit</th>
                 <th className="py-3.5 px-4 font-bold">Operating Yard</th>
@@ -230,35 +257,35 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
                 <th className="py-3.5 px-4 font-bold text-right">Verification Hash</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
+            <tbody className="divide-y divide-slate-800/60 font-sans print:divide-slate-200">
               {filtered.map((item) => (
-                <tr key={item.vin} className="hover:bg-slate-800/40 transition">
+                <tr key={item.vin} className="hover:bg-slate-800/40 transition print:hover:bg-transparent">
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    <div className="font-bold text-white font-mono">{item.unit}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{item.vin}</div>
+                    <div className="font-bold text-white font-mono print:text-black">{item.unit}</div>
+                    <div className="text-[10px] text-slate-400 font-mono print:text-slate-600">{item.vin}</div>
                   </td>
-                  <td className="py-3.5 px-4 whitespace-nowrap text-slate-200 font-medium">
+                  <td className="py-3.5 px-4 whitespace-nowrap text-slate-200 font-medium print:text-black">
                     {item.makeModel}
                   </td>
-                  <td className="py-3.5 px-4 whitespace-nowrap text-cyan-300 font-mono text-[11px]">
+                  <td className="py-3.5 px-4 whitespace-nowrap text-cyan-300 font-mono text-[11px] print:text-slate-800">
                     📍 {item.terminal}
                   </td>
                   <td className="py-3.5 px-4 max-w-sm">
-                    <div className="text-slate-300 font-mono text-[11px]">{item.recallSummary}</div>
-                    <div className="text-[10px] text-emerald-400/90 mt-0.5">{item.nhtsaStatus}</div>
+                    <div className="text-slate-300 font-mono text-[11px] print:text-black">{item.recallSummary}</div>
+                    <div className="text-[10px] text-emerald-400/90 mt-0.5 print:text-emerald-700">{item.nhtsaStatus}</div>
                   </td>
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     {item.status === 'CLEARED' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-950 text-emerald-300 border border-emerald-800 print:bg-emerald-100 print:text-emerald-800">
                         ✓ DEFECT CLEAN
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-950 text-amber-300 border border-amber-800">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-950 text-amber-300 border border-amber-800 print:bg-amber-100 print:text-amber-800">
                         ⏱ WORK ORDER QUEUED
                       </span>
                     )}
                   </td>
-                  <td className="py-3.5 px-4 whitespace-nowrap text-right font-mono text-[10px] text-slate-500">
+                  <td className="py-3.5 px-4 whitespace-nowrap text-right font-mono text-[10px] text-slate-500 print:text-slate-400">
                     {item.auditHash}
                   </td>
                 </tr>
@@ -267,13 +294,16 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           </table>
         </div>
 
-        {/* Footer Audit Seal */}
-        <div className="text-center pt-4 pb-8 text-xs font-mono text-slate-500 space-y-1">
-          <div>
-            RECALLLOGIC™ CONTINUOUS RISK DEFENSE PLATFORM • IMMUTABLE UNDERWRITING AUDIT LOG
+        {/* Official Audit Seal & Legal Attestation */}
+        <div className="text-center pt-4 pb-12 text-xs font-mono text-slate-500 space-y-1 print:text-slate-600 print:pb-4">
+          <div className="font-bold tracking-wider text-slate-400 print:text-black">
+            RECALLLOGIC™ CONTINUOUS RISK DEFENSE PLATFORM • IMMUTABLE LOSS CONTROL AUDIT RECORD
           </div>
           <div>
-            Data sourced live via NHTSA API, OEM direct telemetry, and integrated Fleetio work order logs.
+            Data sourced live via official NHTSA API endpoints, OEM manufacturer direct telematics, and active Fleetio maintenance work orders.
+          </div>
+          <div className="text-[11px] text-slate-600 print:text-slate-500">
+            Certified for submission to commercial auto insurance underwriters, excess surplus lines, and state compliance boards.
           </div>
         </div>
       </div>
