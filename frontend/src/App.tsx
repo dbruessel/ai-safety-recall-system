@@ -21,7 +21,16 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MainApp: React.FC = () => {
-  const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
+  const {
+    user,
+    userTier,
+    userRole,
+    companyName,
+    userProfile,
+    signOut,
+    signInDemo,
+    demoAuthenticated,
+  } = useAuth();
 
   // Standalone Subpath Route Checks (Bypasses Fleet/Broker Authentication)
   const pathname = window.location.pathname.toLowerCase();
@@ -34,8 +43,10 @@ const MainApp: React.FC = () => {
   const isEvidenceLockerPath = pathname.startsWith('/audit/evidence-locker');
 
   // Track DEMO routes for Fleet & Broker outreach
-  const isFleetDemoPath = pathname.includes('/taskboard/demo') || searchParams.get('role') === 'fleet';
-  const isBrokerDemoPath = pathname.includes('/audit/demo') || pathname.includes('/broker');
+  const isFleetDemoPath =
+    pathname.includes('/taskboard/demo') || searchParams.get('role') === 'fleet';
+  const isBrokerDemoPath =
+    pathname.includes('/audit/demo') || pathname.includes('/broker');
   const isDemoPath = isFleetDemoPath || isBrokerDemoPath;
 
   // STRICT BROKER CHECK: Require explicit boolean or role
@@ -94,12 +105,17 @@ const MainApp: React.FC = () => {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('checkout') === 'success') {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
           const activeUser = session?.user || user;
           if (activeUser?.email) {
             const userEmail = activeUser.email;
             const prefix = userEmail.split('@')[0];
-            const fallbackName = `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
+            const fallbackName = `${prefix
+              .replace('.', ' ')
+              .replace('_', ' ')
+              .toUpperCase()} Fleet Co.`;
             const finalOrgName = companyName || fallbackName;
 
             // 1. Upsert Organization Tier in Supabase
@@ -169,8 +185,13 @@ const MainApp: React.FC = () => {
   }
 
   const isAuthenticated = Boolean(user?.email) || demoAuthenticated || isDemoPath;
-  const currentEmail = user?.email || userProfile?.email || (isBrokerDemoPath ? 'demo-broker@recalllogic.ai' : 'demo-fleet@recalllogic.ai');
-  const effectiveTier = isDemoPath ? 'professional' : (userTier || userProfile?.subscription_tier || 'free');
+  const currentEmail =
+    user?.email ||
+    userProfile?.email ||
+    (isBrokerDemoPath ? 'demo-broker@recalllogic.ai' : 'demo-fleet@recalllogic.ai');
+  const effectiveTier = isDemoPath
+    ? 'professional'
+    : userTier || userProfile?.subscription_tier || 'free';
 
   const getUserOrgName = (): string => {
     if (isBrokerUser || isBrokerDemoPath) {
@@ -189,13 +210,24 @@ const MainApp: React.FC = () => {
     return 'Dennis Enterprise Fleet';
   };
 
-  const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
+  const handleCheckout = async (
+    tierId: string,
+    customEmail?: string,
+    customCompany?: string
+  ) => {
     const targetEmail = (customEmail || currentEmail || '').trim();
     const rawCompany = customCompany || companyName || 'My Fleet Co.';
-    const targetCompany = typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
+    const targetCompany =
+      typeof rawCompany === 'string' ? rawCompany.trim() : 'My Fleet Co.';
 
-    const brokerId = sessionStorage.getItem('broker_id') || sessionStorage.getItem('recalllogic_referred_broker_id') || 'direct';
-    const brokerName = sessionStorage.getItem('broker_name') || sessionStorage.getItem('recalllogic_referred_broker_name') || '';
+    const brokerId =
+      sessionStorage.getItem('broker_id') ||
+      sessionStorage.getItem('recalllogic_referred_broker_id') ||
+      'direct';
+    const brokerName =
+      sessionStorage.getItem('broker_name') ||
+      sessionStorage.getItem('recalllogic_referred_broker_name') ||
+      '';
 
     if (!targetEmail) {
       console.error('Checkout blocked: User email missing.');
@@ -203,7 +235,8 @@ const MainApp: React.FC = () => {
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const response = await fetch(`${apiBaseUrl}/api/stripe/create-checkout-session`, {
         method: 'POST',
         headers: {
@@ -217,7 +250,7 @@ const MainApp: React.FC = () => {
           broker_id: brokerId,
           broker_name: brokerName,
           success_url: `${window.location.origin}?checkout=success`,
-          cancel_url: `${window.location.origin}?checkout=cancel`
+          cancel_url: `${window.location.origin}?checkout=cancel`,
         }),
       });
 
@@ -244,10 +277,13 @@ const MainApp: React.FC = () => {
 
   const handleDownloadRiskCard = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+      const apiBaseUrl =
+        import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
       const fleetId = auditingFleetId || userProfile?.organization_id || 'demo-fleet-001';
       const response = await fetch(
-        `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(companyName || 'RecallLogic Partner')}`,
+        `${apiBaseUrl}/api/broker/compliance-report/${fleetId}/pdf?broker_name=${encodeURIComponent(
+          companyName || 'RecallLogic Partner'
+        )}`,
         { method: 'GET' }
       );
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
@@ -278,12 +314,11 @@ const MainApp: React.FC = () => {
           <header className="border-b border-slate-800/80 bg-[#070B14]/95 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <a href="/" className="flex items-center gap-3 hover:opacity-95 transition">
-                <img 
-                  src="/recall-logo.png" 
-                  alt="RecallLogic Continuous Risk Defense" 
+                <img
+                  src="/recall-logo.png"
+                  alt="RecallLogic Continuous Risk Defense"
                   className="h-9 w-auto object-contain"
                   onError={(e) => {
-                    // Fallback to stylized text badge if logo file is loading
                     (e.target as HTMLElement).style.display = 'none';
                   }}
                 />
@@ -343,7 +378,9 @@ const MainApp: React.FC = () => {
             <div className="bg-cyan-950/40 border-b border-cyan-500/30 px-6 py-2.5 flex items-center justify-between text-xs font-mono text-cyan-300">
               <div className="flex items-center gap-2">
                 <span>🏛️ Portfolio Command &gt;</span>
-                <span className="font-bold text-white">🚚 Auditing: {auditingFleetId} [Read-Only Mode]</span>
+                <span className="font-bold text-white">
+                  🚚 Auditing: {auditingFleetId} [Read-Only Mode]
+                </span>
               </div>
               <button
                 onClick={() => {
@@ -358,7 +395,7 @@ const MainApp: React.FC = () => {
             </div>
           )}
 
-          {/* MAIN CONTENT ROUTER: EXPANSIVE CONTAINER (max-w-[1680px]) */}
+          {/* MAIN CONTENT ROUTER */}
           <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1680px] mx-auto w-full">
             {activeView === 'broker_portal' && !auditingFleetId ? (
               <BrokerPortal />
@@ -368,11 +405,14 @@ const MainApp: React.FC = () => {
                 userRole={userRole || 'admin'}
                 userTier={auditingFleetId ? 'enterprise' : (effectiveTier as any)}
                 onOpenShareModal={handleCopyUnderwriterLink}
-                onSignOut={signOut}
                 onNavigatePortfolio={
                   isBrokerUser || isBrokerDemoPath || auditingFleetId
                     ? () => {
-                        window.history.pushState({}, '', window.location.pathname.split('?')[0]);
+                        window.history.pushState(
+                          {},
+                          '',
+                          window.location.pathname.split('?')[0]
+                        );
                         setAuditingFleetId(null);
                         setActiveView('broker_portal');
                       }
@@ -407,8 +447,8 @@ const MainApp: React.FC = () => {
       )}
 
       {/* SHARE / UNDERWRITER LINK MODAL */}
-      {isShareModalOpen && (
-        isBrokerUser || isBrokerDemoPath ? (
+      {isShareModalOpen &&
+        (isBrokerUser || isBrokerDemoPath ? (
           <BrokerShareModal
             isOpen={isShareModalOpen}
             shareUrl={window.location.href}
@@ -420,8 +460,7 @@ const MainApp: React.FC = () => {
             userCompany={getUserOrgName()}
             onClose={() => setIsShareModalOpen(false)}
           />
-        )
-      )}
+        ))}
     </div>
   );
 };
