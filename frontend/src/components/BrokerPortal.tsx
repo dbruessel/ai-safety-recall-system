@@ -37,14 +37,18 @@ interface ClientAccount {
   connectedProviders?: string[];
 }
 
-export const BrokerPortal: React.FC = () => {
+interface BrokerPortalProps {
+  onAuditClient?: (clientName: string) => void;
+}
+
+export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => {
   const [clientAccounts, setClientAccounts] = useState<ClientAccount[]>([]);
   const [showScoreTooltip, setShowScoreTooltip] = useState<boolean>(false);
   const [showLiabilityTooltip, setShowLiabilityTooltip] = useState<boolean>(false);
   const [isFleetioModalOpen, setIsFleetioModalOpen] = useState<boolean>(false);
   const [activeSelectedClient, setActiveSelectedClient] = useState<{ id: string; name: string }>({
-    id: "apex-logistics",
-    name: "Apex Logistics & Freight",
+    id: "dennis-enterprise",
+    name: "Dennis Enterprise Fleet",
   });
 
   useEffect(() => {
@@ -52,6 +56,7 @@ export const BrokerPortal: React.FC = () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://recalllogic-api.onrender.com";
       
       const mockClients = [
+        { id: "dennis-enterprise", name: "Dennis Enterprise Fleet", tier: "ENTERPRISE TIER" },
         { id: "apex-logistics", name: "Apex Logistics & Freight", tier: "ENTERPRISE TIER" },
         { id: "summit-regional", name: "Summit Regional Transport", tier: "PROFESSIONAL TIER" },
         { id: "titan-hauling", name: "Titan Heavy Hauling Co.", tier: "PROFESSIONAL TIER" },
@@ -69,42 +74,42 @@ export const BrokerPortal: React.FC = () => {
               id: client.id,
               name: client.name,
               tier: client.tier,
-              totalVins: data.total_vins || 100,
-              openRecalls: data.open_recalls || 0,
+              totalVins: data.total_vins || (client.id === "dennis-enterprise" ? 4 : 100),
+              openRecalls: data.open_recalls ?? (client.id === "dennis-enterprise" ? 1 : 0),
               clearedRecalls: Math.max(0, (data.total_vins || 100) - (data.open_recalls || 0)),
-              safetyScore: data.safety_score ?? 85,
-              riskTier: data.risk_tier || "PREFERRED",
-              nuclearLiabilityCount: data.nuclear_liability_count || 0,
-              financialExposureUsd: data.financial_exposure_usd || 0,
-              underwriterDiscount: data.underwriter_discount_eligibility || "Standard Rates",
-              hasNuclearRecall: (data.nuclear_liability_count || 0) > 0,
-              nuclearCampaign: data.nuclear_liability_count > 0 ? "Campaign #23V-891" : undefined,
-              nuclearComponent: data.nuclear_liability_count > 0 ? "STEERING / BRAKE ASSEMBLY" : undefined,
-              recallPenalty: data.breakdown?.recall_penalty ?? 7,
-              maintenancePenalty: data.breakdown?.maintenance_penalty ?? 4,
+              safetyScore: data.safety_score ?? (client.id === "dennis-enterprise" ? 82 : 85),
+              riskTier: data.risk_tier || (client.id === "dennis-enterprise" ? "NUCLEAR RISK" : "PREFERRED"),
+              nuclearLiabilityCount: data.nuclear_liability_count ?? (client.id === "dennis-enterprise" ? 1 : 0),
+              financialExposureUsd: data.financial_exposure_usd ?? (client.id === "dennis-enterprise" ? 250000 : 0),
+              underwriterDiscount: data.underwriter_discount_eligibility || (client.id === "dennis-enterprise" ? "Locked — Resolve Recalls for 15% Credit" : "Standard Rates"),
+              hasNuclearRecall: (data.nuclear_liability_count ?? (client.id === "dennis-enterprise" ? 1 : 0)) > 0,
+              nuclearCampaign: (data.nuclear_liability_count || client.id === "dennis-enterprise") ? "Campaign #23V-891" : undefined,
+              nuclearComponent: (data.nuclear_liability_count || client.id === "dennis-enterprise") ? "STEERING AXLE DRAG LINK" : undefined,
+              recallPenalty: data.breakdown?.recall_penalty ?? 11,
+              maintenancePenalty: data.breakdown?.maintenance_penalty ?? 7,
               telematicsPenalty: data.breakdown?.telematics_penalty ?? 0,
-              connectedProviders: client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
+              connectedProviders: client.id === "dennis-enterprise" ? ["fleetio", "samsara"] : client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
             };
-          } catch (err) {
+          } catch {
             return {
               id: client.id,
               name: client.name,
               tier: client.tier,
-              totalVins: client.id === "apex-logistics" ? 142 : client.id === "titan-hauling" ? 210 : client.id === "summit-regional" ? 68 : 45,
-              openRecalls: client.id === "apex-logistics" ? 3 : client.id === "titan-hauling" ? 14 : client.id === "metro-delivery" ? 1 : 0,
-              clearedRecalls: client.id === "apex-logistics" ? 139 : client.id === "titan-hauling" ? 196 : client.id === "summit-regional" ? 68 : 44,
-              safetyScore: client.id === "apex-logistics" ? 82 : client.id === "titan-hauling" ? 58 : client.id === "metro-delivery" ? 90 : 98,
-              riskTier: client.id === "titan-hauling" ? "HIGH RISK / NUCLEAR EXPOSURE" : client.id === "apex-logistics" ? "STANDARD" : "PREFERRED",
-              nuclearLiabilityCount: client.id === "apex-logistics" || client.id === "titan-hauling" ? 1 : 0,
-              financialExposureUsd: client.id === "apex-logistics" ? 250000 : client.id === "titan-hauling" ? 500000 : 0,
-              underwriterDiscount: client.id === "apex-logistics" ? "12-15% Optimal Credit" : client.id === "titan-hauling" ? "Subject to Surcharge Risk" : "15% Optimal Credit",
-              hasNuclearRecall: client.id === "apex-logistics" || client.id === "titan-hauling",
-              nuclearCampaign: client.id === "apex-logistics" ? "Campaign #23V-891" : client.id === "titan-hauling" ? "Campaign #23V-838" : undefined,
-              nuclearComponent: client.id === "apex-logistics" ? "STEERING AXLE DRAG LINK" : client.id === "titan-hauling" ? "AIR BRAKE ACTUATOR DIAPHRAGM" : undefined,
-              recallPenalty: client.id === "apex-logistics" ? 11 : client.id === "titan-hauling" ? 28 : client.id === "metro-delivery" ? 2 : 0,
-              maintenancePenalty: client.id === "apex-logistics" ? 7 : client.id === "titan-hauling" ? 14 : 0,
+              totalVins: client.id === "dennis-enterprise" ? 4 : client.id === "apex-logistics" ? 142 : client.id === "titan-hauling" ? 210 : client.id === "summit-regional" ? 68 : 45,
+              openRecalls: client.id === "dennis-enterprise" ? 1 : client.id === "apex-logistics" ? 3 : client.id === "titan-hauling" ? 14 : client.id === "metro-delivery" ? 1 : 0,
+              clearedRecalls: client.id === "dennis-enterprise" ? 3 : client.id === "apex-logistics" ? 139 : client.id === "titan-hauling" ? 196 : client.id === "summit-regional" ? 68 : 44,
+              safetyScore: client.id === "dennis-enterprise" ? 82 : client.id === "apex-logistics" ? 82 : client.id === "titan-hauling" ? 58 : client.id === "metro-delivery" ? 90 : 98,
+              riskTier: client.id === "titan-hauling" ? "HIGH RISK / NUCLEAR EXPOSURE" : client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "STANDARD" : "PREFERRED",
+              nuclearLiabilityCount: client.id === "dennis-enterprise" || client.id === "apex-logistics" || client.id === "titan-hauling" ? 1 : 0,
+              financialExposureUsd: client.id === "dennis-enterprise" ? 250000 : client.id === "apex-logistics" ? 250000 : client.id === "titan-hauling" ? 500000 : 0,
+              underwriterDiscount: client.id === "dennis-enterprise" ? "Locked — Resolve Recalls to Unlock 15% Credit" : client.id === "apex-logistics" ? "12-15% Optimal Credit" : client.id === "titan-hauling" ? "Subject to Surcharge Risk" : "15% Optimal Credit",
+              hasNuclearRecall: client.id === "dennis-enterprise" || client.id === "apex-logistics" || client.id === "titan-hauling",
+              nuclearCampaign: client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "Campaign #23V-891" : client.id === "titan-hauling" ? "Campaign #23V-838" : undefined,
+              nuclearComponent: client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "STEERING AXLE DRAG LINK" : client.id === "titan-hauling" ? "AIR BRAKE ACTUATOR DIAPHRAGM" : undefined,
+              recallPenalty: client.id === "dennis-enterprise" ? 11 : client.id === "apex-logistics" ? 11 : client.id === "titan-hauling" ? 28 : client.id === "metro-delivery" ? 2 : 0,
+              maintenancePenalty: client.id === "dennis-enterprise" ? 7 : client.id === "apex-logistics" ? 7 : client.id === "titan-hauling" ? 14 : 0,
               telematicsPenalty: 0,
-              connectedProviders: client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
+              connectedProviders: client.id === "dennis-enterprise" ? ["fleetio", "samsara"] : client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
             };
           }
         })
@@ -127,6 +132,16 @@ export const BrokerPortal: React.FC = () => {
   const handleOpenIntegrationModal = (clientId: string, clientName: string) => {
     setActiveSelectedClient({ id: clientId, name: clientName });
     setIsFleetioModalOpen(true);
+  };
+
+  const handleAuditClient = (clientName: string) => {
+    if (onAuditClient) {
+      onAuditClient(clientName);
+    } else {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('org', clientName);
+      window.location.href = currentUrl.toString();
+    }
   };
 
   const getTierBadgeDetails = (score: number, hasNuclear: boolean) => {
@@ -172,17 +187,27 @@ export const BrokerPortal: React.FC = () => {
 
         <div className="flex gap-3">
           <button 
-            onClick={() => handleOpenIntegrationModal("apex-logistics", "Apex Logistics & Freight")}
-            className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm shadow-cyan-950"
+            onClick={() => handleOpenIntegrationModal("dennis-enterprise", "Dennis Enterprise Fleet")}
+            className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm shadow-cyan-950 cursor-pointer"
           >
             <Plug className="w-4 h-4 text-cyan-400" /> Connect Fleetio & Telematics
           </button>
           
-          <button className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition">
+          <button 
+            onClick={() => {
+              const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
+              navigator.clipboard.writeText(onboardingLink);
+              alert("Client onboarding link copied to clipboard:\n" + onboardingLink);
+            }}
+            className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"
+          >
             <Share2 className="w-4 h-4 text-cyan-400" /> Share Client Onboarding Link
           </button>
           
-          <button className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-cyan-900/40 transition">
+          <button 
+            onClick={() => alert("Generating aggregate portfolio loss control audit PDF for underwriters...")}
+            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-cyan-900/40 transition cursor-pointer"
+          >
             <FileText className="w-4 h-4" /> Export Portfolio Audit PDF
           </button>
         </div>
@@ -212,7 +237,10 @@ export const BrokerPortal: React.FC = () => {
                     <span className="font-semibold text-red-200">
                       {account.name}: <span className="font-mono text-red-300">{account.nuclearCampaign || "Campaign #23V-891"}</span> ({account.nuclearComponent || "CRITICAL SAFETY COMPONENT"})
                     </span>
-                    <button className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded font-medium transition">
+                    <button 
+                      onClick={() => handleAuditClient(account.name)}
+                      className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded font-medium transition cursor-pointer"
+                    >
                       Audit Client Workspace →
                     </button>
                   </div>
@@ -240,7 +268,7 @@ export const BrokerPortal: React.FC = () => {
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">BOOK SAFETY SCORE</span>
             <button 
               onClick={() => setShowScoreTooltip(!showScoreTooltip)}
-              className="text-slate-400 hover:text-cyan-400 p-1 transition"
+              className="text-slate-400 hover:text-cyan-400 p-1 transition cursor-pointer"
               title="Click to view actuarial calculation breakdown"
             >
               <Info className="w-4 h-4" />
@@ -259,13 +287,13 @@ export const BrokerPortal: React.FC = () => {
                 <span className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">
                   <Info className="w-4 h-4" /> Actuarial Score Breakdown
                 </span>
-                <button onClick={() => setShowScoreTooltip(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => setShowScoreTooltip(false)} className="text-slate-400 hover:text-white cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects[cite: 1].
+                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability)[cite: 12]. 100 represents zero unaddressed recalls or maintenance defects[cite: 12].
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -292,7 +320,7 @@ export const BrokerPortal: React.FC = () => {
               </div>
 
               <div className="mt-3 p-2 bg-cyan-950/50 border border-cyan-800/60 rounded text-[11px] text-cyan-200">
-                💡 <strong>Underwriter Tip:</strong> Resolve 2 active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>[cite: 1].
+                💡 <strong>Underwriter Tip:</strong> Resolve active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>[cite: 12].
               </div>
             </div>
           )}
@@ -304,7 +332,7 @@ export const BrokerPortal: React.FC = () => {
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">PUNITIVE LIABILITY EXPOSURE</span>
             <button 
               onClick={() => setShowLiabilityTooltip(!showLiabilityTooltip)}
-              className="text-slate-400 hover:text-red-400 p-1 transition"
+              className="text-slate-400 hover:text-red-400 p-1 transition cursor-pointer"
               title="Click to view legal exposure calculation breakdown"
             >
               <Info className="w-4 h-4" />
@@ -312,7 +340,7 @@ export const BrokerPortal: React.FC = () => {
           </div>
           
           <p className="text-3xl font-bold text-red-400 mt-2">
-            \${totalFinancialExposure.toLocaleString()}
+            ${totalFinancialExposure.toLocaleString()}
           </p>
 
           {/* LIABILITY EXPOSURE TOOLTIP POPOVER */}
@@ -322,13 +350,13 @@ export const BrokerPortal: React.FC = () => {
                 <span className="font-bold text-red-400 flex items-center gap-1.5 text-sm">
                   <ShieldAlert className="w-4 h-4 text-red-500" /> Uninsurable Legal Exposure
                 </span>
-                <button onClick={() => setShowLiabilityTooltip(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => setShowLiabilityTooltip(false)} className="text-slate-400 hover:text-white cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls[cite: 1]. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties[cite: 1].
+                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls[cite: 12]. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties[cite: 12].
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -337,21 +365,25 @@ export const BrokerPortal: React.FC = () => {
                   <span className="text-red-400 font-bold">{nuclearAlerts.length} ACTIVE</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
+                  <span>Dennis Enterprise Fleet:</span>
+                  <span className="text-red-400 font-bold">$250,000</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
                   <span>Apex Logistics (Campaign #23V-891):</span>
-                  <span className="text-red-400 font-bold">\$250,000</span>
+                  <span className="text-red-400 font-bold">$250,000</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
                   <span>Titan Heavy Hauling (Campaign #23V-838):</span>
-                  <span className="text-red-400 font-bold">\$500,000</span>
+                  <span className="text-red-400 font-bold">$500,000</span>
                 </div>
                 <div className="flex justify-between text-red-400 border-t border-slate-800 pt-1 font-bold">
                   <span>TOTAL UNINSURABLE RISK:</span>
-                  <span>\${totalFinancialExposure.toLocaleString()} USD</span>
+                  <span>${totalFinancialExposure.toLocaleString()} USD</span>
                 </div>
               </div>
 
               <div className="mt-3 p-2 bg-red-950/60 border border-red-800/80 rounded text-[11px] text-red-200">
-                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability[cite: 1].
+                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability[cite: 12].
               </div>
             </div>
           )}
@@ -419,7 +451,7 @@ export const BrokerPortal: React.FC = () => {
                     <span className={`font-mono font-bold ${
                       (account.financialExposureUsd || 0) > 0 ? "text-red-400" : "text-emerald-400"
                     }`}>
-                      \${(account.financialExposureUsd || 0).toLocaleString()} USD
+                      ${(account.financialExposureUsd || 0).toLocaleString()} USD
                     </span>
                   </div>
 
@@ -431,7 +463,7 @@ export const BrokerPortal: React.FC = () => {
                       account.hasNuclearRecall ? "text-amber-400" : "text-emerald-400"
                     }`}>
                       {account.hasNuclearRecall 
-                        ? "Locked — Resolve Recalls to Unlock 12% Credit" 
+                        ? "Locked — Resolve Recalls to Unlock 15% Credit" 
                         : account.underwriterDiscount}
                     </span>
                   </div>
@@ -445,7 +477,7 @@ export const BrokerPortal: React.FC = () => {
                       <div>
                         <span className="font-bold text-cyan-300">Actionable Underwriter ROI:</span>
                         <p className="text-slate-300 mt-0.5 leading-normal">
-                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">\${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">91/100</strong> and unlocking a <strong className="text-emerald-300">12% renewal premium credit</strong>[cite: 1].
+                          Clearing <strong className="text-white font-mono">{account.nuclearCampaign || "active recall"}</strong> will remove <strong className="text-red-300">${(account.financialExposureUsd || 0).toLocaleString()}</strong> in punitive exposure, raising fleet score to <strong className="text-emerald-300">92/100</strong> and unlocking a <strong className="text-emerald-300">15% renewal premium credit</strong>.
                         </p>
                       </div>
                     </div>
@@ -477,11 +509,14 @@ export const BrokerPortal: React.FC = () => {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => handleOpenIntegrationModal(account.id, account.name)}
-                      className="text-xs font-medium text-slate-400 hover:text-cyan-300 border border-slate-800 px-2.5 py-1 rounded transition flex items-center gap-1"
+                      className="text-xs font-medium text-slate-400 hover:text-cyan-300 border border-slate-800 px-2.5 py-1 rounded transition flex items-center gap-1 cursor-pointer"
                     >
                       <Plug className="w-3 h-3 text-cyan-400" /> Sync Fleetio
                     </button>
-                    <button className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition">
+                    <button 
+                      onClick={() => handleAuditClient(account.name)}
+                      className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
+                    >
                       Audit Client Workspace <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
