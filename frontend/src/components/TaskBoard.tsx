@@ -99,6 +99,13 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
   },
 ];
 
+const CARRIER_PRESETS = [
+  { id: 'travelers', name: 'Travelers Commercial Auto', badge: '🛡️ Travelers' },
+  { id: 'acrisure', name: 'Acrisure Risk Solutions', badge: '🔷 Acrisure' },
+  { id: 'great_american', name: 'Great American Trucking', badge: '🦅 Great American' },
+  { id: 'cottingham', name: 'Cottingham & Butler', badge: '🏛️ Cottingham' },
+];
+
 export const TaskBoard: React.FC<TaskBoardProps> = ({
   userCompany = 'Dennis Enterprise Fleet',
   userTier = 'enterprise',
@@ -122,6 +129,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [scanTerminalInput, setScanTerminalInput] = useState('');
   const [csvRawText, setCsvRawText] = useState('');
 
+  // White-label configuration state
+  const [selectedCarrier, setSelectedCarrier] = useState<string>(CARRIER_PRESETS[0].name);
+  const [riskOfficerName, setRiskOfficerName] = useState<string>('Dennis Vance, VP Safety & Risk');
+  const [riskOfficerEmail, setRiskOfficerEmail] = useState<string>('safety@dennisfleet.com');
+  const [riskOfficerPhone, setRiskOfficerPhone] = useState<string>('(214) 555-0144');
+
   // Fetch live fleet data from Supabase if connected
   useEffect(() => {
     const fetchMonitoredVehicles = async () => {
@@ -135,7 +148,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           .eq('profile_id', user.id);
 
         if (!error && data && data.length > 0) {
-          const mappedVehicles: MonitoredVehicle[] = data.map((item, idx) => ({
+          const mappedVehicles: MonitoredVehicle[] = data.map((item: any, idx: number) => ({
             id: item.id || `veh-${idx}`,
             vin: item.vin,
             unit_number: item.unit_number || `UNIT-${100 + idx}`,
@@ -860,28 +873,124 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         </div>
       )}
 
-      {/* Modal 3: Share Live Underwriter Link */}
+      {/* Modal 3: White-Label Co-Branded Underwriter Evidence Portal */}
       {isInternalShareOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">Live Underwriter Evidence Token</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              This bearer token gives commercial insurance underwriters read-only access to verify real-time loss control compliance and rate discounts.
-            </p>
-
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-[11px] text-cyan-300 break-all mb-4">
-              https://recalllogic.ai/audit/evidence-locker?token=rl_live_{btoa(userCompany).slice(0, 16)}
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="text-emerald-400 font-medium">✓ 15% Underwriter discount ready</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-cyan-400 font-bold tracking-wider">
+                  Enterprise Insurtech White-Label
+                </span>
+                <h3 className="text-lg font-extrabold text-white">
+                  Co-Branded Underwriter Evidence Locker
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={handleCopyUnderwriterLink}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded text-xs transition cursor-pointer font-mono"
+                onClick={() => setIsInternalShareOpen(false)}
+                className="text-slate-400 hover:text-slate-200 text-sm font-mono cursor-pointer"
               >
-                {copiedLink ? 'Copied to Clipboard! ✓' : 'Copy Token Link'}
+                ✕
               </button>
+            </div>
+
+            {/* Carrier Preset Selector */}
+            <div>
+              <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase font-bold">
+                Commercial Underwriting Carrier Co-Branding
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {CARRIER_PRESETS.map((carrier) => (
+                  <button
+                    key={carrier.id}
+                    type="button"
+                    onClick={() => setSelectedCarrier(carrier.name)}
+                    className={`p-2.5 rounded-lg text-xs font-mono text-center transition cursor-pointer border ${
+                      selectedCarrier === carrier.name
+                        ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500 font-bold'
+                        : 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    {carrier.badge}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 text-[11px] font-mono text-cyan-400/90">
+                Active Co-Brand: <span className="font-bold text-slate-200">{selectedCarrier}</span>
+              </div>
+            </div>
+
+            {/* Risk Officer Contact Card Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+              <div>
+                <label className="block text-slate-400 mb-1">Designated Risk Officer</label>
+                <input
+                  type="text"
+                  value={riskOfficerName}
+                  onChange={(e) => setRiskOfficerName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-cyan-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Audit Email</label>
+                <input
+                  type="email"
+                  value={riskOfficerEmail}
+                  onChange={(e) => setRiskOfficerEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-cyan-500 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Direct Phone</label>
+                <input
+                  type="text"
+                  value={riskOfficerPhone}
+                  onChange={(e) => setRiskOfficerPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-cyan-500 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Bearer Token URL Box */}
+            <div>
+              <label className="block text-xs font-mono text-slate-400 mb-1 uppercase font-bold">
+                Immutable Read-Only Underwriter Token Link
+              </label>
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-[11px] text-cyan-300 break-all select-all">
+                https://recalllogic.ai/audit/evidence-locker?token=rl_live_{btoa(userCompany).slice(0, 16)}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <span className="text-emerald-400 text-xs font-mono">
+                ✓ Co-branding & 15% rate credit active
+              </span>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyUnderwriterLink}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-mono transition cursor-pointer"
+                >
+                  {copiedLink ? 'Copied! ✓' : 'Copy Link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(
+                      `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(userCompany).slice(0, 16)}`,
+                      '_blank'
+                    );
+                  }}
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded text-xs font-mono transition cursor-pointer"
+                >
+                  Open Live Portal ↗
+                </button>
+              </div>
             </div>
           </div>
         </div>
