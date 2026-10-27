@@ -9,6 +9,7 @@ import AccountMenu from './components/AccountMenu';
 import BrokerShareModal from './components/BrokerShareModal';
 import { ShareUnderwriterModal } from './components/ShareUnderwriterModal';
 import { UnderwriterReportView } from './components/UnderwriterReportView';
+import UnderwriterEvidenceLocker from './components/UnderwriterEvidenceLocker';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -23,13 +24,18 @@ const MainApp: React.FC = () => {
   const { user, userTier, userRole, companyName, userProfile, signOut, signInDemo, demoAuthenticated } = useAuth();
 
   // Standalone Subpath Route Checks (Bypasses Fleet/Broker Authentication)
-  const isSignupPath = window.location.pathname.toLowerCase().startsWith('/signup');
-  const isAcceptInvitePath = window.location.pathname.toLowerCase().startsWith('/accept-invite');
-  const isUnderwriterPortalPath = window.location.pathname.toLowerCase().startsWith('/portal/audit');
+  const pathname = window.location.pathname.toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  const token = searchParams.get('token') || '';
+
+  const isSignupPath = pathname.startsWith('/signup');
+  const isAcceptInvitePath = pathname.startsWith('/accept-invite');
+  const isUnderwriterPortalPath = pathname.startsWith('/portal/audit');
+  const isEvidenceLockerPath = pathname.startsWith('/audit/evidence-locker');
 
   // Track DEMO routes for Fleet & Broker outreach
-  const isFleetDemoPath = window.location.pathname.toLowerCase().includes('/taskboard/demo') || new URLSearchParams(window.location.search).get('role') === 'fleet';
-  const isBrokerDemoPath = window.location.pathname.toLowerCase().includes('/audit/demo') || window.location.pathname.toLowerCase().includes('/broker');
+  const isFleetDemoPath = pathname.includes('/taskboard/demo') || searchParams.get('role') === 'fleet';
+  const isBrokerDemoPath = pathname.includes('/audit/demo') || pathname.includes('/broker');
   const isDemoPath = isFleetDemoPath || isBrokerDemoPath;
 
   // STRICT BROKER CHECK: Require explicit boolean or role
@@ -124,7 +130,32 @@ const MainApp: React.FC = () => {
     handlePostCheckoutSync();
   }, [user, companyName]);
 
-  // UNRESTRICTED PUBLIC ACCESS: TOKENIZED UNDERWRITER AUDIT PORTAL
+  // UNRESTRICTED PUBLIC ACCESS: WHITE-LABELED UNDERWRITER EVIDENCE LOCKER
+  if (isEvidenceLockerPath) {
+    let decodedFleetName = 'Dennis Enterprise Fleet';
+    if (token.startsWith('rl_live_')) {
+      try {
+        const base64Str = token.replace('rl_live_', '');
+        decodedFleetName = atob(base64Str);
+      } catch {
+        decodedFleetName = 'Dennis Enterprise Fleet';
+      }
+    }
+
+    return (
+      <UnderwriterEvidenceLocker
+        fleetName={decodedFleetName}
+        token={token || 'rl_live_demo_audit'}
+        carrierName="Travelers Commercial Auto"
+        brokerName="Apex Risk Brokers"
+        onClosePreview={() => {
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
+  // UNRESTRICTED PUBLIC ACCESS: LEGACY UNDERWRITER REPORT VIEW
   if (isUnderwriterPortalPath) {
     return <UnderwriterReportView />;
   }
@@ -143,16 +174,19 @@ const MainApp: React.FC = () => {
 
   const getUserOrgName = (): string => {
     if (isBrokerUser || isBrokerDemoPath) {
-      return companyName || userProfile?.company_name || 'Partner Brokerage';
+      return companyName || userProfile?.company_name || 'Apex Risk Brokers';
     }
     if (companyName && companyName.trim() !== '') {
       return companyName;
+    }
+    if (userProfile?.company_name && userProfile.company_name.trim() !== '') {
+      return userProfile.company_name;
     }
     if (currentEmail && !currentEmail.includes('demo-')) {
       const prefix = currentEmail.split('@')[0];
       return `${prefix.replace('.', ' ').replace('_', ' ').toUpperCase()} Fleet Co.`;
     }
-    return 'Apex Freight Logistics';
+    return 'Dennis Enterprise Fleet';
   };
 
   const handleCheckout = async (tierId: string, customEmail?: string, customCompany?: string) => {
@@ -299,7 +333,7 @@ const MainApp: React.FC = () => {
               </div>
               <button
                 onClick={() => {
-                  window.history.pushState({}, '', window.location.pathname);
+                  window.history.pushState({}, '', window.location.pathname.split('?')[0]);
                   setAuditingFleetId(null);
                   setActiveView('broker_portal');
                 }}
@@ -316,10 +350,20 @@ const MainApp: React.FC = () => {
               <BrokerPortal />
             ) : (
               <Taskboard
-                userCompany={getUserOrgName()}
+                userCompany={auditingFleetId || getUserOrgName()}
                 userRole={userRole || 'admin'}
-                userTier={effectiveTier as any}
+                userTier={auditingFleetId ? 'enterprise' : (effectiveTier as any)}
                 onOpenShareModal={handleCopyUnderwriterLink}
+                onSignOut={signOut}
+                onNavigatePortfolio={
+                  isBrokerUser || isBrokerDemoPath || auditingFleetId
+                    ? () => {
+                        window.history.pushState({}, '', window.location.pathname.split('?')[0]);
+                        setAuditingFleetId(null);
+                        setActiveView('broker_portal');
+                      }
+                    : undefined
+                }
               />
             )}
           </main>
