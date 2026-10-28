@@ -273,3 +273,5 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
+
+app = create_app()
