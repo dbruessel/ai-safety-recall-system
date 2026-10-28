@@ -28,6 +28,7 @@ from app.routers import (
     payment_router,
     stripe_router,
     telematics_router,  # Telematics & Webhooks router for Phase 2
+    fleetio_sync,       # Fleetio 2-Way Sync & Webhook Router
 )
 
 # Initialize Vertex AI before application construction if configured
@@ -121,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(stripe_router.router)
     app.include_router(pdf_router)
     app.include_router(audit_router.router)
+    app.include_router(fleetio_sync.router)  # Mounts /api/v1/integrations/fleetio/sync and /webhook
 
     # ==========================================
     # ROBUST STRIPE BILLING PORTAL ENDPOINT
@@ -271,6 +273,3 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
-
-# Expose app instance for Uvicorn
-app = create_app()
