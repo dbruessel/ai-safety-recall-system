@@ -91,7 +91,6 @@ class FleetioService:
                 data = res.json()
                 records = data if isinstance(data, list) else data.get("records", [])
                 target_id = str(fleetio_vehicle_id)
-                # Match work orders belonging to this vehicle
                 return [wo for wo in records if str(wo.get("vehicle_id")) == target_id]
         except Exception as e:
             logger.error(f"Failed to query Fleetio work orders for vehicle {fleetio_vehicle_id}: {e}")
@@ -119,9 +118,15 @@ class FleetioService:
             logger.error(f"Failed to query Fleetio work order statuses: {str(e)}")
             return None
 
-    def create_work_order(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def create_work_order(
+        self,
+        fleetio_vehicle_id: str,
+        recall: Dict[str, Any],
+        vin: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Generates a live Fleetio Work Order with required issued_at and status fields.
+        Generates a live Fleetio Work Order with required issued_at and status fields,
+        including a deep-link back to the RecallLogic Underwriter Defense Dossier.
         """
         url = f"{FLEETIO_BASE_URL}/work_orders"
         open_status_id = self.get_open_work_order_status_id()
@@ -132,13 +137,28 @@ class FleetioService:
 
         component = recall.get("component", "SAFETY RECALL").upper()
         campaign_number = recall.get("campaign_number", "N/A")
+        summary = recall.get("summary", "Safety defect identified by NHTSA.")
+        remedy = recall.get("remedy", "Contact authorized OEM dealer for campaign remediation.")
+        target_vin = vin or recall.get("vin", "")
         issued_at_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        dossier_url = f"https://recalllogic.ai/vehicles/{target_vin}" if target_vin else "https://recalllogic.ai"
+
+        description_text = (
+            f"🚨 RECALLLOGIC DEFECT REMEDIATION: NHTSA Campaign #{campaign_number} ({component})\n\n"
+            f"Summary:\n{summary}\n\n"
+            f"Required Remedy:\n{remedy}\n\n"
+            f"Compliance Defense Dossier: {dossier_url}\n\n"
+            f"Note: Marking this Work Order 'Completed' or 'Closed' automatically verifies compliance "
+            f"and updates your insurer's loss-control audit ledger."
+        )
 
         payload = {
             "vehicle_id": int(fleetio_vehicle_id) if str(fleetio_vehicle_id).isdigit() else fleetio_vehicle_id,
             "work_order_status_id": open_status_id,
             "issued_at": issued_at_iso,
-            "description": f"RECALLLOGIC PRIORITY SAFETY: NHTSA Campaign #{campaign_number} ({component}) Remediation"
+            "description": description_text,
+            "labels": ["RecallLogic", "Safety-Critical", "Underwriter-Audit"]
         }
 
         try:

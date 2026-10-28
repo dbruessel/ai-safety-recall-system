@@ -1,4 +1,7 @@
-﻿import os
+﻿import asyncio
+from contextlib import asynccontextmanager
+import logging
+import os
 from typing import List, Optional
 from dotenv import load_dotenv
 
@@ -31,6 +34,8 @@ from app.routers import (
     fleetio_sync,       # Fleetio 2-Way Sync & Webhook Router
 )
 
+logger = logging.getLogger("uvicorn.error")
+
 # Initialize Vertex AI before application construction if configured
 init_vertex()
 
@@ -45,6 +50,48 @@ STRIPE_PRICE_MAP = {
     "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE"),
 }
 
+
+# =====================================================================
+# BACKGROUND SAFETY NET SCHEDULER (AUTONOMOUS 6-HOUR SWEEP)
+# =====================================================================
+async def continuous_risk_defense_loop():
+    """
+    Autonomous safety net: Audits active fleet assets against newly published
+    NHTSA recall campaigns every 6 hours without requiring external cron services.
+    Uses asyncio.to_thread to keep the event loop fully non-blocking.
+    """
+    # Allow container startup, network, and DB pools to settle before initial sweep
+    await asyncio.sleep(45)
+
+    while True:
+        try:
+            logger.info("🛡️ [RECALLLOGIC ENGINE] Initiating scheduled automated fleet safety audit...")
+            from app.routers.fleetio_sync import run_fleetio_sync_task
+            await asyncio.to_thread(run_fleetio_sync_task)
+            logger.info("🛡️ [RECALLLOGIC ENGINE] Scheduled fleet safety audit completed successfully.")
+        except Exception as e:
+            logger.error(f"⚠️ Scheduled sync error in continuous_risk_defense_loop: {e}", exc_info=True)
+
+        # 6-hour cadence (21,600 seconds)
+        await asyncio.sleep(21600)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan context manager to start and cleanly cancel background tasks.
+    """
+    logger.info("🚀 Starting RecallLogic Enterprise Risk Defense Engine...")
+    audit_task = asyncio.create_task(continuous_risk_defense_loop())
+    yield
+    logger.info("🛑 Shutting down background tasks...")
+    audit_task.cancel()
+    try:
+        await audit_task
+    except asyncio.CancelledError:
+        pass
+
+
 # ==========================================
 # ALERT DIGEST DATA MODELS & ENDPOINT
 # ==========================================
@@ -55,10 +102,12 @@ class RecallItem(BaseModel):
     component: str
     summary: str
 
+
 class AlertDigestRequest(BaseModel):
     email: str
     userTier: Optional[str] = "standard"
     recalls: List[RecallItem]
+
 
 # ==========================================
 # STRIPE PAYLOAD MODELS
@@ -68,6 +117,7 @@ class StripePortalRequest(BaseModel):
     customer_email: Optional[str] = None
     return_url: Optional[str] = "https://recalllogic.ai"
 
+
 class StripeCheckoutRequest(BaseModel):
     email: Optional[str] = None
     customer_email: Optional[str] = None
@@ -76,15 +126,20 @@ class StripeCheckoutRequest(BaseModel):
     success_url: Optional[str] = "https://recalllogic.ai?checkout=success"
     cancel_url: Optional[str] = "https://recalllogic.ai?checkout=cancel"
 
+
+# ==========================================
+# APPLICATION FACTORY
+# ==========================================
 def create_app() -> FastAPI:
     """
     Application factory to initialize and configure the central FastAPI backend.
     """
     settings = get_settings()
-    
+
     app = FastAPI(
         title="RecallLogic Backend",
-        version="2026.4.2"
+        version="2026.4.2",
+        lifespan=lifespan
     )
 
     # Configure CORS middleware with production origins
@@ -135,7 +190,7 @@ def create_app() -> FastAPI:
         try:
             # 1. Search for existing Stripe customer by email
             customers = stripe.Customer.list(email=target_email, limit=1)
-            
+
             if customers.data:
                 customer_id = customers.data[0].id
             else:
@@ -155,7 +210,7 @@ def create_app() -> FastAPI:
             return {"url": session.url, "status": "success"}
 
         except Exception as e:
-            print(f"⚠️ Stripe Portal Error: {str(e)}")
+            logger.error(f"⚠️ Stripe Portal Error: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Stripe Portal Generation Failed: {str(e)}")
 
     # ==========================================
@@ -173,7 +228,7 @@ def create_app() -> FastAPI:
             "professional": {"amount": 24900, "name": "RecallLogic Professional Tier"},
             "enterprise": {"amount": 49900, "name": "RecallLogic Enterprise Tier"},
         }
-        
+
         tier_data = tier_pricing.get(target_tier, tier_pricing["professional"])
 
         try:
@@ -183,7 +238,7 @@ def create_app() -> FastAPI:
 
             # 2. Check if a direct price ID exists in env, otherwise fallback to price_data
             env_price_id = STRIPE_PRICE_MAP.get(target_tier)
-            
+
             if env_price_id and env_price_id.startswith("price_"):
                 line_items = [{"price": env_price_id, "quantity": 1}]
             else:
@@ -208,11 +263,11 @@ def create_app() -> FastAPI:
                 success_url=payload.success_url or "https://recalllogic.ai?checkout=success",
                 cancel_url=payload.cancel_url or "https://recalllogic.ai?checkout=cancel",
             )
-            
+
             return {"url": checkout_session.url, "sessionId": checkout_session.id}
 
         except Exception as e:
-            print(f"⚠️ Stripe Checkout Error: {str(e)}")
+            logger.error(f"⚠️ Stripe Checkout Error: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Stripe Checkout Session Failed: {str(e)}")
 
     # ==========================================
@@ -273,5 +328,6 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
+
 
 app = create_app()
