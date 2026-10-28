@@ -13,7 +13,7 @@ FLEETIO_BASE_URL = "https://secure.fleetio.com/api/v1"
 class FleetioService:
     def __init__(self, api_token: Optional[str] = None, account_token: Optional[str] = None):
         """
-        Initializes the Fleetio API Service with the required headers.
+        Initializes the Fleetio API Service with required headers.
         Falls back to environment variables if parameters are omitted.
         """
         raw_api_key = api_token or os.getenv("FLEETIO_API_KEY") or getattr(settings, "FLEETIO_API_KEY", "")
@@ -22,7 +22,7 @@ class FleetioService:
         if not raw_api_key or not raw_account_token:
             raise ValueError("Fleetio API credentials missing: Both FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN are required.")
 
-        # Sanitize token to avoid double prefixing
+        # Sanitize token to avoid double-prefixing
         clean_api_key = raw_api_key.strip()
         auth_header = clean_api_key if clean_api_key.startswith("Token ") else f"Token {clean_api_key}"
 
@@ -39,8 +39,8 @@ class FleetioService:
         Fetches all active vehicles and VINs from Fleetio, handling pagination automatically.
         """
         url = f"{FLEETIO_BASE_URL}/vehicles"
+        # Fleetio excludes archived vehicles by default; filter[status_eq] is omitted to prevent 400 Bad Request
         params = {
-            "filter[status_eq]": "active",
             "per_page": 100
         }
 
@@ -112,7 +112,7 @@ class FleetioService:
     def create_work_order(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Generates a live Fleetio Work Order with required issued_at and status fields.
-        Returns a dict containing the created work order 'id' and 'number'.
+        Returns a dictionary containing the created work order 'id' and 'number'.
         """
         url = f"{FLEETIO_BASE_URL}/work_orders"
         open_status_id = self.get_open_work_order_status_id()
