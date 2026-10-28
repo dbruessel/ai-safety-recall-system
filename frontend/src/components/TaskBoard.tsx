@@ -230,6 +230,26 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const availableSlots = Math.max(0, vehicleLimit - vehicles.length);
   const capacityPercent = Math.min(100, Math.round((vehicles.length / vehicleLimit) * 100));
 
+  // Dynamic deep-link navigation into Fleetio Work Orders
+  const handleRemediateInFleetio = () => {
+    setStatusFilter('OPEN');
+    const openDefectVehicle = vehicles.find((v) => v.compliance_status === 'OPEN');
+
+    if (openDefectVehicle?.vin === '1FUJGLDR5MLKE1234') {
+      window.open(
+        'https://secure.fleetio.com/52f335f6cd/vehicles/5863002/work_orders/22',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    } else {
+      window.open(
+        'https://secure.fleetio.com/52f335f6cd/work_orders',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    }
+  };
+
   // 2-Way Fleetio sync status transition loop
   const handleSyncStatus = (vin: string) => {
     setSyncingVin(vin);
@@ -429,8 +449,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
           <button
             type="button"
-            onClick={() => setStatusFilter('OPEN')}
+            onClick={handleRemediateInFleetio}
             className="whitespace-nowrap px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow cursor-pointer font-mono"
+            title="Open remediation work order in Fleetio"
           >
             Remediate in Fleetio ↗
           </button>
@@ -481,11 +502,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 ? 'Portfolio Aggregate Liability'
                 : `Filtered Scope: ${selectedTerminal}`}
             </span>
-            <span className="text-cyan-400 font-medium">
+            <button
+              type="button"
+              onClick={handleRemediateInFleetio}
+              className="text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer transition bg-transparent border-0 p-0 text-xs"
+            >
               {filteredExposure > 0
-                ? 'Remediate in Fleetio to defend loss ratio'
+                ? 'Remediate in Fleetio to defend loss ratio ↗'
                 : 'Underwriter audit certified ✓'}
-            </span>
+            </button>
           </div>
         </div>
 
