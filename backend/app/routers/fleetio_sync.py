@@ -1,18 +1,69 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, List, Dict, Any
+import requests
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 
 from app.services.fleetio_service import FleetioService
-from app.services.recall_service import check_vin_recalls
-from app.engine import get_supabase_client
+
+# Safe Supabase connection loader
+try:
+    from app.engine import get_supabase_client
+except ImportError:
+    from supabase import create_client
+    def get_supabase_client():
+        url = os.getenv("SUPABASE_URL", "")
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+        return create_client(url, key)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/integrations/fleetio", tags=["Fleetio Integration"])
 
 
+# =====================================================================
+# DIRECT NHTSA RECALL LOOKUP HELPER
+# =====================================================================
+def check_vin_recalls(vin: str) -> List[Dict[str, Any]]:
+    """
+    Direct NHTSA API recall lookup for a given VIN.
+    Normalizes the response into a structured list of defect dictionaries.
+    """
+    if not vin or len(vin) < 11:
+        return []
+
+    try:
+        url = f"https://api.nhtsa.gov/recalls/recallsByVin?vin={vin}&issueType=r"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            raw_results = data.get("results") or []
+            normalized = []
+            for item in raw_results:
+                campaign = item.get("NHTSACampaignNumber") or item.get("CampaignNumber") or "UNKNOWN"
+                component = item.get("Component") or "SAFETY DEFECT"
+                summary = item.get("Summary") or "Safety defect identified by NHTSA."
+                remedy = item.get("Remedy") or "Contact authorized OEM dealer for remedy."
+                normalized.append({
+                    "campaign_number": campaign,
+                    "component": component,
+                    "summary": summary,
+                    "remedy": remedy,
+                    "status": "open"
+                })
+            return normalized
+        else:
+            logger.warning(f"NHTSA API returned status {response.status_code} for VIN {vin}")
+    except Exception as e:
+        logger.error(f"Error querying NHTSA for VIN {vin}: {e}")
+
+    return []
+
+
+# =====================================================================
+# REQUEST BODY MODEL
+# =====================================================================
 class FleetioSyncRequest(BaseModel):
     api_token: Optional[str] = Field(None, description="Fleetio API User Key/Token (defaults to env)")
     account_token: Optional[str] = Field(None, description="Fleetio Account Token (defaults to env)")
@@ -20,6 +71,9 @@ class FleetioSyncRequest(BaseModel):
     profile_id: Optional[str] = Field(None, description="Supabase Profile ID")
 
 
+# =====================================================================
+# BACKGROUND SYNC WORKER
+# =====================================================================
 def run_fleetio_sync_task(
     api_token: Optional[str] = None,
     account_token: Optional[str] = None,
@@ -66,7 +120,7 @@ def run_fleetio_sync_task(
             fleetio_wo_id = None
             fleetio_issue_id = None
 
-            # Dispatch Work Order and Issue to Fleetio if defect is detected
+            # Dispatch Work Order and Issue to Fleetio if a defect is detected
             if has_defect:
                 recalls_flagged += 1
                 try:
@@ -83,9 +137,13 @@ def run_fleetio_sync_task(
 
             compliance_status = "OPEN" if has_defect else "CLEARED"
             punitive_exposure = 250000 if (has_defect and is_critical) else 0
-            remedy_logistics = "Fleetio Work Order Issued" if fleetio_wo_id else ("NHTSA Safety Certified Defect-Free" if not has_defect else "Remediation Required")
+            remedy_logistics = (
+                "Fleetio Work Order Issued"
+                if fleetio_wo_id
+                else ("NHTSA Safety Certified Defect-Free" if not has_defect else "Remediation Required")
+            )
 
-            # Persist to monitored_vehicles for the dashboard
+            # Persist to monitored_vehicles table
             vehicle_data = {
                 "vin": vin,
                 "unit_number": v.get("name") or f"UNIT-{vin[-4:]}",
@@ -117,7 +175,7 @@ def run_fleetio_sync_task(
             saved_vehicle_id = vehicle_res.data[0]["id"]
             synced_count += 1
 
-            # Update recall_tasks table for granular audit tracking
+            # Update recall_tasks table for loss-control tracking
             if has_defect:
                 task_data = {
                     "vehicle_id": saved_vehicle_id,
@@ -140,13 +198,17 @@ def run_fleetio_sync_task(
         logger.error(f"Error during Fleetio background sync: {str(e)}", exc_info=True)
 
 
+# =====================================================================
+# FASTAPI ENDPOINTS
+# =====================================================================
 @router.post("/sync")
 async def sync_fleetio_fleet(
     payload: FleetioSyncRequest,
     background_tasks: BackgroundTasks
 ):
     """
-    Initializes a fleet sync from Fleetio. If tokens are omitted, reads them from env.
+    Initializes a fleet sync from Fleetio. If credentials are omitted from
+    the JSON body, it uses FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN from env.
     """
     resolved_api_key = payload.api_token or os.getenv("FLEETIO_API_KEY")
     resolved_account_token = payload.account_token or os.getenv("FLEETIO_ACCOUNT_TOKEN")
@@ -154,10 +216,10 @@ async def sync_fleetio_fleet(
     if not resolved_api_key or not resolved_account_token:
         raise HTTPException(
             status_code=400,
-            detail="Missing Fleetio credentials. Provide them in the request body or configure FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN."
+            detail="Missing Fleetio credentials. Provide them in request or configure FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN."
         )
 
-    # Validate connectivity
+    # Validate Fleetio connectivity
     try:
         fleetio = FleetioService(api_token=resolved_api_key, account_token=resolved_account_token)
         _ = fleetio.fetch_active_vehicles()
@@ -184,7 +246,7 @@ async def sync_fleetio_fleet(
 @router.post("/webhook")
 async def fleetio_webhook_listener(request: Request):
     """
-    Webhook endpoint to catch Fleetio work_order.updated events.
+    Webhook endpoint listening for Fleetio work_order.updated events.
     When a work order is completed or closed in Fleetio, resets punitive exposure to $0.
     """
     try:
