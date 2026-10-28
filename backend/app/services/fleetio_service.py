@@ -22,7 +22,6 @@ class FleetioService:
         if not raw_api_key or not raw_account_token:
             raise ValueError("Fleetio API credentials missing: Both FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN are required.")
 
-        # Sanitize token to avoid double-prefixing
         clean_api_key = raw_api_key.strip()
         auth_header = clean_api_key if clean_api_key.startswith("Token ") else f"Token {clean_api_key}"
 
@@ -39,11 +38,7 @@ class FleetioService:
         Fetches all active vehicles and VINs from Fleetio, handling pagination automatically.
         """
         url = f"{FLEETIO_BASE_URL}/vehicles"
-        # Fleetio excludes archived vehicles by default; filter[status_eq] is omitted to prevent 400 Bad Request
-        params = {
-            "per_page": 100
-        }
-
+        params = {"per_page": 100}
         parsed_vehicles = []
         next_cursor = None
 
@@ -85,6 +80,23 @@ class FleetioService:
         logger.info(f"Successfully fetched {len(parsed_vehicles)} active vehicles from Fleetio.")
         return parsed_vehicles
 
+    def get_vehicle_work_orders(self, fleetio_vehicle_id: str) -> List[Dict[str, Any]]:
+        """
+        Queries Fleetio for existing work orders tied to a specific vehicle.
+        """
+        url = f"{FLEETIO_BASE_URL}/work_orders"
+        try:
+            res = requests.get(url, headers=self.headers, params={"per_page": 100}, timeout=15)
+            if res.status_code == 200:
+                data = res.json()
+                records = data if isinstance(data, list) else data.get("records", [])
+                target_id = str(fleetio_vehicle_id)
+                # Match work orders belonging to this vehicle
+                return [wo for wo in records if str(wo.get("vehicle_id")) == target_id]
+        except Exception as e:
+            logger.error(f"Failed to query Fleetio work orders for vehicle {fleetio_vehicle_id}: {e}")
+        return []
+
     def get_open_work_order_status_id(self) -> Optional[int]:
         """
         Queries Fleetio work order statuses to resolve the ID for the 'Open' state.
@@ -96,12 +108,10 @@ class FleetioService:
             data = res.json()
             records = data if isinstance(data, list) else data.get("records", [])
 
-            # Locate status containing 'open' (case-insensitive)
             for status in records:
                 if "open" in str(status.get("name", "")).lower():
                     return status.get("id")
 
-            # Fallback to the first status record if none match explicitly
             if records:
                 return records[0].get("id")
             return None
@@ -112,7 +122,6 @@ class FleetioService:
     def create_work_order(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Generates a live Fleetio Work Order with required issued_at and status fields.
-        Returns a dictionary containing the created work order 'id' and 'number'.
         """
         url = f"{FLEETIO_BASE_URL}/work_orders"
         open_status_id = self.get_open_work_order_status_id()
@@ -148,7 +157,7 @@ class FleetioService:
 
     def create_safety_recall_issue(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[str]:
         """
-        Creates a high-priority Issue in Fleetio for accounts tracking defects via issues.
+        Creates a high-priority Issue in Fleetio.
         """
         url = f"{FLEETIO_BASE_URL}/issues"
 

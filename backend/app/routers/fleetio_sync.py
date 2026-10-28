@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from app.services.fleetio_service import FleetioService
 
-# Safe Supabase connection loader
 try:
     from app.engine import get_supabase_client
 except ImportError:
@@ -22,13 +21,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/integrations/fleetio", tags=["Fleetio Integration"])
 
 
-# =====================================================================
-# DIRECT NHTSA RECALL LOOKUP HELPER
-# =====================================================================
 def check_vin_recalls(vin: str) -> List[Dict[str, Any]]:
     """
     Direct NHTSA API recall lookup for a given VIN.
-    Normalizes the response into a structured list of defect dictionaries.
     """
     if not vin or len(vin) < 11:
         return []
@@ -61,9 +56,6 @@ def check_vin_recalls(vin: str) -> List[Dict[str, Any]]:
     return []
 
 
-# =====================================================================
-# REQUEST BODY MODEL
-# =====================================================================
 class FleetioSyncRequest(BaseModel):
     api_token: Optional[str] = Field(None, description="Fleetio API User Key/Token (defaults to env)")
     account_token: Optional[str] = Field(None, description="Fleetio Account Token (defaults to env)")
@@ -71,9 +63,6 @@ class FleetioSyncRequest(BaseModel):
     profile_id: Optional[str] = Field(None, description="Supabase Profile ID")
 
 
-# =====================================================================
-# BACKGROUND SYNC WORKER
-# =====================================================================
 def run_fleetio_sync_task(
     api_token: Optional[str] = None,
     account_token: Optional[str] = None,
@@ -82,7 +71,7 @@ def run_fleetio_sync_task(
 ):
     """
     Background worker that fetches vehicles from Fleetio, checks NHTSA recalls,
-    dispatches Fleetio Work Orders, and synchronizes state to Supabase.
+    respects existing completed Fleetio work orders, and synchronizes state to Supabase.
     """
     try:
         resolved_api_key = api_token or os.getenv("FLEETIO_API_KEY")
@@ -97,10 +86,11 @@ def run_fleetio_sync_task(
 
         for v in vehicles:
             vin = v.get("vin")
+            fleetio_veh_id = v.get("fleetio_id")
             if not vin:
                 continue
 
-            # Query NHTSA recalls
+            # 1. Query NHTSA recalls
             recalls = check_vin_recalls(vin)
             active_recalls = [r for r in recalls if r.get("status") == "open"]
 
@@ -118,39 +108,62 @@ def run_fleetio_sync_task(
             defect_summary = f"{campaign_number} — {component_display}" if has_defect else "No Open NHTSA Defect Campaigns"
 
             fleetio_wo_id = None
-            fleetio_issue_id = None
+            is_remediated_in_fleetio = False
 
-            # Dispatch Work Order and Issue to Fleetio if a defect is detected
-            if has_defect:
+            # 2. Check existing Fleetio Work Orders before creating duplicates
+            existing_wos = fleetio.get_vehicle_work_orders(fleetio_veh_id)
+            if existing_wos:
+                # Find the most relevant work order (or latest)
+                latest_wo = existing_wos[0]
+                wo_num = str(latest_wo.get("number") or latest_wo.get("id"))
+                fleetio_wo_id = f"WO #{wo_num}"
+
+                wo_status = ""
+                if isinstance(latest_wo.get("work_order_status"), dict):
+                    wo_status = latest_wo["work_order_status"].get("name", "")
+                else:
+                    wo_status = str(latest_wo.get("status", ""))
+
+                if any(k in wo_status.lower() for k in ["complete", "closed"]):
+                    is_remediated_in_fleetio = True
+
+            # 3. If defect exists but has no work order yet in Fleetio, create one
+            if has_defect and not fleetio_wo_id:
                 recalls_flagged += 1
                 try:
-                    wo_res = fleetio.create_work_order(v.get("fleetio_id"), primary_recall)
+                    wo_res = fleetio.create_work_order(fleetio_veh_id, primary_recall)
                     if wo_res:
                         fleetio_wo_id = f"WO #{wo_res.get('number', wo_res.get('id'))}"
                 except Exception as wo_err:
                     logger.error(f"Failed to dispatch Fleetio Work Order for {vin}: {wo_err}")
 
                 try:
-                    fleetio_issue_id = fleetio.create_safety_recall_issue(v.get("fleetio_id"), primary_recall)
+                    fleetio.create_safety_recall_issue(fleetio_veh_id, primary_recall)
                 except Exception as issue_err:
                     logger.error(f"Failed to dispatch Fleetio Issue for {vin}: {issue_err}")
 
-            compliance_status = "OPEN" if has_defect else "CLEARED"
-            punitive_exposure = 250000 if (has_defect and is_critical) else 0
-            remedy_logistics = (
-                "Fleetio Work Order Issued"
-                if fleetio_wo_id
-                else ("NHTSA Safety Certified Defect-Free" if not has_defect else "Remediation Required")
-            )
+            # 4. Resolve Compliance & Punitive Liability Status
+            if not has_defect or is_remediated_in_fleetio:
+                compliance_status = "CLEARED"
+                punitive_exposure = 0
+                if is_remediated_in_fleetio:
+                    remedy_logistics = f"Closed in Fleetio ({fleetio_wo_id})"
+                else:
+                    remedy_logistics = "NHTSA Safety Certified Defect-Free"
+            else:
+                compliance_status = "OPEN"
+                punitive_exposure = 250000 if is_critical else 0
+                remedy_logistics = "Fleetio Work Order Issued" if fleetio_wo_id else "Remediation Required"
+                recalls_flagged += 1
 
-            # Persist to monitored_vehicles table
+            # 5. Persist to monitored_vehicles
             vehicle_data = {
                 "vin": vin,
                 "unit_number": v.get("name") or f"UNIT-{vin[-4:]}",
                 "make": (v.get("make") or "COMMERCIAL").upper(),
                 "model": (v.get("model") or "POWER UNIT").upper(),
                 "year": v.get("year") or 2023,
-                "fleetio_vehicle_id": v.get("fleetio_id"),
+                "fleetio_vehicle_id": fleetio_veh_id,
                 "fleetio_meter_reading": v.get("meter_reading"),
                 "campaign_id": campaign_number,
                 "safety_recall_details": defect_summary,
@@ -172,25 +185,7 @@ def run_fleetio_sync_task(
                 logger.warning(f"Failed to upsert vehicle record with VIN: {vin}")
                 continue
 
-            saved_vehicle_id = vehicle_res.data[0]["id"]
             synced_count += 1
-
-            # Update recall_tasks table for loss-control tracking
-            if has_defect:
-                task_data = {
-                    "vehicle_id": saved_vehicle_id,
-                    "campaign_number": campaign_number,
-                    "component": primary_recall.get("component"),
-                    "summary": primary_recall.get("summary"),
-                    "remedy": primary_recall.get("remedy"),
-                    "severity_score": 9.5 if is_critical else 6.0,
-                    "nuclear_liability_flag": is_critical,
-                    "fleetio_issue_id": fleetio_issue_id,
-                    "status": "open",
-                }
-                supabase.table("recall_tasks").upsert(
-                    task_data, on_conflict="vehicle_id,campaign_number"
-                ).execute()
 
         logger.info(f"Fleetio sync completed: {synced_count} vehicles processed, {recalls_flagged} defects flagged.")
 
@@ -198,18 +193,11 @@ def run_fleetio_sync_task(
         logger.error(f"Error during Fleetio background sync: {str(e)}", exc_info=True)
 
 
-# =====================================================================
-# FASTAPI ENDPOINTS
-# =====================================================================
 @router.post("/sync")
 async def sync_fleetio_fleet(
     payload: FleetioSyncRequest,
     background_tasks: BackgroundTasks
 ):
-    """
-    Initializes a fleet sync from Fleetio. If credentials are omitted from
-    the JSON body, it uses FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN from env.
-    """
     resolved_api_key = payload.api_token or os.getenv("FLEETIO_API_KEY")
     resolved_account_token = payload.account_token or os.getenv("FLEETIO_ACCOUNT_TOKEN")
 
@@ -219,7 +207,6 @@ async def sync_fleetio_fleet(
             detail="Missing Fleetio credentials. Provide them in request or configure FLEETIO_API_KEY and FLEETIO_ACCOUNT_TOKEN."
         )
 
-    # Validate Fleetio connectivity
     try:
         fleetio = FleetioService(api_token=resolved_api_key, account_token=resolved_account_token)
         _ = fleetio.fetch_active_vehicles()
@@ -247,7 +234,6 @@ async def sync_fleetio_fleet(
 async def fleetio_webhook_listener(request: Request):
     """
     Webhook endpoint listening for Fleetio work_order.updated events.
-    When a work order is completed or closed in Fleetio, resets punitive exposure to $0.
     """
     try:
         payload = await request.json()
@@ -265,7 +251,6 @@ async def fleetio_webhook_listener(request: Request):
             wo_identifier = str(work_order.get("number") or work_order.get("id"))
             supabase = get_supabase_client()
 
-            # Clear exposure in Supabase
             supabase.table("monitored_vehicles").update({
                 "compliance_status": "CLEARED",
                 "punitive_exposure": 0,
