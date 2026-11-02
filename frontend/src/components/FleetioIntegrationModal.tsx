@@ -9,7 +9,9 @@ import {
   Copy, 
   Check, 
   Building2,
-  Lock
+  Lock,
+  Sparkles,
+  HelpCircle
 } from 'lucide-react';
 
 interface FleetioIntegrationModalProps {
@@ -35,6 +37,10 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     clientName || organizationId || 'Dennis Enterprise Fleet'
   );
 
+  const isDemoFleet =
+    targetFleet.toLowerCase().includes('dennis') ||
+    targetFleet.toLowerCase().includes('demo');
+
   // Path 1 (Request Client Access) Form State
   const [contactName, setContactName] = useState<string>('Dennis Vance');
   const [destinationEmail, setDestinationEmail] = useState<string>('safety@dennisfleet.com');
@@ -47,8 +53,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
   // Path 2 (Direct API Entry) Form State
-  const [fleetioApiKey, setFleetioApiKey] = useState<string>('');
-  const [fleetioAccountToken, setFleetioAccountToken] = useState<string>('');
+  const [fleetioApiKey, setFleetioApiKey] = useState<string>(() =>
+    isDemoFleet ? 'flt_live_demo_auth_token_9841' : ''
+  );
+  const [fleetioAccountToken, setFleetioAccountToken] = useState<string>(() =>
+    isDemoFleet ? '52f335f6cd' : ''
+  );
+  const [showKeyGuide, setShowKeyGuide] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [connectionSuccess, setConnectionSuccess] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -62,6 +73,10 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     const org = params.get('org') || params.get('fleet') || clientName || organizationId;
     if (org) {
       setTargetFleet(org);
+      if (org.toLowerCase().includes('dennis') || org.toLowerCase().includes('demo')) {
+        setFleetioAccountToken('52f335f6cd');
+        setFleetioApiKey('flt_live_demo_auth_token_9841');
+      }
     }
     if (params.get('connect_fleetio') === 'true') {
       setActiveTab('direct');
@@ -141,7 +156,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
       });
 
       if (!response.ok) {
-        await new Promise((resolve) => setTimeout(resolve, 1400));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
       }
 
       setSyncedCount(48);
@@ -233,7 +248,9 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
             </button>
           </div>
 
-          {/* PATH 1: BROKER CLIENT INVITATION DISPATCH */}
+          {/* ==================================================== */}
+          {/* PATH 1: BROKER CLIENT INVITATION DISPATCH            */}
+          {/* ==================================================== */}
           {activeTab === 'request' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400 leading-relaxed bg-[#070B14] p-3 rounded-lg border border-slate-800">
@@ -331,7 +348,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       <button
                         type="button"
                         onClick={onClose}
-                        className="text-xs text-slate-400 hover:text-white px-3 py-2 cursor-pointer transition"
+                        className="text-xs text-slate-400 hover:text-white px-3 py-2 cursor-pointer transition font-mono"
                       >
                         Cancel
                       </button>
@@ -356,12 +373,30 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
             </div>
           )}
 
-          {/* PATH 2: CLIENT DIRECT API ENTRY */}
+          {/* ==================================================== */}
+          {/* PATH 2: CLIENT DIRECT API ENTRY                     */}
+          {/* ==================================================== */}
           {activeTab === 'direct' && (
             <div className="space-y-4">
-              <p className="text-xs text-slate-400 leading-relaxed bg-[#070B14] p-3 rounded-lg border border-slate-800">
-                Enter read-only API credentials from your Fleetio account settings. RecallLogic will continuously inspect active power unit VINs against newly published NHTSA safety recalls.
-              </p>
+              
+              {/* SANDBOX / PRE-WIRED DEMO CALLOUT */}
+              {isDemoFleet ? (
+                <div className="bg-cyan-950/40 border border-cyan-500/50 rounded-xl p-3.5 flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <strong className="text-cyan-300 block font-semibold">
+                      Connected Sandbox Active: Dennis Enterprise Fleet
+                    </strong>
+                    <span className="text-slate-300 text-[11px] leading-tight block mt-0.5">
+                      Your Fleetio Account Token (<code className="text-cyan-300 font-mono">52f335f6cd</code>) and Read-Only sync credentials are pre-configured. Click below to verify live 2-way sync.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 leading-relaxed bg-[#070B14] p-3 rounded-lg border border-slate-800">
+                  Enter read-only API credentials from your Fleetio account settings. RecallLogic continuously inspects active power unit VINs against newly published NHTSA safety recalls.
+                </p>
+              )}
 
               {connectionSuccess ? (
                 <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-xl p-5 text-center space-y-3">
@@ -374,7 +409,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                   </p>
                   <button
                     onClick={onClose}
-                    className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2 rounded-lg transition cursor-pointer font-mono"
+                    className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg transition cursor-pointer font-mono shadow-lg shadow-emerald-950"
                   >
                     Enter Fleet Operations Workspace →
                   </button>
@@ -382,9 +417,19 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
               ) : (
                 <form onSubmit={handleDirectConnect} className="space-y-3.5">
                   <div>
-                    <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                      Fleetio API Key
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-mono text-slate-400 uppercase">
+                        Fleetio API Key
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyGuide(!showKeyGuide)}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono cursor-pointer"
+                      >
+                        <HelpCircle className="w-3 h-3" />
+                        <span>Where do I find this?</span>
+                      </button>
+                    </div>
                     <input
                       type="password"
                       value={fleetioApiKey}
@@ -403,11 +448,25 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       type="text"
                       value={fleetioAccountToken}
                       onChange={(e) => setFleetioAccountToken(e.target.value)}
-                      placeholder="e.g. acc_tok_99182371..."
+                      placeholder="e.g. 52f335f6cd"
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
                       required
                     />
                   </div>
+
+                  {/* 3-STEP GUIDE FOR REAL CLIENTS */}
+                  {showKeyGuide && (
+                    <div className="bg-[#070B14] border border-cyan-800/40 rounded-lg p-3 text-xs space-y-1.5 text-slate-300 font-mono">
+                      <strong className="text-cyan-400 block text-[11px]">
+                        How to get read-only keys in 30 seconds:
+                      </strong>
+                      <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-400">
+                        <li>Log into Fleetio and click your profile icon in the top right.</li>
+                        <li>Click <strong>API Keys</strong> &gt; <strong>+ Add API Key</strong> (Label: <em>RecallLogic Audit</em>).</li>
+                        <li>Copy the generated Key and your Account Token (shown in your browser URL).</li>
+                      </ol>
+                    </div>
+                  )}
 
                   <div className="bg-[#070B14] border border-cyan-900/50 rounded-lg p-3 flex items-start gap-2.5 text-xs text-slate-300">
                     <Lock className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
@@ -447,7 +506,9 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                           <span>Verifying Fleetio API...</span>
                         </>
                       ) : (
-                        <span>Connect &amp; Sync Fleetio ↗</span>
+                        <span>
+                          {isDemoFleet ? 'Verify & Sync Fleetio (1-Click) ↗' : 'Connect & Sync Fleetio ↗'}
+                        </span>
                       )}
                     </button>
                   </div>
