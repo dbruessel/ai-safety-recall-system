@@ -12,6 +12,7 @@ import { UnderwriterReportView } from './components/UnderwriterReportView';
 import UnderwriterEvidenceLocker from './components/UnderwriterEvidenceLocker';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
+import { FleetioIntegrationModal } from './components/FleetioIntegrationModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
@@ -49,6 +50,10 @@ const MainApp: React.FC = () => {
     pathname.includes('/audit/demo') || pathname.includes('/broker');
   const isDemoPath = isFleetDemoPath || isBrokerDemoPath;
 
+  // Check if invited client fleet is present via query params
+  const clientFleetParam = searchParams.get('org') || searchParams.get('fleet');
+  const isClientInvitePath = Boolean(clientFleetParam);
+
   // STRICT BROKER CHECK: Require explicit boolean or role
   const isBrokerUser = Boolean(
     userProfile?.is_broker === true || userProfile?.role === 'broker'
@@ -56,16 +61,20 @@ const MainApp: React.FC = () => {
 
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
+    if (clientFleetParam) return 'workspace';
     if (isFleetDemoPath) return 'workspace';
     if (isBrokerDemoPath || isBrokerUser) return 'broker_portal';
     return 'workspace';
   });
 
   // Track client fleet auditing drill-down
-  const [auditingFleetId, setAuditingFleetId] = useState<string | null>(null);
+  const [auditingFleetId, setAuditingFleetId] = useState<string | null>(
+    () => clientFleetParam || null
+  );
 
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isFleetioModalOpen, setIsFleetioModalOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
   // Handle URL parameter inspection, broker attribution capture, and strict view routing
@@ -85,11 +94,17 @@ const MainApp: React.FC = () => {
       sessionStorage.setItem('recalllogic_referred_broker_name', brokerName);
     }
 
-    // 2. VIEW ROUTING LOGIC
-    const auditedOrg = params.get('org');
+    // 2. VIEW ROUTING LOGIC & CLIENT WORKSPACE ISOLATION
+    const auditedOrg = params.get('org') || params.get('fleet');
+    const shouldConnectFleetio = params.get('connect_fleetio') === 'true';
+
     if (auditedOrg) {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
+      sessionStorage.setItem('current_fleet_name', auditedOrg);
+      if (shouldConnectFleetio) {
+        setIsFleetioModalOpen(true);
+      }
     } else if (isFleetDemoPath) {
       setActiveView('workspace');
     } else if (isBrokerDemoPath || isBrokerUser) {
@@ -184,16 +199,22 @@ const MainApp: React.FC = () => {
     return <AcceptInvite />;
   }
 
-  const isAuthenticated = Boolean(user?.email) || demoAuthenticated || isDemoPath;
+  // Allow invite-flow guests into their isolated fleet workspace
+  const isAuthenticated =
+    Boolean(user?.email) || demoAuthenticated || isDemoPath || isClientInvitePath;
   const currentEmail =
     user?.email ||
     userProfile?.email ||
     (isBrokerDemoPath ? 'demo-broker@recalllogic.ai' : 'demo-fleet@recalllogic.ai');
-  const effectiveTier = isDemoPath
-    ? 'professional'
-    : userTier || userProfile?.subscription_tier || 'free';
+  const effectiveTier =
+    isDemoPath || isClientInvitePath
+      ? 'professional'
+      : userTier || userProfile?.subscription_tier || 'free';
 
   const getUserOrgName = (): string => {
+    if (auditingFleetId) {
+      return auditingFleetId;
+    }
     if (isBrokerUser || isBrokerDemoPath) {
       return companyName || userProfile?.company_name || 'Apex Risk Brokers';
     }
@@ -383,23 +404,41 @@ const MainApp: React.FC = () => {
                   🚚 Auditing: {auditingFleetId} [Read-Only Mode]
                 </span>
               </div>
-              <button
-                onClick={() => {
-                  window.history.pushState({}, '', window.location.pathname.split('?')[0]);
-                  setAuditingFleetId(null);
-                  setActiveView('broker_portal');
-                }}
-                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
-              >
-                ← Back to Portfolio Command
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsFleetioModalOpen(true)}
+                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5 shadow-sm shadow-cyan-950"
+                >
+                  <span>🔌 Connect Fleetio</span>
+                </button>
+                {(isBrokerUser || isBrokerDemoPath) && (
+                  <button
+                    onClick={() => {
+                      window.history.pushState({}, '', window.location.pathname.split('?')[0]);
+                      setAuditingFleetId(null);
+                      setActiveView('broker_portal');
+                    }}
+                    className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded-lg cursor-pointer transition text-[11px]"
+                  >
+                    ← Back to Portfolio Command
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
           {/* MAIN CONTENT ROUTER */}
           <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1680px] mx-auto w-full">
             {activeView === 'broker_portal' && !auditingFleetId ? (
-              <BrokerPortal />
+              <BrokerPortal
+                onAuditClient={(clientName: string) => {
+                  setAuditingFleetId(clientName);
+                  setActiveView('workspace');
+                  const newUrl = new URL(window.location.href);
+                  newUrl.searchParams.set('org', clientName);
+                  window.history.pushState({}, '', newUrl.toString());
+                }}
+              />
             ) : (
               <Taskboard
                 userCompany={auditingFleetId || getUserOrgName()}
@@ -425,8 +464,18 @@ const MainApp: React.FC = () => {
         </>
       )}
 
-      {/* UNIVERSAL SITE FOOTER (Rendered universally across all pages) */}
+      {/* UNIVERSAL SITE FOOTER */}
       <Footer />
+
+      {/* FLEETIO INTEGRATION MODAL */}
+      {isFleetioModalOpen && (
+        <FleetioIntegrationModal
+          isOpen={isFleetioModalOpen}
+          onClose={() => setIsFleetioModalOpen(false)}
+          organizationId={auditingFleetId || getUserOrgName()}
+          clientName={auditingFleetId || getUserOrgName()}
+        />
+      )}
 
       {/* TEAM MANAGEMENT MODAL */}
       {activeAdminModal === 'team' && (

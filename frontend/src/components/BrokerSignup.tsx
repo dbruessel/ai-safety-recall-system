@@ -46,16 +46,22 @@ export const BrokerSignup: React.FC = () => {
     // Retrieve active broker parameters to pass forward
     const currentBrokerId = sessionStorage.getItem('broker_id') || brokerId || 'demo-broker';
     const currentBrokerName = sessionStorage.getItem('broker_name') || brokerageName || '';
+    const fleet = targetFleet || sessionStorage.getItem('target_fleet') || 'Dennis Enterprise Fleet';
 
     // Construct URL preserving BOTH broker parameters across full-page redirect
     const redirectUrl = new URL('/', window.location.origin);
+    
+    // Explicitly pass both org & fleet for complete backwards-compatibility
+    redirectUrl.searchParams.set('org', fleet);
+    redirectUrl.searchParams.set('fleet', fleet);
+    
     redirectUrl.searchParams.set('broker_id', currentBrokerId);
     if (currentBrokerName) {
       redirectUrl.searchParams.set('broker_name', currentBrokerName);
     }
-    if (targetFleet) {
-      redirectUrl.searchParams.set('fleet', targetFleet);
-    }
+    
+    // Tells App.tsx to pop open the Fleetio connection dialog on arrival
+    redirectUrl.searchParams.set('connect_fleetio', 'true');
 
     window.location.href = redirectUrl.toString();
   };
