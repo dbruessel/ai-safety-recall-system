@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   Wrench,
   Radio,
-  Plug
+  Plug,
+  Mail,
 } from "lucide-react";
 import { FleetioIntegrationModal } from "./FleetioIntegrationModal";
 
@@ -46,15 +47,15 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
   const [showScoreTooltip, setShowScoreTooltip] = useState<boolean>(false);
   const [showLiabilityTooltip, setShowLiabilityTooltip] = useState<boolean>(false);
   const [isFleetioModalOpen, setIsFleetioModalOpen] = useState<boolean>(false);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [activeSelectedClient, setActiveSelectedClient] = useState<{ id: string; name: string }>({
     id: "dennis-enterprise",
     name: "Dennis Enterprise Fleet",
   });
-  
-  // NEW: State for tracking when the onboarding link is copied to clipboard
-  const [isCopied, setIsCopied] = useState<boolean>(false);
 
   useEffect(() => {
+    document.title = "RECALLLOGIC — Enterprise Loss Control System";
+
     const fetchBrokerPortfolio = async () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://recalllogic-api.onrender.com";
       
@@ -128,7 +129,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
   const totalFinancialExposure = clientAccounts.reduce((acc, curr) => acc + (curr.financialExposureUsd || 0), 0);
   const nuclearAlerts = clientAccounts.filter(a => a.hasNuclearRecall);
 
-  // Calculate weighted portfolio recall/maintenance deductions for macro tooltip
   const avgRecallDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.recallPenalty || 0), 0) / (clientAccounts.length || 1));
   const avgMaintDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.maintenancePenalty || 0), 0) / (clientAccounts.length || 1));
 
@@ -173,8 +173,30 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8 relative">
+      
+      {/* ENTERPRISE PLATFORM BRANDING BAR */}
+      <div className="flex items-center justify-between pb-3 mb-6 border-b border-slate-800/80 text-xs">
+        <div className="flex items-center gap-3">
+          <span className="font-extrabold tracking-wider text-cyan-400 font-mono text-sm">
+            RECALLLOGIC
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-400 font-medium tracking-wide uppercase text-[11px]">
+            Continuous Risk Defense Platform
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className="text-cyan-300/80 font-mono text-[11px] bg-cyan-950/60 border border-cyan-800/60 px-2 py-0.5 rounded">
+            Enterprise Loss Control System
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-slate-400 text-xs font-mono">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>NHTSA Sync Active</span>
+        </div>
+      </div>
+
       {/* HEADER COMMAND BAR */}
-      <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-cyan-400" />
@@ -188,36 +210,71 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={() => handleOpenIntegrationModal("dennis-enterprise", "Dennis Enterprise Fleet")}
-            className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm shadow-cyan-950 cursor-pointer"
+            className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-3.5 py-2 rounded-lg text-xs font-semibold transition shadow-sm shadow-cyan-950 cursor-pointer"
           >
-            <Plug className="w-4 h-4 text-cyan-400" /> Connect Fleetio & Telematics
+            <Plug className="w-4 h-4 text-cyan-400" /> Connect Fleetio &amp; Telematics
           </button>
           
-          {/* UPDATED: SILENT ASYNC CLIPBOARD HANDLER */}
-          <button 
-            type="button"
-            onClick={async () => {
-              const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
-              try {
-                await navigator.clipboard.writeText(onboardingLink);
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2500);
-              } catch (err) {
-                console.error("Clipboard copy failed:", err);
-              }
-            }}
-            className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"
-          >
-            <Share2 className={`w-4 h-4 ${isCopied ? "text-emerald-400" : "text-cyan-400"}`} /> 
-            {isCopied ? "✓ Copied to Clipboard" : "Share Client Onboarding Link"}
-          </button>
+          {/* COMBINED ONBOARDING ACTIONS (COPY & MAILTO) */}
+          <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5">
+            <button 
+              type="button"
+              onClick={async () => {
+                const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
+                try {
+                  await navigator.clipboard.writeText(onboardingLink);
+                  setIsCopied(true);
+                  setTimeout(() => setIsCopied(false), 2500);
+                } catch (err) {
+                  console.error("Clipboard copy failed:", err);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 rounded transition cursor-pointer"
+              title="Copy onboarding URL to clipboard"
+            >
+              <Share2 className={`w-3.5 h-3.5 ${isCopied ? "text-emerald-400" : "text-cyan-400"}`} />
+              <span>{isCopied ? "✓ Copied!" : "Share Link"}</span>
+            </button>
+
+            <span className="text-slate-700">|</span>
+
+            <button
+              type="button"
+              onClick={() => {
+                const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
+                const subject = encodeURIComponent("Action Required: Loss-Control Audit & Pre-Renewal Rate Credit");
+                const body = encodeURIComponent(
+`Hi Team,
+
+In preparation for upcoming commercial auto renewal negotiations with underwriters, Apex Risk Brokers has provisioned an Underwriter Loss-Control Audit for your fleet.
+
+Operating power units with open NHTSA safety recalls exposes your business to uninsurable punitive liability in highway litigation and triggers carrier rate surcharges.
+
+Please claim your fleet workspace to verify your units and defend up to a 15% rate credit at renewal:
+👉 ${onboardingLink}
+
+You can connect your Fleetio instance in under 60 seconds (or upload your active VIN list) to certify zero open safety defects.
+
+Best regards,
+Commercial Transportation Risk Division
+Apex Risk Brokers`
+                );
+                window.location.href = `mailto:?subject=${subject}&body=${body}`;
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/40 rounded transition cursor-pointer"
+              title="Open pre-drafted email invitation in Outlook / Gmail"
+            >
+              <Mail className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Open Email Draft ↗</span>
+            </button>
+          </div>
           
           <button 
             onClick={() => alert("Generating aggregate portfolio loss control audit PDF for underwriters...")}
-            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-cyan-900/40 transition cursor-pointer"
+            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-cyan-900/40 transition cursor-pointer"
           >
             <FileText className="w-4 h-4" /> Export Portfolio Audit PDF
           </button>
@@ -273,7 +330,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
           <p className="text-3xl font-bold text-white mt-2">{totalManagedVins}</p>
         </div>
 
-        {/* BOOK SAFETY SCORE WITH INTERACTIVE TOOLTIP */}
+        {/* BOOK SAFETY SCORE */}
         <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-xl relative">
           <div className="flex items-center justify-between">
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">BOOK SAFETY SCORE</span>
@@ -291,7 +348,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             <span className="text-slate-500 text-sm font-mono">/ 100</span>
           </div>
 
-          {/* BOOK SAFETY SCORE TOOLTIP POPOVER */}
           {showScoreTooltip && (
             <div className="absolute top-16 left-0 right-0 z-50 p-5 bg-slate-900 border border-cyan-500/60 rounded-xl shadow-2xl shadow-cyan-950/80 text-xs w-[320px] md:w-[380px] backdrop-blur-lg">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
@@ -337,7 +393,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
           )}
         </div>
 
-        {/* PUNITIVE LIABILITY EXPOSURE WITH INTERACTIVE EXPLANATION TOOLTIP */}
+        {/* PUNITIVE LIABILITY EXPOSURE */}
         <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-xl relative">
           <div className="flex items-center justify-between">
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">PUNITIVE LIABILITY EXPOSURE</span>
@@ -354,7 +410,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             ${totalFinancialExposure.toLocaleString()}
           </p>
 
-          {/* LIABILITY EXPOSURE TOOLTIP POPOVER */}
           {showLiabilityTooltip && (
             <div className="absolute top-16 right-0 z-50 p-5 bg-slate-900 border border-red-500/60 rounded-xl shadow-2xl shadow-red-950/90 text-xs w-[320px] md:w-[380px] backdrop-blur-lg">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
@@ -446,14 +501,12 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
                   </div>
                 </div>
 
-                {/* EXPLICIT UNDERWRITER RISK TIER BADGE */}
                 <div className="mb-4">
                   <span className={`inline-block text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded border ${tierBadge.colorClass}`}>
                     {tierBadge.label}
                   </span>
                 </div>
 
-                {/* DYNAMIC FINANCIAL LIABILITY & UNDERWRITER CREDIT HIGHLIGHTS */}
                 <div className="my-4 p-3.5 bg-slate-950 rounded-lg border border-slate-800/80 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 flex items-center gap-1.5">
@@ -480,7 +533,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
                   </div>
                 </div>
 
-                {/* ACTIONABLE IMPACT CALLOUT ("HOW TO FIX & ROI") */}
                 {account.hasNuclearRecall && (
                   <div className="mb-4 p-3 bg-red-950/40 border border-red-800/50 rounded-lg text-xs">
                     <div className="flex items-start gap-2">
@@ -495,7 +547,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
                   </div>
                 )}
 
-                {/* STATS BREAKDOWN */}
                 <div className="grid grid-cols-3 gap-4 my-4 p-3 bg-slate-950/60 rounded-lg border border-slate-800/50 text-center">
                   <div>
                     <span className="text-slate-500 text-[10px] font-mono uppercase">TOTAL VINS</span>
@@ -538,7 +589,6 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
         </div>
       </div>
 
-      {/* RENDER FLEETIO INTEGRATION MODAL */}
       <FleetioIntegrationModal
         isOpen={isFleetioModalOpen}
         onClose={() => setIsFleetioModalOpen(false)}
