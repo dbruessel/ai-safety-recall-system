@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from typing import List, Optional
+from urllib.parse import quote
 from dotenv import load_dotenv
 
 # Load environment variables from .env immediately before app configs are initialized
@@ -93,7 +94,7 @@ async def lifespan(app: FastAPI):
 
 
 # ==========================================
-# ALERT DIGEST DATA MODELS & ENDPOINT
+# ALERT DIGEST DATA MODELS
 # ==========================================
 class RecallItem(BaseModel):
     unit_number: Optional[str] = "UNASSIGNED"
@@ -107,6 +108,17 @@ class AlertDigestRequest(BaseModel):
     email: str
     userTier: Optional[str] = "standard"
     recalls: List[RecallItem]
+
+
+# ==========================================
+# BROKER CLIENT INVITATION DATA MODELS
+# ==========================================
+class BrokerInvitePayload(BaseModel):
+    recipient_email: str
+    recipient_name: Optional[str] = "Fleet Safety Director"
+    fleet_name: str
+    broker_name: Optional[str] = "Apex Risk Brokers"
+    carrier_goal: Optional[str] = "Travelers Commercial Auto (15% Credit Defense)"
 
 
 # ==========================================
@@ -173,11 +185,74 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router.router, prefix="/api")
     app.include_router(sandbox.router, prefix="/api")
     app.include_router(payment_router.router, prefix="/api")
-    app.include_router(telematics_router.router, prefix="/api")  # Mounts /api/webhooks/samsara, /api/webhooks/geotab, /api/webhooks/test-event
+    app.include_router(telematics_router.router, prefix="/api")
     app.include_router(stripe_router.router)
     app.include_router(pdf_router)
     app.include_router(audit_router.router)
-    app.include_router(fleetio_sync.router)  # Mounts /api/v1/integrations/fleetio/sync and /webhook
+    app.include_router(fleetio_sync.router)
+
+    # ==========================================
+    # BROKER 1-CLICK CLIENT INVITATION ROUTE
+    # ==========================================
+    @app.post("/api/broker/invite-client")
+    async def send_broker_client_invite(payload: BrokerInvitePayload):
+        encoded_fleet = quote(payload.fleet_name)
+        encoded_broker = quote(payload.broker_name or "Apex Risk Brokers")
+        onboarding_link = (
+            f"https://recalllogic.ai/signup?broker=apex-risk&fleet={encoded_fleet}&broker_name={encoded_broker}"
+        )
+
+        html_content = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0B0F17; color: #f1f5f9; padding: 32px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b;">
+          <div style="margin-bottom: 20px;">
+            <span style="background-color: #082f49; color: #38bdf8; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 9999px; border: 1px solid #0369a1; text-transform: uppercase;">
+              Underwriter Risk Defense
+            </span>
+          </div>
+
+          <h2 style="color: #ffffff; margin-top: 0; font-size: 20px; font-weight: 700;">
+            Loss-Control Audit Request for {payload.fleet_name}
+          </h2>
+
+          <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">
+            Hi {payload.recipient_name},
+          </p>
+
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6;">
+            <strong>{payload.broker_name}</strong> has initiated a pre-renewal safety defect audit for your power units in support of your <strong>{payload.carrier_goal}</strong> objective.
+          </p>
+
+          <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
+            Operating power units with unaddressed NHTSA safety recalls creates direct uninsurable corporate exposure in commercial litigation and prevents underwriting carriers from issuing maximum loss-control credits.
+          </p>
+
+          <div style="margin: 28px 0; text-align: center;">
+            <a href="{onboarding_link}" style="display: inline-block; background-color: #06B6D4; color: #020617; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 14px;">
+              Authorize Read-Only Fleetio Access (60s) →
+            </a>
+          </div>
+
+          <p style="color: #64748b; font-size: 11px; line-height: 1.5; border-top: 1px solid #1e293b; padding-top: 16px;">
+            🔒 Read-only access is strictly restricted to VIN inventory and work order status. Zero credit card or manual configuration required.
+          </p>
+        </div>
+        """
+
+        try:
+            # Uses custom verified domain if provided in environment, otherwise falls back to Resend test sender
+            sender_email = os.getenv("RESEND_FROM_EMAIL", "Apex Risk Loss Control <onboarding@resend.dev>")
+            
+            email_res = resend.Emails.send({
+                "from": sender_email,
+                "to": [payload.recipient_email],
+                "subject": f"Action Required: Authorize Fleetio Access for {payload.fleet_name}",
+                "html": html_content,
+            })
+            logger.info(f"Broker invite successfully sent to {payload.recipient_email}: {email_res}")
+            return {"status": "success", "data": email_res}
+        except Exception as e:
+            logger.error(f"Failed to dispatch broker client invite to {payload.recipient_email}: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     # ==========================================
     # ROBUST STRIPE BILLING PORTAL ENDPOINT
