@@ -50,6 +50,9 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
     id: "dennis-enterprise",
     name: "Dennis Enterprise Fleet",
   });
+  
+  // NEW: State for tracking when the onboarding link is copied to clipboard
+  const [isCopied, setIsCopied] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchBrokerPortfolio = async () => {
@@ -193,15 +196,23 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             <Plug className="w-4 h-4 text-cyan-400" /> Connect Fleetio & Telematics
           </button>
           
+          {/* UPDATED: SILENT ASYNC CLIPBOARD HANDLER */}
           <button 
-            onClick={() => {
+            type="button"
+            onClick={async () => {
               const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
-              navigator.clipboard.writeText(onboardingLink);
-              alert("Client onboarding link copied to clipboard:\n" + onboardingLink);
+              try {
+                await navigator.clipboard.writeText(onboardingLink);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2500);
+              } catch (err) {
+                console.error("Clipboard copy failed:", err);
+              }
             }}
             className="flex items-center gap-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer"
           >
-            <Share2 className="w-4 h-4 text-cyan-400" /> Share Client Onboarding Link
+            <Share2 className={`w-4 h-4 ${isCopied ? "text-emerald-400" : "text-cyan-400"}`} /> 
+            {isCopied ? "✓ Copied to Clipboard" : "Share Client Onboarding Link"}
           </button>
           
           <button 
@@ -293,7 +304,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability)[cite: 12]. 100 represents zero unaddressed recalls or maintenance defects[cite: 12].
+                Measures portfolio-wide loss control compliance (<strong>NOT</strong> crash probability). 100 represents zero unaddressed recalls or maintenance defects.
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -320,7 +331,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               </div>
 
               <div className="mt-3 p-2 bg-cyan-950/50 border border-cyan-800/60 rounded text-[11px] text-cyan-200">
-                💡 <strong>Underwriter Tip:</strong> Resolve active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>[cite: 12].
+                💡 <strong>Underwriter Tip:</strong> Resolve active nuclear recalls to elevate this book to <strong>Preferred Tier (92/100)</strong>.
               </div>
             </div>
           )}
@@ -356,7 +367,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               </div>
 
               <p className="text-slate-300 mb-3 leading-relaxed">
-                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls[cite: 12]. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties[cite: 12].
+                Estimated <strong>out-of-pocket court damages</strong> awarded in gross-negligence lawsuits when crashes involve unaddressed critical safety recalls. Standard insurance policies <strong>DO NOT</strong> cover punitive penalties.
               </p>
 
               <div className="space-y-2 font-mono text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -383,7 +394,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               </div>
 
               <div className="mt-3 p-2 bg-red-950/60 border border-red-800/80 rounded text-[11px] text-red-200">
-                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability[cite: 12].
+                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability.
               </div>
             </div>
           )}
