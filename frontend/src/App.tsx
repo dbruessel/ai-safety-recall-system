@@ -346,7 +346,7 @@ const MainApp: React.FC = () => {
                 />
                 <div className="flex flex-col">
                   <span className="text-[#06B6D4] font-extrabold tracking-wider font-mono text-sm sm:text-base leading-none">
-                    RECALLLOGIC
+                    RecallLogic
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono tracking-widest uppercase mt-0.5">
                     Continuous Risk Defense Platform

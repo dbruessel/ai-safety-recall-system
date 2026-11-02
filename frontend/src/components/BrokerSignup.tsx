@@ -8,7 +8,7 @@ export const BrokerSignup: React.FC = () => {
 
   useEffect(() => {
     // Standardize browser tab title
-    document.title = "RECALLLOGIC — Underwriter Risk Audit";
+    document.title = "RecallLogic — Underwriter Risk Audit";
 
     const params = new URLSearchParams(window.location.search);
     const id = params.get('broker_id') || params.get('broker') || 'demo-broker';
