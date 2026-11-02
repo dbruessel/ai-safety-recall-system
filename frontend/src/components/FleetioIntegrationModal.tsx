@@ -89,7 +89,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
       });
 
       if (!response.ok) {
-        const errJson = await response.json();
+        const errJson = await response.json().catch(() => ({}));
         throw new Error(errJson.detail || "Invitation delivery failed.");
       }
 

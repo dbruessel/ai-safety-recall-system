@@ -239,12 +239,17 @@ def create_app() -> FastAPI:
         """
 
         try:
-            # Uses custom verified domain if provided in environment, otherwise falls back to Resend test sender
-            sender_email = os.getenv("RESEND_FROM_EMAIL", "Apex Risk Loss Control <onboarding@resend.dev>")
-            
+            # Priority: BROKER_FROM_EMAIL > RESEND_FROM_EMAIL > verified recalllogic.ai sender
+            sender_email = os.getenv(
+                "BROKER_FROM_EMAIL",
+                os.getenv("RESEND_FROM_EMAIL", f"{payload.broker_name} <dennis@recalllogic.ai>")
+            )
+            reply_to_address = os.getenv("RESEND_REPLY_TO", "dennis@recalllogic.ai")
+
             email_res = resend.Emails.send({
                 "from": sender_email,
                 "to": [payload.recipient_email],
+                "reply_to": reply_to_address,
                 "subject": f"Action Required: Authorize Fleetio Access for {payload.fleet_name}",
                 "html": html_content,
             })
@@ -263,20 +268,17 @@ def create_app() -> FastAPI:
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
 
         try:
-            # 1. Search for existing Stripe customer by email
             customers = stripe.Customer.list(email=target_email, limit=1)
 
             if customers.data:
                 customer_id = customers.data[0].id
             else:
-                # 2. Auto-provision customer profile if absent
                 new_customer = stripe.Customer.create(
                     email=target_email,
                     description=f"Fleet Customer ({target_email})"
                 )
                 customer_id = new_customer.id
 
-            # 3. Create Stripe Billing Portal Session
             return_link = payload.return_url or "https://recalllogic.ai"
             session = stripe.billingPortal.Session.create(
                 customer=customer_id,
@@ -297,7 +299,6 @@ def create_app() -> FastAPI:
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
         target_tier = (payload.tier or "professional").lower()
 
-        # Set monthly price tiers ($99 / $249 / $499)
         tier_pricing = {
             "standard": {"amount": 9900, "name": "RecallLogic Standard Tier"},
             "professional": {"amount": 24900, "name": "RecallLogic Professional Tier"},
@@ -307,11 +308,9 @@ def create_app() -> FastAPI:
         tier_data = tier_pricing.get(target_tier, tier_pricing["professional"])
 
         try:
-            # 1. Search or create customer to ensure session attaches cleanly
             customers = stripe.Customer.list(email=target_email, limit=1)
             customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
 
-            # 2. Check if a direct price ID exists in env, otherwise fallback to price_data
             env_price_id = STRIPE_PRICE_MAP.get(target_tier)
 
             if env_price_id and env_price_id.startswith("price_"):
@@ -330,7 +329,6 @@ def create_app() -> FastAPI:
                     "quantity": 1,
                 }]
 
-            # 3. Create Checkout Session
             checkout_session = stripe.checkout.Session.create(
                 customer=customer_id,
                 line_items=line_items,
@@ -353,7 +351,6 @@ def create_app() -> FastAPI:
         if not payload.recalls:
             return {"status": "skipped", "message": "No actionable recalls to report."}
 
-        # Format recall HTML list
         recall_rows = ""
         for r in payload.recalls:
             recall_rows += f"""
@@ -364,7 +361,6 @@ def create_app() -> FastAPI:
             </div>
             """
 
-        # Add Pro upgrade banner for Standard tier users
         upgrade_banner = ""
         if payload.userTier == "standard":
             upgrade_banner = """
@@ -391,15 +387,20 @@ def create_app() -> FastAPI:
         """
 
         try:
+            sender_email = os.getenv("RESEND_FROM_EMAIL", "RecallLogic Safety Shield <dennis@recalllogic.ai>")
+            reply_to_address = os.getenv("RESEND_REPLY_TO", "dennis@recalllogic.ai")
+
             params = {
-                "from": "RecallLogic Safety <onboarding@resend.dev>",
+                "from": sender_email,
                 "to": [payload.email],
+                "reply_to": reply_to_address,
                 "subject": f"🚨 [Safety Alert] {len(payload.recalls)} New Safety Recall(s) Detected",
                 "html": html_content,
             }
             email_res = resend.Emails.send(params)
             return {"status": "success", "data": email_res}
         except Exception as e:
+            logger.error(f"Failed to dispatch safety digest to {payload.email}: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
