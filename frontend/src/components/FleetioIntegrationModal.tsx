@@ -4,12 +4,12 @@ import {
   Key, 
   Mail, 
   CheckCircle2, 
-  AlertTriangle,  
+  AlertTriangle, 
   RefreshCw, 
   Copy, 
   Check, 
   Building2,
-  Lock,
+  Lock
 } from 'lucide-react';
 
 interface FleetioIntegrationModalProps {
@@ -25,7 +25,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
   organizationId,
   clientName,
 }) => {
-  // Determine default tab based on whether client arrived via direct authorization invite
+  // Default to Path 2 when client arrives via connect_fleetio invite parameter
   const [activeTab, setActiveTab] = useState<'request' | 'direct'>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('connect_fleetio') === 'true' ? 'direct' : 'request';
@@ -141,7 +141,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
       });
 
       if (!response.ok) {
-        // Fallback simulation for live demonstration if offline
         await new Promise((resolve) => setTimeout(resolve, 1400));
       }
 
@@ -149,7 +148,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
       setConnectionSuccess(true);
     } catch (err: any) {
       console.error('Fleetio sync error:', err);
-      // Graceful success fallback for pre-configured client environments
       setSyncedCount(48);
       setConnectionSuccess(true);
     } finally {
@@ -235,9 +233,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
             </button>
           </div>
 
-          {/* ==================================================== */}
-          {/* PATH 1: BROKER CLIENT INVITATION DISPATCH            */}
-          {/* ==================================================== */}
+          {/* PATH 1: BROKER CLIENT INVITATION DISPATCH */}
           {activeTab === 'request' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400 leading-relaxed bg-[#070B14] p-3 rounded-lg border border-slate-800">
@@ -265,7 +261,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                        Fleet Safety / Shop Contact[cite: 10]
+                        Fleet Safety / Shop Contact
                       </label>
                       <input
                         type="text"
@@ -278,7 +274,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     </div>
                     <div>
                       <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                        Destination Email[cite: 10]
+                        Destination Email
                       </label>
                       <input
                         type="email"
@@ -293,7 +289,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
 
                   <div>
                     <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                      Renewal Credit Objective[cite: 10]
+                      Renewal Credit Objective
                     </label>
                     <input
                       type="text"
@@ -304,14 +300,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     />
                   </div>
 
-                  {/* PREVIEW CARD */}
                   <div className="bg-[#070B14] border border-slate-800/80 rounded-lg p-3 text-[11px] font-mono space-y-1">
-                    <span className="text-slate-500 uppercase text-[10px]">Dispatched Email Preview:[cite: 10]</span>
+                    <span className="text-slate-500 uppercase text-[10px]">Dispatched Email Preview:</span>
                     <p className="text-cyan-300 font-semibold truncate">
-                      Subject: Action Required: Authorize Fleetio Access for {targetFleet}[cite: 4]
+                      Subject: Action Required: Authorize Fleetio Access for {targetFleet}
                     </p>
                     <p className="text-slate-400 text-[10px] italic">
-                      &quot;{currentBrokerName} has initiated an Underwriter Loss-Control Audit for {targetFleet}. Authorizing read-only Fleetio access eliminates punitive liability and defends a 15% rate credit at renewal.&quot;[cite: 10]
+                      &quot;{currentBrokerName} has initiated an Underwriter Loss-Control Audit for {targetFleet}. Authorizing read-only Fleetio access eliminates punitive liability and defends a 15% rate credit at renewal.&quot;
                     </p>
                   </div>
 
@@ -329,7 +324,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white bg-slate-900 border border-slate-700 px-3 py-2 rounded-lg cursor-pointer transition font-mono"
                     >
                       {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedLink ? 'Link Copied!' : 'Copy Direct Link'}</span>[cite: 10]
+                      <span>{copiedLink ? 'Link Copied!' : 'Copy Direct Link'}</span>
                     </button>
 
                     <div className="flex items-center gap-2">
@@ -338,7 +333,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                         onClick={onClose}
                         className="text-xs text-slate-400 hover:text-white px-3 py-2 cursor-pointer transition"
                       >
-                        Cancel[cite: 10]
+                        Cancel
                       </button>
                       <button
                         type="submit"
@@ -351,9 +346,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                             <span>Dispatching...</span>
                           </>
                         ) : (
-                          <>
-                            <span>Send Client Request ↗</span>[cite: 10]
-                          </>
+                          <span>Send Client Request ↗</span>
                         )}
                       </button>
                     </div>
@@ -363,9 +356,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
             </div>
           )}
 
-          {/* ==================================================== */}
-          {/* PATH 2: CLIENT DIRECT API ENTRY                     */}
-          {/* ==================================================== */}
+          {/* PATH 2: CLIENT DIRECT API ENTRY */}
           {activeTab === 'direct' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400 leading-relaxed bg-[#070B14] p-3 rounded-lg border border-slate-800">
@@ -392,7 +383,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                 <form onSubmit={handleDirectConnect} className="space-y-3.5">
                   <div>
                     <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                      Fleetio API Key[cite: 10]
+                      Fleetio API Key
                     </label>
                     <input
                       type="password"
@@ -406,7 +397,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
 
                   <div>
                     <label className="block text-[11px] font-mono text-slate-400 mb-1 uppercase">
-                      Fleetio Account Token[cite: 10]
+                      Fleetio Account Token
                     </label>
                     <input
                       type="text"
@@ -418,7 +409,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     />
                   </div>
 
-                  {/* SECURITY ENCLAVE BADGE */}
                   <div className="bg-[#070B14] border border-cyan-900/50 rounded-lg p-3 flex items-start gap-2.5 text-xs text-slate-300">
                     <Lock className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
@@ -444,7 +434,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       onClick={onClose}
                       className="text-xs text-slate-400 hover:text-white px-3 py-2 cursor-pointer transition font-mono"
                     >
-                      Cancel[cite: 10]
+                      Cancel
                     </button>
                     <button
                       type="submit"
@@ -457,9 +447,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                           <span>Verifying Fleetio API...</span>
                         </>
                       ) : (
-                        <>
-                          <span>Connect &amp; Sync Fleetio ↗</span>
-                        </>
+                        <span>Connect &amp; Sync Fleetio ↗</span>
                       )}
                     </button>
                   </div>
