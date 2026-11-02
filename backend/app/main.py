@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
     """
     FastAPI lifespan context manager to start and cleanly cancel background tasks.
     """
-    logger.info("🚀 Starting RecallLogic Enterprise Risk Defense Engine...")
+    logger.info("🚀 Starting RECALLLOGIC Enterprise Loss Control System...")
     audit_task = asyncio.create_task(continuous_risk_defense_loop())
     yield
     logger.info("🛑 Shutting down background tasks...")
@@ -149,7 +149,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="RecallLogic Backend",
+        title="RECALLLOGIC — Continuous Risk Defense Platform",
+        description="Enterprise Loss Control System",
         version="2026.4.2",
         lifespan=lifespan
     )
@@ -202,47 +203,152 @@ def create_app() -> FastAPI:
             f"https://recalllogic.ai/signup?broker=apex-risk&fleet={encoded_fleet}&broker_name={encoded_broker}"
         )
 
+        # Bulletproof table-based template for Outlook, Gmail, and Apple Mail
         html_content = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0B0F17; color: #f1f5f9; padding: 32px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b;">
-          <div style="margin-bottom: 20px;">
-            <span style="background-color: #082f49; color: #38bdf8; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 9999px; border: 1px solid #0369a1; text-transform: uppercase;">
-              Underwriter Risk Defense
-            </span>
-          </div>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Loss-Control Audit Authorization</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #060911; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #060911; padding: 30px 15px;">
+            <tr>
+              <td align="center">
+                
+                <!-- MAIN CONTAINER (600px Max) -->
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #0C1220; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                  
+                  <!-- HEADER BAR -->
+                  <tr>
+                    <td style="padding: 24px 32px; background-color: #070B14; border-bottom: 1px solid #1e293b;">
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                          <td>
+                            <div style="font-size: 15px; font-weight: 900; letter-spacing: 0.12em; color: #38bdf8; font-family: monospace;">
+                              RECALLLOGIC
+                            </div>
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-top: 3px;">
+                              Continuous Risk Defense Platform &bull; Enterprise Loss Control System
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
 
-          <h2 style="color: #ffffff; margin-top: 0; font-size: 20px; font-weight: 700;">
-            Loss-Control Audit Request for {payload.fleet_name}
-          </h2>
+                  <!-- BODY CONTENT -->
+                  <tr>
+                    <td style="padding: 32px;">
+                      
+                      <!-- BADGE -->
+                      <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+                        <tr>
+                          <td style="background-color: #082f49; border: 1px solid #0284c7; padding: 5px 12px; border-radius: 9999px;">
+                            <span style="color: #38bdf8; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-family: monospace;">
+                              🛡️ Pre-Renewal Underwriter Audit
+                            </span>
+                          </td>
+                        </tr>
+                      </table>
 
-          <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">
-            Hi {payload.recipient_name},
-          </p>
+                      <h1 style="color: #ffffff; font-size: 20px; font-weight: 700; line-height: 1.4; margin: 0 0 16px 0;">
+                        Loss-Control Audit Request for {payload.fleet_name}
+                      </h1>
 
-          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6;">
-            <strong>{payload.broker_name}</strong> has initiated a pre-renewal safety defect audit for your power units in support of your <strong>{payload.carrier_goal}</strong> objective.
-          </p>
+                      <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+                        Hi {payload.recipient_name},
+                      </p>
 
-          <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
-            Operating power units with unaddressed NHTSA safety recalls creates direct uninsurable corporate exposure in commercial litigation and prevents underwriting carriers from issuing maximum loss-control credits.
-          </p>
+                      <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+                        <strong style="color: #ffffff;">{payload.broker_name}</strong> has provisioned an Underwriter Loss-Control Audit for your power units in direct support of your <strong style="color: #38bdf8;">{payload.carrier_goal}</strong> objective.
+                      </p>
 
-          <div style="margin: 28px 0; text-align: center;">
-            <a href="{onboarding_link}" style="display: inline-block; background-color: #06B6D4; color: #020617; font-weight: 700; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 14px;">
-              Authorize Read-Only Fleetio Access (60s) →
-            </a>
-          </div>
+                      <!-- STRUCTURED AUDIT DETAILS CARD -->
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #070B14; border: 1px solid #1e293b; border-radius: 8px; margin-bottom: 24px;">
+                        <tr>
+                          <td style="padding: 16px 20px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                              <tr>
+                                <td style="padding: 6px 0; color: #64748b; font-size: 12px; font-family: monospace; text-transform: uppercase; width: 40%;">Requesting Broker:</td>
+                                <td style="padding: 6px 0; color: #f1f5f9; font-size: 12px; font-weight: bold; font-family: monospace;">{payload.broker_name}</td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 6px 0; color: #64748b; font-size: 12px; font-family: monospace; text-transform: uppercase;">Target Fleet:</td>
+                                <td style="padding: 6px 0; color: #f1f5f9; font-size: 12px; font-weight: bold; font-family: monospace;">{payload.fleet_name}</td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 6px 0; color: #64748b; font-size: 12px; font-family: monospace; text-transform: uppercase;">Renewal Goal:</td>
+                                <td style="padding: 6px 0; color: #34d399; font-size: 12px; font-weight: bold; font-family: monospace;">15% Premium Credit Defense</td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 6px 0; color: #64748b; font-size: 12px; font-family: monospace; text-transform: uppercase;">Legal Exposure:</td>
+                                <td style="padding: 6px 0; color: #f87171; font-size: 12px; font-weight: bold; font-family: monospace;">$250k+ Punitive Liability Defense</td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
 
-          <p style="color: #64748b; font-size: 11px; line-height: 1.5; border-top: 1px solid #1e293b; padding-top: 16px;">
-            🔒 Read-only access is strictly restricted to VIN inventory and work order status. Zero credit card or manual configuration required.
-          </p>
-        </div>
+                      <p style="color: #94a3b8; font-size: 13px; line-height: 1.6; margin: 0 0 28px 0;">
+                        Operating commercial power units with unaddressed NHTSA safety defects creates uninsurable gross-negligence exposure in accident litigation and prevents carriers from applying maximum renewal credits.
+                      </p>
+
+                      <!-- BULLETPROOF BUTTON TABLE (Outlook & Mobile Immune) -->
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0;">
+                        <tr>
+                          <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td align="center" style="border-radius: 8px; background-color: #06B6D4;">
+                                  <a href="{onboarding_link}" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 800; color: #020617; text-decoration: none; border-radius: 8px; letter-spacing: 0.02em;">
+                                    Authorize Read-Only Fleetio Access (60s) &rarr;
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- SECURITY FOOTER -->
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #1e293b; margin-top: 24px; padding-top: 16px;">
+                        <tr>
+                          <td style="color: #64748b; font-size: 11px; line-height: 1.5;">
+                            🔒 <strong>Enterprise Security:</strong> Read-only access is restricted to VIN inventory and work order status. Zero credit card or software installation required.
+                          </td>
+                        </tr>
+                      </table>
+
+                    </td>
+                  </tr>
+
+                  <!-- COMPLIANCE FOOTER -->
+                  <tr>
+                    <td style="background-color: #070B14; border-top: 1px solid #1e293b; padding: 18px 32px; text-align: center;">
+                      <p style="margin: 0; color: #475569; font-size: 11px; font-family: monospace;">
+                        RECALLLOGIC Continuous Risk Defense Platform &bull; Enterprise Loss Control System<br/>
+                        Automated NHTSA Compliance &bull; Work Order Sync &bull; Underwriter Evidence Locker
+                      </p>
+                    </td>
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+          </table>
+
+        </body>
+        </html>
         """
 
         try:
-            # Priority: BROKER_FROM_EMAIL > RESEND_FROM_EMAIL > verified recalllogic.ai sender
             sender_email = os.getenv(
                 "BROKER_FROM_EMAIL",
-                os.getenv("RESEND_FROM_EMAIL", f"{payload.broker_name} <dennis@recalllogic.ai>")
+                f"{payload.broker_name} Loss Control <dennis@recalllogic.ai>"
             )
             reply_to_address = os.getenv("RESEND_REPLY_TO", "dennis@recalllogic.ai")
 
@@ -268,17 +374,20 @@ def create_app() -> FastAPI:
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
 
         try:
+            # 1. Search for existing Stripe customer by email
             customers = stripe.Customer.list(email=target_email, limit=1)
 
             if customers.data:
                 customer_id = customers.data[0].id
             else:
+                # 2. Auto-provision customer profile if absent
                 new_customer = stripe.Customer.create(
                     email=target_email,
                     description=f"Fleet Customer ({target_email})"
                 )
                 customer_id = new_customer.id
 
+            # 3. Create Stripe Billing Portal Session
             return_link = payload.return_url or "https://recalllogic.ai"
             session = stripe.billingPortal.Session.create(
                 customer=customer_id,
@@ -299,6 +408,7 @@ def create_app() -> FastAPI:
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
         target_tier = (payload.tier or "professional").lower()
 
+        # Set monthly price tiers ($99 / $249 / $499)
         tier_pricing = {
             "standard": {"amount": 9900, "name": "RecallLogic Standard Tier"},
             "professional": {"amount": 24900, "name": "RecallLogic Professional Tier"},
@@ -308,9 +418,11 @@ def create_app() -> FastAPI:
         tier_data = tier_pricing.get(target_tier, tier_pricing["professional"])
 
         try:
+            # 1. Search or create customer to ensure session attaches cleanly
             customers = stripe.Customer.list(email=target_email, limit=1)
             customer_id = customers.data[0].id if customers.data else stripe.Customer.create(email=target_email).id
 
+            # 2. Check if a direct price ID exists in env, otherwise fallback to price_data
             env_price_id = STRIPE_PRICE_MAP.get(target_tier)
 
             if env_price_id and env_price_id.startswith("price_"):
@@ -321,7 +433,7 @@ def create_app() -> FastAPI:
                         "currency": "usd",
                         "product_data": {
                             "name": tier_data["name"],
-                            "description": "Automated NHTSA recall monitoring & loss-control portal.",
+                            "description": "RECALLLOGIC Continuous Risk Defense & Loss-Control System.",
                         },
                         "unit_amount": tier_data["amount"],
                         "recurring": {"interval": "month"},
@@ -329,6 +441,7 @@ def create_app() -> FastAPI:
                     "quantity": 1,
                 }]
 
+            # 3. Create Checkout Session
             checkout_session = stripe.checkout.Session.create(
                 customer=customer_id,
                 line_items=line_items,
@@ -351,50 +464,149 @@ def create_app() -> FastAPI:
         if not payload.recalls:
             return {"status": "skipped", "message": "No actionable recalls to report."}
 
+        # Format recall table rows for bulletproof rendering
         recall_rows = ""
         for r in payload.recalls:
             recall_rows += f"""
-            <div style="background-color: #070B14; border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-              <strong style="color: #ffffff;">Unit: {r.unit_number} ({r.vin})</strong><br/>
-              <span style="color: #ef4444; font-weight: bold;">Campaign #{r.campaign_number}</span> — {r.component}<br/>
-              <p style="color: #94a3b8; font-size: 11px; margin-top: 6px; margin-bottom: 0;">{r.summary}</p>
+            <div style="background-color: #070B14; border: 1px solid #1e293b; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px;">
+              <div style="color: #ffffff; font-weight: 700; font-size: 13px; font-family: monospace;">
+                Unit: {r.unit_number} &bull; VIN: {r.vin}
+              </div>
+              <div style="color: #ef4444; font-weight: 700; font-size: 12px; margin-top: 4px; font-family: monospace;">
+                Campaign #{r.campaign_number} &mdash; {r.component}
+              </div>
+              <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 8px 0 0 0;">
+                {r.summary}
+              </p>
             </div>
             """
 
         upgrade_banner = ""
         if payload.userTier == "standard":
             upgrade_banner = """
-            <hr style="border-color: #1e293b; margin: 24px 0;" />
-            <p style="color: #94a3b8; font-size: 11px;">
-              ⚡ <strong>Need a Signed Underwriter Compliance Certificate for your broker?</strong><br/>
-              <a href="https://recalllogic.ai" style="color: #06B6D4;">Upgrade to Professional ($249/mo)</a> to generate instant PDF risk packets and shareable broker links.
-            </p>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #1e293b; margin-top: 24px; padding-top: 18px;">
+              <tr>
+                <td style="color: #94a3b8; font-size: 12px; line-height: 1.6;">
+                  ⚡ <strong style="color: #ffffff;">Need a Certified Underwriter Evidence Locker for your broker?</strong><br/>
+                  <a href="https://recalllogic.ai" style="color: #38bdf8; text-decoration: underline; font-weight: bold;">Upgrade to Professional ($249/mo)</a> to generate instant PDF risk packets and live underwriter access tokens.
+                </td>
+              </tr>
+            </table>
             """
 
         html_content = f"""
-        <div style="font-family: monospace; background-color: #0B0F17; color: #f1f5f9; padding: 24px; border-radius: 12px;">
-          <h2 style="color: #06B6D4; margin-top: 0;">RecallLogic Safety Alert</h2>
-          <p style="color: #94a3b8; font-size: 13px;">Our automated NHTSA sync detected active safety recalls on your registered fleet units:</p>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>RecallLogic Critical Safety Defect Notice</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #060911; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
           
-          <div style="margin: 20px 0;">
-            {recall_rows}
-          </div>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #060911; padding: 30px 15px;">
+            <tr>
+              <td align="center">
+                
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #0C1220; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                  
+                  <!-- HEADER BAR -->
+                  <tr>
+                    <td style="padding: 24px 32px; background-color: #070B14; border-bottom: 1px solid #1e293b;">
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                          <td>
+                            <div style="font-size: 15px; font-weight: 900; letter-spacing: 0.12em; color: #38bdf8; font-family: monospace;">
+                              RECALLLOGIC
+                            </div>
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-top: 3px;">
+                              Continuous Risk Defense Platform &bull; Enterprise Loss Control System
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
 
-          <a href="https://recalllogic.ai" style="display: inline-block; background-color: #06B6D4; color: #020617; font-weight: bold; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-size: 12px;">Open Operations Workspace</a>
-          
-          {upgrade_banner}
-        </div>
+                  <!-- BODY CONTENT -->
+                  <tr>
+                    <td style="padding: 32px;">
+                      
+                      <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
+                        <tr>
+                          <td style="background-color: #450a0a; border: 1px solid #b91c1c; padding: 5px 12px; border-radius: 9999px;">
+                            <span style="color: #f87171; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-family: monospace;">
+                              🚨 Safety Critical Alert
+                            </span>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <h1 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 0 0 12px 0;">
+                        Critical Safety Defect Notice
+                      </h1>
+
+                      <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+                        Our continuous NHTSA synchronization identified active, safety-critical recall campaigns requiring immediate shop remediation across your registered power units:
+                      </p>
+
+                      <div style="margin: 20px 0;">
+                        {recall_rows}
+                      </div>
+
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0;">
+                        <tr>
+                          <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td align="center" style="border-radius: 8px; background-color: #06B6D4;">
+                                  <a href="https://recalllogic.ai" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 800; color: #020617; text-decoration: none; border-radius: 8px;">
+                                    Open Operations Workspace &rarr;
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      {upgrade_banner}
+
+                    </td>
+                  </tr>
+
+                  <!-- FOOTER -->
+                  <tr>
+                    <td style="background-color: #070B14; border-top: 1px solid #1e293b; padding: 18px 32px; text-align: center;">
+                      <p style="margin: 0; color: #475569; font-size: 11px; font-family: monospace;">
+                        RECALLLOGIC Continuous Risk Defense Platform &bull; Enterprise Loss Control System<br/>
+                        Automated NHTSA Compliance &bull; Work Order Sync &bull; Underwriter Evidence Locker
+                      </p>
+                    </td>
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+          </table>
+
+        </body>
+        </html>
         """
 
         try:
-            sender_email = os.getenv("RESEND_FROM_EMAIL", "RecallLogic Safety Shield <dennis@recalllogic.ai>")
+            sender_email = os.getenv(
+                "RESEND_FROM_EMAIL",
+                "RecallLogic Continuous Risk Defense <dennis@recalllogic.ai>"
+            )
             reply_to_address = os.getenv("RESEND_REPLY_TO", "dennis@recalllogic.ai")
 
             params = {
                 "from": sender_email,
                 "to": [payload.email],
                 "reply_to": reply_to_address,
-                "subject": f"🚨 [Safety Alert] {len(payload.recalls)} New Safety Recall(s) Detected",
+                "subject": f"🚨 [Safety Notice] {len(payload.recalls)} New Safety Defect(s) Detected",
                 "html": html_content,
             }
             email_res = resend.Emails.send(params)
