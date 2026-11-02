@@ -37,14 +37,11 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
   clientName = "Dennis Enterprise Fleet",
   clientEmail = ""
 }) => {
-  // Navigation tab state: 'request' (Path 1) vs 'manual' (Path 2)
   const [activeTab, setActiveTab] = useState<"request" | "manual">("request");
   
-  // Selected client state
   const [selectedFleetId, setSelectedFleetId] = useState<string>(organizationId);
   const [selectedFleetName, setSelectedFleetName] = useState<string>(clientName);
   
-  // Path 1 Form state
   const [recipientEmail, setRecipientEmail] = useState<string>(clientEmail || "safety@dennisfleet.com");
   const [recipientName, setRecipientName] = useState<string>("VP of Safety & Fleet Maintenance");
   const [carrierGoal, setCarrierGoal] = useState<string>("Travelers Commercial Auto (15% Credit Defense)");
@@ -52,13 +49,11 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
   const [isSending, setIsSending] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
-  // Path 2 (Direct Keys) Form state
   const [accountToken, setAccountToken] = useState<string>("");
   const [userApiKey, setUserApiKey] = useState<string>("");
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [manualSyncComplete, setManualSyncComplete] = useState<boolean>(false);
 
-  // Sync selected fleet when modal opens with props
   useEffect(() => {
     if (clientName) {
       setSelectedFleetName(clientName);
@@ -74,7 +69,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
 
   const currentOnboardingUrl = `${typeof window !== "undefined" ? window.location.origin : "https://recalllogic.ai"}/signup?broker=apex-risk&fleet=${selectedFleetId}&broker_name=${encodeURIComponent("Apex Risk Brokers")}`;
 
-  // Handle Path 1: Dispatch automated invite via backend
   const handleSendClientRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSending(true);
@@ -82,30 +76,32 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://recalllogic-api.onrender.com";
       
-      // Dispatch invite email via Resend alert/invite route
-      await fetch(`${API_BASE_URL}/api/alerts/send-digest`, {
+      const response = await fetch(`${API_BASE_URL}/api/broker/invite-client`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: recipientEmail,
+          recipient_email: recipientEmail,
+          recipient_name: recipientName,
           fleet_name: selectedFleetName,
-          recalls: [], // signals administrative onboarding invite
-          userTier: "enterprise"
+          broker_name: "Apex Risk Brokers",
+          carrier_goal: carrierGoal
         })
-      }).catch(() => {
-        // Fallback gracefully for mock/demo environments
       });
 
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.detail || "Invitation delivery failed.");
+      }
+
       setRequestSent(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error dispatching invitation:", err);
-      setRequestSent(true);
+      alert(`Email delivery notice: ${err.message}`);
     } finally {
       setIsSending(false);
     }
   };
 
-  // Copy direct 1-click connect URL
   const handleCopyDirectLink = async () => {
     try {
       await navigator.clipboard.writeText(currentOnboardingUrl);
@@ -116,7 +112,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     }
   };
 
-  // Handle Path 2: Direct API submission
   const handleDirectAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
@@ -162,7 +157,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Autonomous NHTSA safety defect audits &amp; underwriter rate defense[cite: 8].
+              Autonomous NHTSA safety defect audits &amp; underwriter rate defense.
             </p>
           </div>
           <button
@@ -233,15 +228,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
           </button>
         </div>
 
-        {/* ============================================================== */}
-        {/* PATH 1: REQUEST CLIENT ACCESS (DEFAULT)                        */}
-        {/* ============================================================== */}
+        {/* PATH 1: REQUEST CLIENT ACCESS */}
         {activeTab === "request" && (
           <div className="pt-4">
             {!requestSent ? (
               <form onSubmit={handleSendClientRequest} className="space-y-4 text-xs">
                 <div className="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-xl text-slate-300 leading-relaxed">
-                  Delegates API key entry to the fleet's maintenance or IT director. They receive a 1-click authorization link to connect Fleetio in under 60 seconds[cite: 8].
+                  Delegates API key entry to the fleet's maintenance or IT director. They receive a 1-click authorization link to connect Fleetio in under 60 seconds.
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -293,9 +286,9 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     Dispatched Email Preview:
                   </span>
                   <div className="p-3 bg-slate-950 border border-slate-800/90 rounded-lg text-slate-400 text-[11px] font-mono space-y-1">
-                    <p><strong className="text-cyan-400">Subject:</strong> Action Required: Authorize Fleetio Access for {carrierGoal}[cite: 8]</p>
+                    <p><strong className="text-cyan-400">Subject:</strong> Action Required: Authorize Fleetio Access for {carrierGoal}</p>
                     <p className="text-slate-300 mt-1">
-                      "Apex Risk Brokers has initiated an Underwriter Loss-Control Audit for {selectedFleetName}[cite: 8]. Authorizing read-only Fleetio access eliminates punitive liability and defends a 15% rate credit at renewal[cite: 8]."
+                      "Apex Risk Brokers has initiated an Underwriter Loss-Control Audit for {selectedFleetName}. Authorizing read-only Fleetio access eliminates punitive liability and defends a 15% rate credit at renewal."
                     </p>
                   </div>
                 </div>
@@ -331,7 +324,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                 </div>
               </form>
             ) : (
-              /* Success State */
               <div className="py-6 text-center space-y-4">
                 <div className="w-12 h-12 rounded-full bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400">
                   <CheckCircle2 className="w-6 h-6" />
@@ -350,7 +342,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     <Clock className="w-4 h-4" /> Status: Awaiting Client Authorization
                   </div>
                   <p className="text-slate-400 text-[11px]">
-                    Once {selectedFleetName} authorizes their Fleetio connection, power units will audit automatically and reflect inside your <strong>Apex Risk Portfolio Command</strong>[cite: 8].
+                    Once {selectedFleetName} authorizes their Fleetio connection, power units will audit automatically and reflect inside your <strong>Apex Risk Portfolio Command</strong>.
                   </p>
                 </div>
 
@@ -375,15 +367,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* PATH 2: DIRECT MANUAL API ENTRY (WHITE-GLOVE ONBOARDING)       */}
-        {/* ============================================================== */}
+        {/* PATH 2: DIRECT MANUAL API ENTRY */}
         {activeTab === "manual" && (
           <div className="pt-4">
             {!manualSyncComplete ? (
               <form onSubmit={handleDirectAuth} className="space-y-4 text-xs font-mono">
                 <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-400 text-[11px] leading-relaxed">
-                  Enter Fleetio Developer Credentials directly if provided by the client's IT administrator.
+                  Enter Fleetio Developer Credentials directly if provided by the client's IT administrator[cite: 10].
                 </div>
 
                 <div>
@@ -438,7 +428,6 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                 </div>
               </form>
             ) : (
-              /* Direct Sync Complete State */
               <div className="py-6 text-center space-y-4">
                 <div className="w-12 h-12 rounded-full bg-emerald-950/80 border border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400">
                   <ShieldCheck className="w-6 h-6" />
