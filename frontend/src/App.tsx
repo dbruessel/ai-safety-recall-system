@@ -204,7 +204,11 @@ const MainApp: React.FC = () => {
     let decodedFleetName = 'Dennis Enterprise Fleet';
     if (token.startsWith('rl_live_')) {
       try {
-        const base64Str = token.replace('rl_live_', '');
+        let base64Str = token.replace('rl_live_', '');
+        // Restore base64 padding if stripped
+        while (base64Str.length % 4 !== 0) {
+          base64Str += '=';
+        }
         decodedFleetName = atob(base64Str);
       } catch {
         decodedFleetName = 'Dennis Enterprise Fleet';
@@ -560,7 +564,8 @@ const MainApp: React.FC = () => {
         ) : (
           <ShareUnderwriterModal
             isOpen={isShareModalOpen}
-            userCompany={getUserOrgName()}
+            userCompany={auditingFleetId || getUserOrgName()}
+            brokerName={companyName || userProfile?.company_name || 'Apex Risk Brokers'}
             onClose={() => setIsShareModalOpen(false)}
           />
         ))}

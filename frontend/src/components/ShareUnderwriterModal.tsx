@@ -7,7 +7,8 @@ import {
   ExternalLink, 
   ShieldCheck, 
   Lock,
-  Building2
+  Building2,
+  FileCheck
 } from 'lucide-react';
 
 interface ShareUnderwriterModalProps {
@@ -24,7 +25,7 @@ export const ShareUnderwriterModal: React.FC<ShareUnderwriterModalProps> = ({
   brokerName,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedBody, setCopiedBody] = useState(false);
+  const [copiedRich, setCopiedRich] = useState(false);
 
   if (!isOpen) return null;
 
@@ -34,14 +35,15 @@ export const ShareUnderwriterModal: React.FC<ShareUnderwriterModalProps> = ({
     sessionStorage.getItem('broker_name') ||
     'Apex Risk Brokers';
 
-  // Generate base64 token compatible with App.tsx evidence locker routing
-  const safeToken = `rl_live_${btoa(targetFleet)}`;
-  const evidenceUrl = `${window.location.origin}/audit/evidence-locker?token=${encodeURIComponent(
-    safeToken
-  )}`;
+  // Generate unpadded, clean URL-safe token (eliminates %3D from URL)
+  const cleanBase64 = btoa(targetFleet).replace(/=+$/, '');
+  const safeToken = `rl_live_${cleanBase64}`;
+  const evidenceUrl = `${window.location.origin}/audit/evidence-locker?token=${safeToken}`;
 
   const emailSubject = `Commercial Auto Underwriter Evidence: ${targetFleet} (15% Rate Credit Defense)`;
-  const emailBody = `Underwriting Team,
+
+  // Plain text email body with URL isolated on its own line (no emoji prefix)
+  const plainEmailBody = `Underwriting Team,
 
 In support of commercial auto renewal negotiations and to defend our 15% Loss-Control Rate Credit, ${broker} has verified a Continuous Risk Defense Audit for ${targetFleet}.
 
@@ -53,7 +55,7 @@ AUDIT SUMMARY & LOSS CONTROL VERIFICATION:
 • Unaddressed Punitive Liability Exposure: $0.00
 
 VERIFIED UNDERWRITER EVIDENCE LOCKER (Read-Only Access):
-👉 ${evidenceUrl}
+${evidenceUrl}
 
 This cryptographic evidence log establishes certified due-diligence records under commercial carrier loss-control standards.
 
@@ -62,9 +64,34 @@ Best regards,
 Commercial Transportation Risk Division
 ${broker}`;
 
+  // Rich HTML template for direct paste into Outlook / Gmail with live <a> hyperlink
+  const richHtmlBody = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6;">
+  <p><strong>Underwriting Team,</strong></p>
+  <p>In support of commercial auto renewal negotiations and to defend our 15% Loss-Control Rate Credit, <strong>${broker}</strong> has verified a Continuous Risk Defense Audit for <strong>${targetFleet}</strong>.</p>
+  
+  <p><strong>AUDIT SUMMARY &amp; LOSS CONTROL VERIFICATION:</strong></p>
+  <ul>
+    <li><strong>Account / Insured:</strong> ${targetFleet}</li>
+    <li><strong>Monitored Power Units:</strong> 48 Units</li>
+    <li><strong>Real-Time Source:</strong> Fleetio API 2-Way Sync (Active &amp; Defect-Free)</li>
+    <li><strong>Open NHTSA Safety Recalls:</strong> 0 (Critical defect Unit-101 cleared via WO #22)</li>
+    <li><strong>Unaddressed Punitive Liability Exposure:</strong> $0.00</li>
+  </ul>
+
+  <p><strong>VERIFIED UNDERWRITER EVIDENCE LOCKER (Read-Only Access):</strong><br />
+    👉 <a href="${evidenceUrl}" style="color: #0284c7; text-decoration: underline; font-weight: bold;">${evidenceUrl}</a>
+  </p>
+
+  <p style="color: #64748b; font-size: 13px;"><em>This cryptographic evidence log establishes certified due-diligence records under commercial carrier loss-control standards.</em></p>
+
+  <p>Best regards,<br /><br />
+  <strong>Commercial Transportation Risk Division</strong><br />
+  ${broker}</p>
+</div>`;
+
   const mailtoUrl = `mailto:?subject=${encodeURIComponent(
     emailSubject
-  )}&body=${encodeURIComponent(emailBody)}`;
+  )}&body=${encodeURIComponent(plainEmailBody)}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(evidenceUrl);
@@ -72,10 +99,23 @@ ${broker}`;
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const handleCopyBody = () => {
-    navigator.clipboard.writeText(emailBody);
-    setCopiedBody(true);
-    setTimeout(() => setCopiedBody(false), 2500);
+  const handleCopyRichEmail = async () => {
+    try {
+      const blobHtml = new Blob([richHtmlBody], { type: 'text/html' });
+      const blobText = new Blob([plainEmailBody], { type: 'text/plain' });
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': blobHtml,
+          'text/plain': blobText,
+        }),
+      ]);
+      setCopiedRich(true);
+      setTimeout(() => setCopiedRich(false), 2500);
+    } catch {
+      navigator.clipboard.writeText(plainEmailBody);
+      setCopiedRich(true);
+      setTimeout(() => setCopiedRich(false), 2500);
+    }
   };
 
   return (
@@ -138,14 +178,14 @@ ${broker}`;
                     </span>
                   </div>
                   <span className="text-[10px] bg-cyan-900/60 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-700/60 font-mono">
-                    RECOMMENDED
+                    DEFAULT APP
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition">
                   Open Underwriter Email Draft ↗
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Launches your default mail client with the full executive loss-control defense packet and tokenized link.
+                  Opens Outlook or your default mail app with the formatted underwriter packet and clean isolated URL.
                 </p>
               </div>
               <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-cyan-400 font-mono font-semibold">
@@ -153,7 +193,7 @@ ${broker}`;
               </span>
             </a>
 
-            {/* ACTION 2: COPY DIRECT EVIDENCE LINK */}
+            {/* ACTION 2: DIRECT LINK & RICH TEXT ACTIONS */}
             <div className="flex flex-col justify-between p-4 bg-slate-950 border border-slate-800 rounded-xl">
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -168,10 +208,10 @@ ${broker}`;
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-white">
-                  Direct Evidence Locker URL
+                  Evidence URL &amp; Rich Format
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Copy the encrypted, read-only link directly into an existing carrier email thread or AMS360 file.
+                  Copy the encrypted locker link or copy pre-formatted HTML directly into an existing carrier thread.
                 </p>
               </div>
 
@@ -189,7 +229,7 @@ ${broker}`;
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Copy Locker Link</span>
+                      <span>Copy Link</span>
                     </>
                   )}
                 </button>
@@ -214,21 +254,30 @@ ${broker}`;
               </span>
               <button
                 type="button"
-                onClick={handleCopyBody}
-                className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                onClick={handleCopyRichEmail}
+                className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-cyan-950/60 border border-cyan-800/80 px-2.5 py-1 rounded cursor-pointer transition"
               >
-                {copiedBody ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                <span>{copiedBody ? 'Body Copied' : 'Copy Text'}</span>
+                {copiedRich ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-300 font-bold">Copied Rich HTML!</span>
+                  </>
+                ) : (
+                  <>
+                    <FileCheck className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Copy Formatted Email (Ctrl+V into Outlook)</span>
+                  </>
+                )}
               </button>
             </div>
             
-            <div className="bg-[#070B14] border border-slate-800/80 rounded-xl p-3.5 text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto space-y-2 select-text leading-relaxed">
+            <div className="bg-[#070B14] border border-slate-800/80 rounded-xl p-3.5 text-[11px] font-mono text-slate-300 max-h-44 overflow-y-auto space-y-2 select-text leading-relaxed">
               <div className="text-cyan-300 border-b border-slate-800 pb-1.5">
                 <span className="text-slate-500">SUBJECT: </span>
                 <span>{emailSubject}</span>
               </div>
               <pre className="whitespace-pre-wrap font-mono text-[11px] text-slate-400 leading-normal">
-                {emailBody}
+                {plainEmailBody}
               </pre>
             </div>
           </div>
