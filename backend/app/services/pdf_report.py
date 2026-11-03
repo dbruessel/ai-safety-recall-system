@@ -21,6 +21,8 @@ from reportlab.platypus import (
     KeepTogether
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode.qr import QrCodeWidget
 
 router = APIRouter(prefix="/api/broker", tags=["Broker Reports"])
 
@@ -60,9 +62,6 @@ class PortfolioAuditRequest(BaseModel):
 # ==============================================================================
 @router.post("/portfolio-audit/pdf")
 async def generate_portfolio_audit_pdf(payload: PortfolioAuditRequest):
-    """
-    Generates a consolidated multi-fleet Book-of-Business Loss Control Audit PDF.
-    """
     fleets = payload.fleets
     broker_name = payload.broker_name or "Apex Risk Brokers"
 
@@ -91,7 +90,6 @@ async def generate_portfolio_audit_pdf(payload: PortfolioAuditRequest):
 
     title_style = ParagraphStyle('TitleStyle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, textColor=PRIMARY, alignment=2, leading=15)
     heading_style = ParagraphStyle('HeadingStyle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=PRIMARY, leading=14)
-    cell_style = ParagraphStyle('CellStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=8, textColor=PRIMARY, leading=11)
     cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, textColor=PRIMARY, leading=11)
 
     logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "recall-logo.png")
@@ -115,7 +113,6 @@ async def generate_portfolio_audit_pdf(payload: PortfolioAuditRequest):
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1.5, color=ACCENT, spaceAfter=10))
 
-    # Executive Portfolio KPI Summary
     kpi_data = [
         ["Active Fleets Audited", "Managed Power Units", "Portfolio Safety Index", "Active Critical Defect Items"],
         [f"{total_fleets}", f"{total_vins:,}", f"{avg_score} / 100", f"{total_open}"]
@@ -176,17 +173,14 @@ async def generate_portfolio_audit_pdf(payload: PortfolioAuditRequest):
 
 
 # ==============================================================================
-# 2. INDIVIDUAL FLEET LOSS-CONTROL CERTIFICATE REPORT
+# 2. INDIVIDUAL FLEET LOSS-CONTROL CERTIFICATE REPORT (WITH DYNAMIC QR CODE)
 # ==============================================================================
 @router.get("/compliance-report/{fleet_id}/pdf")
 async def generate_fleet_compliance_pdf(
     fleet_id: str, 
     broker_name: str = "Apex Risk Brokers"
 ):
-    """
-    Generates an executive, institutional Underwriter Warranty & Loss-Control Certificate.
-    """
-    # 1. Cleanly resolve the fleet name (prevent "Fleet #Dennis E" truncation)
+    # 1. Cleanly resolve the fleet name
     raw_id = fleet_id.strip()
     if raw_id.lower().startswith("dennis") or "dennis" in raw_id.lower():
         fleet_name = "Dennis Enterprise Fleet"
@@ -195,14 +189,24 @@ async def generate_fleet_compliance_pdf(
     else:
         fleet_name = raw_id
 
-    # Cryptographic audit hash & token generation
+    # 2. Cryptographic audit hash & token generation
     date_stamp = datetime.utcnow().strftime("%Y-%m-%d")
     time_stamp_utc = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     clean_token = f"rl_live_{base64.b64encode(fleet_name.encode()).decode().rstrip('=')}"
-    audit_ref = f"CERT-{datetime.utcnow().year}-RL-{hashlib.sha256(fleet_name.encode()).hexdigest()[:6].upper()}"
+    sha_hash = hashlib.sha256(fleet_name.encode()).hexdigest()
+    audit_ref = f"CERT-{datetime.utcnow().year}-RL-{sha_hash[:6].upper()}"
     evidence_url = f"https://recalllogic.ai/audit/evidence-locker?token={clean_token}"
 
-    # Default institutional roster (matches workspace & evidence locker)
+    # 3. Dynamic QR Code generation for one-tap mobile underwriter inspection
+    qr_widget = QrCodeWidget(evidence_url)
+    bounds = qr_widget.getBounds()
+    qr_w = bounds[2] - bounds[0]
+    qr_h = bounds[3] - bounds[1]
+    qr_dim = 48
+    qr_drawing = Drawing(qr_dim, qr_dim, transform=[qr_dim / qr_w, 0, 0, qr_dim / qr_h, 0, 0])
+    qr_drawing.add(qr_widget)
+
+    # 4. Monitored power unit records
     roster_vehicles = [
         {
             "unit": "UNIT-101",
@@ -271,15 +275,15 @@ async def generate_fleet_compliance_pdf(
         except Exception as e:
             print(f"Supabase connection notice: using verified enclave metrics: {e}")
 
-    # ReportLab Document Construction
+    # 5. ReportLab Document Assembly
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=28,
-        bottomMargin=28
+        topMargin=26,
+        bottomMargin=26
     )
     story = []
     styles = getSampleStyleSheet()
@@ -294,16 +298,15 @@ async def generate_fleet_compliance_pdf(
     SUCCESS_BG = colors.HexColor("#ECFDF5")
     WARNING = colors.HexColor("#DC2626")
 
-    title_main = ParagraphStyle('TitleMain', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, textColor=PRIMARY, leading=16)
-    title_sub = ParagraphStyle('TitleSub', parent=styles['Normal'], fontName='Helvetica', fontSize=8, textColor=TEXT_MUTED, leading=11)
     heading_sec = ParagraphStyle('HeadingSec', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, textColor=PRIMARY, leading=13)
     meta_label = ParagraphStyle('MetaLabel', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, textColor=TEXT_MUTED, leading=10)
     meta_val = ParagraphStyle('MetaVal', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, textColor=PRIMARY, leading=11)
     body_txt = ParagraphStyle('BodyTxt', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, textColor=SLATE, leading=10)
     badge_txt = ParagraphStyle('BadgeTxt', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, textColor=SUCCESS, alignment=1, leading=12)
-    warranty_txt = ParagraphStyle('WarrantyTxt', parent=styles['Normal'], fontName='Helvetica', fontSize=7, textColor=TEXT_MUTED, leading=9.5)
+    warranty_txt = ParagraphStyle('WarrantyTxt', parent=styles['Normal'], fontName='Helvetica', fontSize=6.8, textColor=TEXT_MUTED, leading=9.2)
+    sig_txt = ParagraphStyle('SigTxt', parent=styles['Normal'], fontName='Helvetica', fontSize=6.5, textColor=SLATE, leading=8.5)
 
-    # 1. INSTITUTIONAL HEADER BAR
+    # HEADER BAR
     logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "recall-logo.png")
     if os.path.exists(logo_path):
         brand_cell = Image(logo_path, width=145, height=38)
@@ -314,22 +317,23 @@ async def generate_fleet_compliance_pdf(
             meta_val
         )
 
+    # Top-right header: clean clickable text instead of wrapping long raw URL strings
     header_meta = Paragraph(
         f"<b><font size=11 color='#0B132B'>LOSS-CONTROL COMPLIANCE CERTIFICATE</font></b><br/>"
         f"<font size=7.5 color='#64748B'>Audit Reference: <b>{audit_ref}</b> • Issued: <b>{date_stamp}</b></font><br/>"
-        f"<font size=7 color='#0284C7'>Verification Ledger: {evidence_url}</font>",
+        f"<font size=7 color='#64748B'>Ledger Verification: <a href='{evidence_url}' color='#0284C7'><b><u>recalllogic.ai/audit/evidence-locker</u></b></a></font>",
         ParagraphStyle('HeaderMeta', parent=styles['Normal'], alignment=2, leading=11)
     )
 
-    header_table = Table([[brand_cell, header_meta]], colWidths=[200, 340])
+    header_table = Table([[brand_cell, header_meta]], colWidths=[190, 350])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     story.append(header_table)
-    story.append(HRFlowable(width="100%", thickness=1.5, color=ACCENT_CYAN, spaceBefore=4, spaceAfter=8))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=ACCENT_CYAN, spaceBefore=3, spaceAfter=7))
 
-    # 2. VERIFIED STATUS BANNER
+    # VERIFIED STATUS BANNER
     status_content = Paragraph(
         "<b>LEGAL LOSS-CONTROL STATUS: 15% UNDERWRITING RATE CREDIT VERIFIED</b><br/>"
         f"<font size=7.5 color='#047857'>Continuous 2-Way Fleetio API Telematics Active • Last NHTSA Defect Sweep: <b>{time_stamp_utc}</b></font>",
@@ -339,13 +343,13 @@ async def generate_fleet_compliance_pdf(
     status_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), SUCCESS_BG),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#10B981")),
-        ('PADDING', (0, 0), (-1, -1), 6),
+        ('PADDING', (0, 0), (-1, -1), 5),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
     ]))
     story.append(status_table)
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 7))
 
-    # 3. POLICYHOLDER & BROKERAGE AUDIT METADATA MATRIX
+    # POLICYHOLDER & BROKERAGE AUDIT METADATA MATRIX
     meta_matrix = [
         [
             Paragraph("INSURED COMMERCIAL ENTITY:", meta_label),
@@ -370,13 +374,13 @@ async def generate_fleet_compliance_pdf(
     meta_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BG_LIGHT),
         ('GRID', (0, 0), (-1, -1), 0.5, BORDER_LIGHT),
-        ('PADDING', (0, 0), (-1, -1), 4.5),
+        ('PADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     story.append(meta_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 9))
 
-    # 4. EXECUTIVE UNDERWRITING KPI SUMMARY
+    # EXECUTIVE UNDERWRITING KPI SUMMARY
     story.append(Paragraph("Executive Actuarial Risk Scorecard", heading_sec))
     story.append(Spacer(1, 4))
 
@@ -409,12 +413,12 @@ async def generate_fleet_compliance_pdf(
         ('TEXTCOLOR', (2, 1), (2, 1), colors.HexColor("#0284C7")),
         ('TEXTCOLOR', (3, 1), (3, 1), SUCCESS),
         ('GRID', (0, 0), (-1, -1), 0.5, BORDER_LIGHT),
-        ('PADDING', (0, 0), (-1, -1), 5),
+        ('PADDING', (0, 0), (-1, -1), 4.5),
     ]))
     story.append(kpi_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 9))
 
-    # 5. AUDITED POWER UNIT COMPLIANCE LEDGER
+    # AUDITED POWER UNIT COMPLIANCE LEDGER
     story.append(Paragraph("Audited Power Unit Compliance Ledger (NHTSA & Telematics Logs)", heading_sec))
     story.append(Spacer(1, 4))
 
@@ -428,8 +432,6 @@ async def generate_fleet_compliance_pdf(
 
     for item in roster_vehicles:
         status_color = "#047857" if item["status"] == "CLEARED" else "#D97706"
-        status_bg = "#ECFDF5" if item["status"] == "CLEARED" else "#FFFBEB"
-        
         unit_cell = Paragraph(f"<b>{item['unit']}</b><br/><font color='#64748B'>{item['vin']}</font>", body_txt)
         model_cell = Paragraph(f"<b>{item['details']}</b>", body_txt)
         recall_cell = Paragraph(f"<font color='#0F172A'><b>{item['campaign']}</b></font><br/>{item['component']}", body_txt)
@@ -445,14 +447,14 @@ async def generate_fleet_compliance_pdf(
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
-        ('PADDING', (0, 0), (-1, -1), 4.5),
+        ('PADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (4, 0), (4, -1), 'CENTER'),
     ]))
     story.append(ledger_table)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 8))
 
-    # 6. LEGAL WARRANTY & CRYPTOGRAPHIC VERIFICATION FOOTER
+    # LEGAL WARRANTY & QR-VERIFICATION FOOTER
     warranty_clause = Paragraph(
         "<b>UNDERWRITER LOSS-CONTROL WARRANTY &amp; DUE DILIGENCE ATTESTATION:</b><br/>"
         "This certification confirms that active commercial power units under the designated fleet entity are continuously monitored "
@@ -463,21 +465,28 @@ async def generate_fleet_compliance_pdf(
         warranty_txt
     )
 
-    signature_content = Paragraph(
-        f"<b>DIGITALLY VERIFIED RISK RECORD</b><br/>"
-        f"<font size=6.5 color='#475569'>SHA-256 Digest: {hashlib.sha256(fleet_name.encode()).hexdigest()[:28].upper()}</font><br/>"
-        f"<font size=6.5 color='#0284C7'>Read-Only Evidence Locker: {clean_token}</font>",
-        ParagraphStyle('SigTxt', parent=styles['Normal'], alignment=2, leading=9)
+    qr_label = Paragraph(
+        "<b>DIGITALLY VERIFIED RECORD</b><br/>"
+        "<font color='#0284C7'><b>Scan to view Live Ledger</b></font><br/>"
+        f"SHA-256: {sha_hash[:16].upper()}...<br/>"
+        f"Token: {clean_token[:18]}...",
+        sig_txt
     )
 
-    cert_box = Table([[warranty_clause, signature_content]], colWidths=[360, 180])
+    verification_subtable = Table([[qr_drawing, qr_label]], colWidths=[52, 134])
+    verification_subtable.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 1),
+    ]))
+
+    cert_box = Table([[warranty_clause, verification_subtable]], colWidths=[348, 192])
     cert_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#F1F5F9")),
         ('BOX', (0, 0), (-1, -1), 0.5, BORDER_LIGHT),
-        ('PADDING', (0, 0), (-1, -1), 6),
+        ('PADDING', (0, 0), (-1, -1), 5),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
-    
+
     story.append(KeepTogether([cert_box]))
 
     doc.build(story)
