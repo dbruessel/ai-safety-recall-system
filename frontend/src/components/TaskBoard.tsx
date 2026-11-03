@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
+import { Loader2, Download } from 'lucide-react'; // Added icons for the export button
 
 export interface MonitoredVehicle {
   id: string;
@@ -126,6 +127,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [scanVinInput, setScanVinInput] = useState('');
   const [scanTerminalInput, setScanTerminalInput] = useState('');
   const [csvRawText, setCsvRawText] = useState('');
+  
+  // PDF Export Loading State
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // White-label configuration state
   const [selectedCarrier, setSelectedCarrier] = useState<string>(CARRIER_PRESETS[0].name);
@@ -369,6 +373,50 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     }
   };
 
+  // Server-generated PDF export handler
+  const handleExportLossControlPDF = async () => {
+    setIsExportingPDF(true);
+    const targetFleet = userCompany || 'Dennis Enterprise Fleet';
+    const broker = sessionStorage.getItem('broker_name') || 'Apex Risk Brokers';
+    const apiBaseUrl =
+      import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/broker/compliance-report/${encodeURIComponent(
+          targetFleet
+        )}/pdf?broker_name=${encodeURIComponent(broker)}`,
+        { method: 'GET' }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `RecallLogic_Loss_Control_Certificate_${targetFleet.replace(
+        /\s+/g,
+        '_'
+      )}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Direct PDF export error, falling back to evidence locker print:', err);
+      // Fallback if backend is sleeping
+      window.open(
+        `/audit/evidence-locker?token=rl_live_${btoa(targetFleet).replace(/=+$/, '')}&print=true`,
+        '_blank'
+      );
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   return (
     <div className="w-full text-slate-100 font-sans space-y-6">
       {/* Top Header & Breadcrumbs */}
@@ -414,11 +462,21 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </button>
 
           <button
-            type="button"
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs transition cursor-pointer shadow-md shadow-cyan-950/50"
+            onClick={handleExportLossControlPDF}
+            disabled={isExportingPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs font-mono transition cursor-pointer shadow-md shadow-cyan-950/50"
           >
-            <span>📄</span> Export Loss Control PDF
+            {isExportingPDF ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Loss Control PDF</span>
+              </>
+            )}
           </button>
         </div>
       </div>
