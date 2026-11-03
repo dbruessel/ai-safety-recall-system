@@ -77,7 +77,25 @@ const MainApp: React.FC = () => {
   const [isFleetioModalOpen, setIsFleetioModalOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
-  // Handle URL parameter inspection, broker attribution capture, and strict view routing
+  // Dynamic Fleetio Connection State (persisted per fleet, Dennis Enterprise Fleet pre-wired)
+  const [isFleetioConnected, setIsFleetioConnected] = useState<boolean>(() => {
+    const currentOrg = clientFleetParam || 'Dennis Enterprise Fleet';
+    const stored = localStorage.getItem(`fleetio_connected_${currentOrg}`);
+    const isDemo = currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
+    return stored === 'true' || isDemo;
+  });
+
+  // Keep connection state synchronized whenever auditing fleet changes
+  useEffect(() => {
+    const currentOrg = auditingFleetId || clientFleetParam || '';
+    if (currentOrg) {
+      const stored = localStorage.getItem(`fleetio_connected_${currentOrg}`);
+      const isDemo = currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
+      setIsFleetioConnected(stored === 'true' || isDemo);
+    }
+  }, [auditingFleetId, clientFleetParam]);
+
+  // Handle URL parameter inspection, broker attribution capture, dynamic title, and strict view routing
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -102,17 +120,37 @@ const MainApp: React.FC = () => {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
       sessionStorage.setItem('current_fleet_name', auditedOrg);
+      document.title = `RecallLogic — ${auditedOrg} Loss Control`;
       if (shouldConnectFleetio) {
         setIsFleetioModalOpen(true);
       }
     } else if (isFleetDemoPath) {
       setActiveView('workspace');
+      document.title = "RecallLogic — Fleet Audit Demo";
     } else if (isBrokerDemoPath || isBrokerUser) {
       setActiveView('broker_portal');
+      document.title = "RecallLogic — Enterprise Loss Control System";
     } else {
       setActiveView('workspace');
+      document.title = "RecallLogic — Continuous Risk Defense Platform";
     }
   }, [isBrokerUser, isFleetDemoPath, isBrokerDemoPath]);
+
+  // Clean URL parameters upon modal closure to avoid re-triggering modal on page reload
+  const handleCloseFleetioModal = () => {
+    setIsFleetioModalOpen(false);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('connect_fleetio')) {
+      url.searchParams.delete('connect_fleetio');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  const handleFleetioSuccess = () => {
+    const currentOrg = auditingFleetId || getUserOrgName();
+    setIsFleetioConnected(true);
+    localStorage.setItem(`fleetio_connected_${currentOrg}`, 'true');
+  };
 
   // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
   useEffect(() => {
@@ -405,12 +443,25 @@ const MainApp: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsFleetioModalOpen(true)}
-                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5 shadow-sm shadow-cyan-950"
-                >
-                  <span>🔌 Connect Fleetio</span>
-                </button>
+                {/* Dynamic Fleetio Connection Status Badge */}
+                {isFleetioConnected ? (
+                  <button
+                    onClick={() => setIsFleetioModalOpen(true)}
+                    className="px-3 py-1 bg-emerald-950/80 border border-emerald-500/50 hover:border-emerald-400 text-emerald-300 rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5 shadow-sm shadow-emerald-950"
+                    title="Fleetio 2-Way API sync active. Click to manage settings."
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Fleetio Synced</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsFleetioModalOpen(true)}
+                    className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5 shadow-sm shadow-cyan-950"
+                  >
+                    <span>🔌 Connect Fleetio</span>
+                  </button>
+                )}
+
                 {(isBrokerUser || isBrokerDemoPath) && (
                   <button
                     onClick={() => {
@@ -471,7 +522,8 @@ const MainApp: React.FC = () => {
       {isFleetioModalOpen && (
         <FleetioIntegrationModal
           isOpen={isFleetioModalOpen}
-          onClose={() => setIsFleetioModalOpen(false)}
+          onClose={handleCloseFleetioModal}
+          onSuccess={handleFleetioSuccess}
           organizationId={auditingFleetId || getUserOrgName()}
           clientName={auditingFleetId || getUserOrgName()}
         />

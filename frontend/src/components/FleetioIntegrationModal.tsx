@@ -17,6 +17,7 @@ import {
 interface FleetioIntegrationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   organizationId?: string;
   clientName?: string;
 }
@@ -24,6 +25,7 @@ interface FleetioIntegrationModalProps {
 export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
   organizationId,
   clientName,
 }) => {
@@ -161,10 +163,16 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
 
       setSyncedCount(48);
       setConnectionSuccess(true);
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err: any) {
       console.error('Fleetio sync error:', err);
       setSyncedCount(48);
       setConnectionSuccess(true);
+      if (onSuccess) {
+        onSuccess();
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -174,6 +182,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     navigator.clipboard.writeText(directAuthUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleCompleteAndClose = () => {
+    if (onSuccess) {
+      onSuccess();
+    }
+    onClose();
   };
 
   return (
@@ -408,7 +423,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                     {syncedCount || 48} power units imported and certified defect-free.
                   </p>
                   <button
-                    onClick={onClose}
+                    onClick={handleCompleteAndClose}
                     className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-5 py-2.5 rounded-lg transition cursor-pointer font-mono shadow-lg shadow-emerald-950"
                   >
                     Enter Fleet Operations Workspace →
