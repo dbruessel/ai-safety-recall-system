@@ -52,7 +52,7 @@ def push_lead_to_instantly(campaign_id: str, email: str, first_name: str, last_n
     }
     payload = {
         "campaign_id": campaign_id,
-        "skip_if_in_workspace": True,
+        "skip_if_in_workspace": False,
         "leads": [{
             "email": email.strip(),
             "first_name": first_name or "",
