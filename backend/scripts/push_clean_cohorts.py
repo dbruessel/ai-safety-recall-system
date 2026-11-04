@@ -1,17 +1,23 @@
 import os
 import time
 import requests
-
 from dotenv import load_dotenv
 
-# Load variables from backend/.env into environment
+# Load credentials from backend/.env
 load_dotenv()
 
-# 1. Credentials from .env
+# 1. Credentials from environment
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ygbniurcvparmwfaqrtg.supabase.co")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 MILLIONVERIFIER_API_KEY = os.getenv("MILLIONVERIFIER_API_KEY")
 INSTANTLY_API_KEY = os.getenv("INSTANTLY_API_KEY")
+
+if not SUPABASE_SERVICE_KEY:
+    raise ValueError("Missing SUPABASE_SERVICE_ROLE_KEY. Check your backend/.env file.")
+if not INSTANTLY_API_KEY:
+    raise ValueError("Missing INSTANTLY_API_KEY. Check your backend/.env file.")
+if not MILLIONVERIFIER_API_KEY:
+    raise ValueError("Missing MILLIONVERIFIER_API_KEY. Check your backend/.env file.")
 
 # 2. Target Campaign IDs
 CAMPAIGN_FLEET = "0a1d7fef-9ad5-4b2f-983e-866e04dea218"
@@ -24,6 +30,19 @@ SUPA_HEADERS = {
     "Content-Type": "application/json",
     "Prefer": "return=minimal"
 }
+
+def clean_email(raw_email: str) -> str:
+    """Extracts and sanitizes the first valid email address from multi-value or malformed fields."""
+    if not raw_email:
+        return ""
+    # Normalize delimiters (semicolons, commas, slashes) and grab the first address
+    first_candidate = raw_email.replace(";", "/").replace(",", "/").split("/")[0].strip()
+    # Strip any trailing punctuation (trailing periods, semicolons, whitespace)
+    cleaned = first_candidate.rstrip(".;, ")
+    # Basic structural check: must have @ and a dot in the domain part
+    if "@" not in cleaned or "." not in cleaned.split("@")[-1]:
+        return ""
+    return cleaned
 
 def push_lead_to_instantly(campaign_id: str, email: str, first_name: str, last_name: str, company: str, custom_vars: dict):
     url = "https://api.instantly.ai/api/v2/leads/add"
@@ -65,8 +84,9 @@ def process_cohorts():
     print(f"Found {len(fleets)} unpushed verified fleet leads.")
 
     for lead in fleets:
-        email = lead.get("email")
+        email = clean_email(lead.get("email"))
         if not email:
+            print(f"  [✗ Skipped invalid email format]: {lead.get('email')}")
             continue
 
         custom_vars = {
@@ -112,8 +132,9 @@ def process_cohorts():
     print(f"Found {len(brokers)} unverified commercial brokers.")
 
     for lead in brokers:
-        email = lead.get("email", "").strip()
+        email = clean_email(lead.get("email"))
         if not email:
+            print(f"  [✗ Skipped invalid broker email]: {lead.get('email')}")
             continue
 
         # MillionVerifier Check
