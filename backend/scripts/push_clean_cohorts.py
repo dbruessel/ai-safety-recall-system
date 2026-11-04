@@ -47,8 +47,8 @@ def clean_email(raw_email: str) -> str:
 def extract_names(first_name: str, last_name: str, email: str):
     """
     Returns (first_name, last_name).
-    If names are absent, infers first/last name from recognizable personal email formats
-    while keeping generic role inboxes (dispatch@, admin@, etc.) blank for template fallbacks.
+    Infers real names from emails while discarding initial+lastname combinations,
+    single initials, and generic role inboxes (leaving them blank for template fallbacks).
     """
     fn = (first_name or "").strip().title()
     ln = (last_name or "").strip().title()
@@ -59,28 +59,45 @@ def extract_names(first_name: str, last_name: str, email: str):
         return "", ""
 
     local = email.split("@")[0].lower()
-    
-    # Exclude generic business/role prefix accounts
+
+    # Generic or role-based prefixes: leave completely blank for {{firstName | there}}
     generic_inboxes = {
         "admin", "dispatch", "accounting", "accounts", "info", "ap", "contact",
         "order", "purchasing", "sales", "office", "officemngr", "truckshop",
         "fleet", "pallets", "hotshot", "truckmasterschool", "reliablecarriers",
-        "inquiries", "billing", "service", "support", "help", "operations", "quote"
+        "inquiries", "billing", "service", "support", "help", "operations", "quote",
+        "accredited", "vegatrucking", "ustransport", "gm", "josechvz"
     }
     if local in generic_inboxes:
         return "", ""
 
-    # Pattern: first.last or first_last or first-last (e.g., john.smith -> John, Smith)
+    # 1. Separators: first.last or first_last or first-last (e.g., john.smith, jennifer.holak)
     for sep in [".", "_", "-"]:
         if sep in local:
             parts = local.split(sep)
             if len(parts) >= 2 and parts[0].isalpha() and parts[1].isalpha():
-                if len(parts[0]) >= 2 and len(parts[1]) >= 2:
-                    return parts[0].title(), parts[1].title()
+                # If first part is just a single initial (e.g. j.holak, t.scott), leave first name blank
+                if len(parts[0]) == 1:
+                    return "", parts[1].title()
+                return parts[0].title(), parts[1].title()
 
-    # Pattern: simple standalone first name (e.g., mike, carrie, jennifer, tom, ryan)
-    if local.isalpha() and 2 <= len(local) <= 12:
-        return local.title(), ""
+    # 2. Known common first names (prevents initial-lastname concatenations like mwinburn, dduncan)
+    common_short_names = {
+        "mike", "carrie", "jennifer", "tom", "ryan", "sandra", "scott", "todd",
+        "ron", "pat", "moe", "edwin", "jeff", "amber", "donnie", "ken", "chris",
+        "paul", "rigo", "joe", "ray", "tyler", "debbie", "brent", "sara", "dani",
+        "elisa", "jenny", "kevin", "tanya", "john", "becky", "tina", "dain", "wes",
+        "natasia", "brian", "chad", "dave", "dan", "steve", "mark", "greg", "lisa"
+    }
+
+    if local.isalpha():
+        if local in common_short_names:
+            return local.title(), ""
+        if len(local) <= 4:
+            return local.title(), ""
+        # If it's 5+ letters and not a verified common first name (e.g., mwinburn, dduncan, ksmith, cbarkdull),
+        # leave blank so {{firstName | there}} takes over cleanly.
+        return "", ""
 
     return "", ""
 
@@ -115,7 +132,7 @@ def process_cohorts():
         "lead_type=eq.fleet_owner&mv_result=eq.ok&pushed_to_instantly=eq.false&limit=100"
     )
     res = requests.get(fleet_query_url, headers=SUPA_HEADERS, timeout=15)
-    
+
     if res.status_code != 200:
         print(f"Error fetching fleets ({res.status_code}): {res.text}")
         return
@@ -139,13 +156,13 @@ def process_cohorts():
             "state": lead.get("state") or "NV",
             "lead_type": "fleet_owner"
         }
-        
+
         company = lead.get("company_name") or "Fleet Operator"
         success = push_lead_to_instantly(
             CAMPAIGN_FLEET, email, first_name, last_name,
             company, custom_vars
         )
-        
+
         if success:
             patch_url = f"{SUPABASE_URL}/rest/v1/leads?id=eq.{lead['id']}"
             requests.patch(patch_url, json={
@@ -153,11 +170,11 @@ def process_cohorts():
                 "instantly_campaign_id": CAMPAIGN_FLEET,
                 "campaign_status": "active"
             }, headers=SUPA_HEADERS, timeout=10)
-            name_str = f" ({first_name} {last_name})".strip() if (first_name or last_name) else " (Role Inbox)"
+            name_str = f" ({first_name} {last_name})".strip() if (first_name or last_name) else " (Role Inbox / Blank)"
             print(f"  [✓ Fleet Synced]: {email}{name_str} -> {company}")
         else:
             print(f"  [✗ Fleet Push Failed]: {email}")
-        
+
         time.sleep(0.2)
 
     print("\n--- 2. Verifying & Pushing Commercial Brokers ---")
@@ -166,7 +183,7 @@ def process_cohorts():
         "lead_type=eq.commercial_broker&mv_result=is.null&email=not.is.null&limit=50"
     )
     res = requests.get(broker_query_url, headers=SUPA_HEADERS, timeout=15)
-    
+
     if res.status_code != 200:
         print(f"Error fetching brokers ({res.status_code}): {res.text}")
         return
