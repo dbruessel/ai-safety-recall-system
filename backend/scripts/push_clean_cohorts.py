@@ -44,6 +44,46 @@ def clean_email(raw_email: str) -> str:
         return ""
     return cleaned
 
+def extract_names(first_name: str, last_name: str, email: str):
+    """
+    Returns (first_name, last_name).
+    If names are absent, infers first/last name from recognizable personal email formats
+    while keeping generic role inboxes (dispatch@, admin@, etc.) blank for template fallbacks.
+    """
+    fn = (first_name or "").strip().title()
+    ln = (last_name or "").strip().title()
+    if fn:
+        return fn, ln
+
+    if not email or "@" not in email:
+        return "", ""
+
+    local = email.split("@")[0].lower()
+    
+    # Exclude generic business/role prefix accounts
+    generic_inboxes = {
+        "admin", "dispatch", "accounting", "accounts", "info", "ap", "contact",
+        "order", "purchasing", "sales", "office", "officemngr", "truckshop",
+        "fleet", "pallets", "hotshot", "truckmasterschool", "reliablecarriers",
+        "inquiries", "billing", "service", "support", "help", "operations", "quote"
+    }
+    if local in generic_inboxes:
+        return "", ""
+
+    # Pattern: first.last or first_last or first-last (e.g., john.smith -> John, Smith)
+    for sep in [".", "_", "-"]:
+        if sep in local:
+            parts = local.split(sep)
+            if len(parts) >= 2 and parts[0].isalpha() and parts[1].isalpha():
+                if len(parts[0]) >= 2 and len(parts[1]) >= 2:
+                    return parts[0].title(), parts[1].title()
+
+    # Pattern: simple standalone first name (e.g., mike, carrie, jennifer, tom, ryan)
+    if local.isalpha() and 2 <= len(local) <= 12:
+        return local.title(), ""
+
+    return "", ""
+
 def push_lead_to_instantly(campaign_id: str, email: str, first_name: str, last_name: str, company: str, custom_vars: dict):
     url = "https://api.instantly.ai/api/v2/leads/add"
     headers = {
@@ -89,6 +129,8 @@ def process_cohorts():
             print(f"  [✗ Skipped invalid email format]: {lead.get('email')}")
             continue
 
+        first_name, last_name = extract_names(lead.get("first_name"), lead.get("last_name"), email)
+
         custom_vars = {
             "id": lead["id"],
             "job_title": lead.get("job_title") or "Fleet Manager",
@@ -100,7 +142,7 @@ def process_cohorts():
         
         company = lead.get("company_name") or "Fleet Operator"
         success = push_lead_to_instantly(
-            CAMPAIGN_FLEET, email, lead.get("first_name"), lead.get("last_name"),
+            CAMPAIGN_FLEET, email, first_name, last_name,
             company, custom_vars
         )
         
@@ -111,7 +153,8 @@ def process_cohorts():
                 "instantly_campaign_id": CAMPAIGN_FLEET,
                 "campaign_status": "active"
             }, headers=SUPA_HEADERS, timeout=10)
-            print(f"  [✓ Fleet Synced]: {email} ({company})")
+            name_str = f" ({first_name} {last_name})".strip() if (first_name or last_name) else " (Role Inbox)"
+            print(f"  [✓ Fleet Synced]: {email}{name_str} -> {company}")
         else:
             print(f"  [✗ Fleet Push Failed]: {email}")
         
@@ -159,6 +202,7 @@ def process_cohorts():
 
         # Push to Instantly Broker Campaign if OK
         if mv_status == "ok":
+            first_name, last_name = extract_names(lead.get("first_name"), lead.get("last_name"), email)
             custom_vars = {
                 "id": lead["id"],
                 "job_title": lead.get("job_title") or "Commercial Broker",
@@ -168,7 +212,7 @@ def process_cohorts():
                 "lead_type": "commercial_broker"
             }
             success = push_lead_to_instantly(
-                CAMPAIGN_BROKER, email, lead.get("first_name"), lead.get("last_name"),
+                CAMPAIGN_BROKER, email, first_name, last_name,
                 company, custom_vars
             )
             if success:
@@ -177,7 +221,8 @@ def process_cohorts():
                     "instantly_campaign_id": CAMPAIGN_BROKER,
                     "campaign_status": "active"
                 }, headers=SUPA_HEADERS, timeout=10)
-                print(f"  [✓ Broker Valid & Synced]: {email} ({company})")
+                name_str = f" ({first_name} {last_name})".strip() if (first_name or last_name) else ""
+                print(f"  [✓ Broker Valid & Synced]: {email}{name_str} -> {company}")
             else:
                 print(f"  [✗ Broker Push Failed]: {email}")
         else:
