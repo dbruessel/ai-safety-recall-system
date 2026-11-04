@@ -2,6 +2,11 @@ import os
 import time
 import requests
 
+from dotenv import load_dotenv
+
+# Load variables from backend/.env into environment
+load_dotenv()
+
 # 1. Credentials from .env
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ygbniurcvparmwfaqrtg.supabase.co")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
