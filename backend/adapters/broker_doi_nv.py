@@ -1,4 +1,3 @@
-Set-Content -Path "adapters\broker_doi_nv.py" -Value @'
 import os
 import glob
 import pandas as pd
@@ -95,4 +94,3 @@ def extract():
 if __name__ == "__main__":
     results = extract()
     print(f"Test run extracted {len(results)} leads.")
-'@
