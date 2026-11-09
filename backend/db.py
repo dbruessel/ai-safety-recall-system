@@ -20,6 +20,8 @@ def stage_leads(leads: list, segment: str):
         if not email or "@" not in email:
             continue
         mv_status = l.get("mv_result", "unknown")
+        is_ok = (mv_status == "ok")
+        
         clean_records.append({
             "first_name": (l.get("first_name") or "").strip().title(),
             "last_name": (l.get("last_name") or "").strip().title(),
@@ -31,9 +33,8 @@ def stage_leads(leads: list, segment: str):
             "state": (l.get("state") or "NV").strip().upper(),
             "domain": email.split("@")[-1],
             "lead_type": segment,
-            "health_status": "ready_to_contact" if mv_status == "ok" else "do_not_contact",
-            "qc_status": "approved" if mv_status == "ok" else "rejected",
-            "campaign_status": "staged" if mv_status == "ok" else "failed",
+            "health_status": "ready_to_contact" if is_ok else "do_not_contact",
+            "qc_status": "approved" if is_ok else "rejected",
             "mv_result": mv_status,
             "pushed_to_instantly": False
         })
