@@ -14,7 +14,7 @@ class FleetioService:
     def __init__(self, api_token: Optional[str] = None, account_token: Optional[str] = None):
         """
         Initializes the Fleetio API Service with required headers.
-        Falls back to environment variables if parameters are omitted.
+        Falls back to environment variables or settings if parameters are omitted.
         """
         raw_api_key = api_token or os.getenv("FLEETIO_API_KEY") or getattr(settings, "FLEETIO_API_KEY", "")
         raw_account_token = account_token or os.getenv("FLEETIO_ACCOUNT_TOKEN") or getattr(settings, "FLEETIO_ACCOUNT_TOKEN", "")
@@ -33,9 +33,27 @@ class FleetioService:
             "Accept": "application/json"
         }
 
+    def test_connection(self) -> Dict[str, Any]:
+        """
+        Validates credentials against Fleetio endpoint.
+        Used for onboarding handshakes and setting checks.
+        """
+        url = f"{FLEETIO_BASE_URL}/vehicles"
+        try:
+            res = requests.get(url, headers=self.headers, params={"per_page": 1}, timeout=10)
+            if res.status_code == 200:
+                return {"valid": True, "error": None}
+            if res.status_code == 401:
+                return {"valid": False, "error": "Invalid API Key or Account Token."}
+            return {"valid": False, "error": f"Fleetio returned HTTP {res.status_code}"}
+        except Exception as e:
+            logger.error(f"Failed to connect to Fleetio: {str(e)}")
+            return {"valid": False, "error": str(e)}
+
     def fetch_active_vehicles(self) -> List[Dict[str, Any]]:
         """
-        Fetches all active vehicles and VINs from Fleetio, handling pagination automatically.
+        Fetches active highway vehicles from Fleetio, handling pagination automatically.
+        Enforces 17-character standard automotive VINs to filter out shop equipment/forklifts.
         """
         url = f"{FLEETIO_BASE_URL}/vehicles"
         params = {"per_page": 100}
@@ -57,13 +75,26 @@ class FleetioService:
             vehicles = data if isinstance(data, list) else data.get("records", [])
 
             for v in vehicles:
-                vin = v.get("vin")
-                if vin:
-                    vin = vin.strip().upper()
+                raw_vin = v.get("vin")
+                status = str(v.get("vehicle_status_name", "")).strip().lower()
+                
+                if not raw_vin:
+                    continue
+
+                clean_vin = raw_vin.strip().upper()
+
+                # Partner Certification Rule: Filter out non-17 character assets (forklifts, shop equipment)
+                if len(clean_vin) != 17:
+                    logger.debug(f"Skipping non-standard VIN asset: {v.get('name')} ({clean_vin})")
+                    continue
+
+                # Only include active assets
+                if status != "active":
+                    continue
 
                 parsed_vehicles.append({
                     "fleetio_id": str(v.get("id")),
-                    "vin": vin,
+                    "vin": clean_vin,
                     "make": v.get("make"),
                     "model": v.get("model"),
                     "year": v.get("year"),
@@ -77,8 +108,83 @@ class FleetioService:
             else:
                 break
 
-        logger.info(f"Successfully fetched {len(parsed_vehicles)} active vehicles from Fleetio.")
+        logger.info(f"Successfully fetched {len(parsed_vehicles)} active highway vehicles from Fleetio.")
         return parsed_vehicles
+
+    def check_existing_issue(self, fleetio_vehicle_id: str, campaign_number: str) -> Optional[Dict[str, Any]]:
+        """
+        Deduplication Check: Queries Fleetio issues for a vehicle using Ransack syntax (q[vehicle_id_eq])
+        to verify if an issue with the campaign ID already exists.
+        """
+        url = f"{FLEETIO_BASE_URL}/issues"
+        params = {"q[vehicle_id_eq]": fleetio_vehicle_id}
+
+        try:
+            res = requests.get(url, headers=self.headers, params=params, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                issues = data.get("records", []) if isinstance(data, dict) else data
+
+                for issue in issues:
+                    summary = issue.get("summary", "")
+                    desc = issue.get("description", "")
+                    state = str(issue.get("state", "")).lower()
+
+                    if (campaign_number in summary or campaign_number in desc) and state != "resolved":
+                        logger.info(f"Existing open issue #{issue.get('id')} found for Campaign {campaign_number}. Skipping creation.")
+                        return issue
+        except Exception as e:
+            logger.error(f"Error querying existing Fleetio issues for vehicle {fleetio_vehicle_id}: {str(e)}")
+        
+        return None
+
+    def create_safety_recall_issue(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[str]:
+        """
+        Creates an Issue in Fleetio with required ISO-8601 reported_at timestamp
+        and deduplication guard.
+        """
+        campaign_number = str(recall.get("campaign_number", "N/A")).strip()
+        
+        # 1. Deduplication Guard: Check if ticket already exists
+        existing = self.check_existing_issue(fleetio_vehicle_id, campaign_number)
+        if existing:
+            return str(existing.get("id"))
+
+        url = f"{FLEETIO_BASE_URL}/issues"
+        component = recall.get("component", "SAFETY RECALL").upper()
+        summary_text = recall.get("summary", "No summary provided.")
+        remedy = recall.get("remedy", "Contact authorized OEM dealer for remedy.")
+        
+        # Fleetio requires an ISO-8601 timestamp for reported_at
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        v_id = int(fleetio_vehicle_id) if str(fleetio_vehicle_id).isdigit() else fleetio_vehicle_id
+
+        # Flat payload matching Fleetio v1 API schema
+        payload = {
+            "vehicle_id": v_id,
+            "summary": f"SAFETY RECALL: NHTSA #{campaign_number} - {component}",
+            "description": (
+                f"RecallLogic detected an active unaddressed safety recall.\n\n"
+                f"Component: {component}\n"
+                f"NHTSA Campaign: {campaign_number}\n"
+                f"Summary: {summary_text}\n"
+                f"Required Remedy: {remedy}\n\n"
+                f"Verified automatically via RecallLogic Intelligence."
+            ),
+            "reported_at": now_iso
+        }
+
+        try:
+            response = requests.post(url, headers=self.headers, json=payload, timeout=15)
+            response.raise_for_status()
+            issue_data = response.json()
+            issue_id = str(issue_data.get("id"))
+            logger.info(f"Successfully created Fleetio Issue #{issue_id} for Vehicle ID {fleetio_vehicle_id}")
+            return issue_id
+        except requests.exceptions.RequestException as e:
+            err_msg = response.text if "response" in locals() and response is not None else str(e)
+            logger.error(f"Failed to create Fleetio Issue for Vehicle ID {fleetio_vehicle_id}: {err_msg}")
+            return None
 
     def get_vehicle_work_orders(self, fleetio_vehicle_id: str) -> List[Dict[str, Any]]:
         """
@@ -86,12 +192,10 @@ class FleetioService:
         """
         url = f"{FLEETIO_BASE_URL}/work_orders"
         try:
-            res = requests.get(url, headers=self.headers, params={"per_page": 100}, timeout=15)
+            res = requests.get(url, headers=self.headers, params={"q[vehicle_id_eq]": fleetio_vehicle_id}, timeout=15)
             if res.status_code == 200:
                 data = res.json()
-                records = data if isinstance(data, list) else data.get("records", [])
-                target_id = str(fleetio_vehicle_id)
-                return [wo for wo in records if str(wo.get("vehicle_id")) == target_id]
+                return data.get("records", []) if isinstance(data, dict) else data
         except Exception as e:
             logger.error(f"Failed to query Fleetio work orders for vehicle {fleetio_vehicle_id}: {e}")
         return []
@@ -125,8 +229,7 @@ class FleetioService:
         vin: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Generates a live Fleetio Work Order with required issued_at and status fields,
-        including a deep-link back to the RecallLogic Underwriter Defense Dossier.
+        Generates a live Fleetio Work Order with required issued_at and status fields.
         """
         url = f"{FLEETIO_BASE_URL}/work_orders"
         open_status_id = self.get_open_work_order_status_id()
@@ -145,20 +248,18 @@ class FleetioService:
         dossier_url = f"https://recalllogic.ai/vehicles/{target_vin}" if target_vin else "https://recalllogic.ai"
 
         description_text = (
-            f"🚨 RECALLLOGIC DEFECT REMEDIATION: NHTSA Campaign #{campaign_number} ({component})\n\n"
+            f"RECALLLOGIC DEFECT REMEDIATION: NHTSA Campaign #{campaign_number} ({component})\n\n"
             f"Summary:\n{summary}\n\n"
             f"Required Remedy:\n{remedy}\n\n"
             f"Compliance Defense Dossier: {dossier_url}\n\n"
-            f"Note: Marking this Work Order 'Completed' or 'Closed' automatically verifies compliance "
-            f"and updates your insurer's loss-control audit ledger."
+            f"Note: Marking this Work Order 'Completed' or 'Closed' automatically verifies compliance."
         )
 
         payload = {
             "vehicle_id": int(fleetio_vehicle_id) if str(fleetio_vehicle_id).isdigit() else fleetio_vehicle_id,
             "work_order_status_id": open_status_id,
             "issued_at": issued_at_iso,
-            "description": description_text,
-            "labels": ["RecallLogic", "Safety-Critical", "Underwriter-Audit"]
+            "description": description_text
         }
 
         try:
@@ -173,45 +274,4 @@ class FleetioService:
         except requests.exceptions.RequestException as e:
             error_details = response.text if "response" in locals() and response is not None else str(e)
             logger.error(f"Failed to create Fleetio Work Order for Vehicle {fleetio_vehicle_id}: {error_details}")
-            return None
-
-    def create_safety_recall_issue(self, fleetio_vehicle_id: str, recall: Dict[str, Any]) -> Optional[str]:
-        """
-        Creates a high-priority Issue in Fleetio.
-        """
-        url = f"{FLEETIO_BASE_URL}/issues"
-
-        component = recall.get("component", "SAFETY RECALL").upper()
-        summary = recall.get("summary", "No summary provided.")
-        campaign_number = recall.get("campaign_number", "N/A")
-        remedy = recall.get("remedy", "Contact authorized OEM dealer for remedy.")
-
-        payload = {
-            "issue": {
-                "vehicle_id": fleetio_vehicle_id,
-                "summary": f"[RECALLLOGIC ALERT] NHTSA Recall #{campaign_number} - {component}",
-                "description": (
-                    f"⚠️ AUTOMATED NUCLEAR LIABILITY ALERT ⚠️\n\n"
-                    f"Campaign Number: {campaign_number}\n"
-                    f"Safety Component: {component}\n\n"
-                    f"Summary:\n{summary}\n\n"
-                    f"Required Remedy:\n{remedy}\n\n"
-                    f"Legal & Insurance Liability Warning:\n"
-                    f"Operating this vehicle with an unaddressed safety-critical recall exposes "
-                    f"the business to severe legal liability and punitive damages in commercial litigation."
-                ),
-                "priority": "urgent",
-                "labels": ["RecallLogic", "Safety-Critical", "Nuclear-Liability"]
-            }
-        }
-
-        try:
-            response = requests.post(url, headers=self.headers, json=payload, timeout=15)
-            response.raise_for_status()
-            issue_data = response.json()
-            issue_id = str(issue_data.get("id"))
-            logger.info(f"Successfully created Fleetio Issue #{issue_id} for Vehicle ID {fleetio_vehicle_id}")
-            return issue_id
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to create Fleetio Issue for Vehicle ID {fleetio_vehicle_id}: {str(e)}")
             return None
