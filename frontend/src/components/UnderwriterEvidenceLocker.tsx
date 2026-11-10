@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface UnderwriterEvidenceLockerProps {
   fleetName?: string;
@@ -69,25 +69,58 @@ const SAMPLE_EVIDENCE: EvidenceVehicle[] = [
 ];
 
 export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps> = ({
-  fleetName = 'Dennis Enterprise Fleet',
-  carrierName = 'Travelers Commercial Auto',
-  brokerName = 'Apex Risk Brokers',
+  fleetName: initialFleetName = 'Titan Logistics Corp',
+  carrierName: initialCarrierName = 'Travelers Commercial Auto',
+  brokerName: initialBrokerName = 'Commercial Risk Partners',
   carrierLogoUrl,
-  riskOfficerName = 'Dennis Vance, VP Safety & Risk',
-  riskOfficerEmail = 'safety@dennisfleet.com',
-  riskOfficerPhone = '(214) 555-0144',
-  token = 'rl_live_RGVubmlzIEVudGVycA',
-  dotNumber = 'USDOT #3940192 • MC-881290',
+  riskOfficerName: initialRiskOfficerName = 'Marcus Sterling, VP Safety & Risk',
+  riskOfficerEmail: initialRiskOfficerEmail = 'safety@titanlogistics.com',
+  riskOfficerPhone: initialRiskOfficerPhone = '(312) 555-0184',
+  token: initialToken = 'rl_live_demo_titan_risk_defense',
+  dotNumber: initialDotNumber = 'USDOT #3849102 • MC-881290',
   policyPeriod = '2026–2027 Policy Term',
   onClosePreview,
 }) => {
   const [filterTerminal, setFilterTerminal] = useState<string>('ALL');
+  const [activeToken, setActiveToken] = useState<string>(initialToken);
+  const [fleet, setFleet] = useState<string>(initialFleetName);
+  const [broker, setBroker] = useState<string>(initialBrokerName);
+  const [carrier, setCarrier] = useState<string>(initialCarrierName);
+  const [officerName, setOfficerName] = useState<string>(initialRiskOfficerName);
+  const [officerEmail, setOfficerEmail] = useState<string>(initialRiskOfficerEmail);
+  const [officerPhone, setOfficerPhone] = useState<string>(initialRiskOfficerPhone);
+  const [dot, setDot] = useState<string>(initialDotNumber);
+
+  // Sync with URL query parameters (?token=demo, etc.)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryToken = urlParams.get('token') || initialToken;
+      setActiveToken(queryToken);
+
+      const normalized = queryToken.toLowerCase();
+      if (
+        normalized === 'demo' ||
+        normalized === 'sample' ||
+        normalized === 'titan' ||
+        normalized.includes('demo')
+      ) {
+        setFleet('Titan Logistics Corp');
+        setBroker('Commercial Risk Partners');
+        setCarrier('Travelers Commercial Auto');
+        setOfficerName('Marcus Sterling, VP Safety & Risk');
+        setOfficerEmail('safety@titanlogistics.com');
+        setOfficerPhone('(312) 555-0184');
+        setDot('USDOT #3849102 • MC-881290');
+      }
+    }
+  }, [initialToken]);
 
   const filtered = SAMPLE_EVIDENCE.filter(
     (item) => filterTerminal === 'ALL' || item.terminal.includes(filterTerminal)
   );
 
-  const certRefId = `CERT-2026-RL-${(token.length > 8 ? token.slice(-6) : '8842').toUpperCase()}`;
+  const certRefId = `CERT-2026-RL-${(activeToken.length > 8 ? activeToken.slice(-6) : '8842').toUpperCase()}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 md:p-12 print:p-0 print:bg-white print:text-black">
@@ -145,12 +178,12 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
               <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 print:text-slate-600">
                 <span>Insured Commercial Entity</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-cyan-400 font-bold print:text-black">Placed by {brokerName}</span>
+                <span className="text-cyan-400 font-bold print:text-black">Placed by {broker}</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-slate-400 font-mono">{dotNumber}</span>
+                <span className="text-slate-400 font-mono">{dot}</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight print:text-black">
-                {fleetName}
+                {fleet}
               </h1>
             </div>
 
@@ -159,7 +192,7 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
               {carrierLogoUrl ? (
                 <img
                   src={carrierLogoUrl}
-                  alt={carrierName}
+                  alt={carrier}
                   className="h-9 w-auto object-contain rounded"
                 />
               ) : (
@@ -171,7 +204,7 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
                 <div className="text-[10px] font-mono uppercase text-slate-400 tracking-wider print:text-slate-600">
                   Audited Underwriting Carrier
                 </div>
-                <div className="text-sm font-bold text-slate-200 print:text-black">{carrierName}</div>
+                <div className="text-sm font-bold text-slate-200 print:text-black">{carrier}</div>
               </div>
             </div>
           </div>
@@ -208,15 +241,15 @@ export const UnderwriterEvidenceLocker: React.FC<UnderwriterEvidenceLockerProps>
           <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono print:border-slate-300">
             <div>
               <span className="text-slate-500 uppercase">Designated Risk Contact</span>
-              <div className="text-slate-200 font-bold mt-0.5 print:text-black">{riskOfficerName}</div>
+              <div className="text-slate-200 font-bold mt-0.5 print:text-black">{officerName}</div>
             </div>
             <div>
               <span className="text-slate-500 uppercase">Audit Contact Email</span>
-              <div className="text-cyan-400 mt-0.5 font-bold print:text-black">{riskOfficerEmail}</div>
+              <div className="text-cyan-400 mt-0.5 font-bold print:text-black">{officerEmail}</div>
             </div>
             <div>
               <span className="text-slate-500 uppercase">Direct Safety Line</span>
-              <div className="text-slate-200 mt-0.5 print:text-black">{riskOfficerPhone}</div>
+              <div className="text-slate-200 mt-0.5 print:text-black">{officerPhone}</div>
             </div>
             <div>
               <span className="text-slate-500 uppercase">Coverage Term</span>
