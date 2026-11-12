@@ -10,6 +10,20 @@ export interface TelemetryPayload {
 const VISITOR_STORAGE_KEY = 'rl_visitor_id';
 const ATTRIBUTION_STORAGE_KEY = 'rl_utm_attribution';
 const LOCAL_EVENT_LOG_KEY = 'rl_telemetry_events';
+const DEBUG_FLAG_KEY = 'rl_debug_tracking';
+
+function isDebugEnabled(): boolean {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debug_tracking') === 'true') {
+      sessionStorage.setItem(DEBUG_FLAG_KEY, 'true');
+      return true;
+    }
+    return sessionStorage.getItem(DEBUG_FLAG_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 function getOrCreateVisitorId(): string {
   try {
@@ -77,6 +91,7 @@ export async function trackEvent({
   portal,
   metadata = {},
 }: TelemetryPayload): Promise<void> {
+  const debug = isDebugEnabled();
   const visitorId = getOrCreateVisitorId();
   const attribution = getSessionAttribution();
   const timestamp = new Date().toISOString();
@@ -98,7 +113,7 @@ export async function trackEvent({
     created_at: timestamp,
   };
 
-  // 1. Store locally for instant session debugging
+  // 1. Store locally in browser LocalStorage for instant inspection
   try {
     const prevRaw = localStorage.getItem(LOCAL_EVENT_LOG_KEY);
     const prev = prevRaw ? JSON.parse(prevRaw) : [];
@@ -108,29 +123,23 @@ export async function trackEvent({
     // Ignore storage quota errors
   }
 
-  if (window.location.search.includes('debug_tracking=true')) {
-    console.info('[RecallLogic Telemetry]', record);
+  if (debug) {
+    console.info('[RecallLogic Telemetry] Firing event:', record);
   }
 
-  // 2. Non-blocking POST to FastAPI backend (keepalive survives tab navigation)
-  const apiBaseUrl =
-    import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
-
+  // 2. Insert into Supabase `sandbox_events` and surface any table/RLS error
   try {
-    fetch(`${apiBaseUrl}/api/telemetry/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    // Fail silently so UI never blocks
-  }
-
-  // 3. Direct Supabase insert into `sandbox_events` table (if configured)
-  try {
-    await supabase.from('sandbox_events').insert([record]);
-  } catch {
-    // Fail silently if table not yet created
+    const { error } = await supabase.from('sandbox_events').insert([record]);
+    if (error) {
+      if (debug) {
+        console.error('[RecallLogic Telemetry] Supabase insert error:', error.message, error);
+      }
+    } else if (debug) {
+      console.info('[RecallLogic Telemetry] Saved to Supabase sandbox_events ✓');
+    }
+  } catch (err) {
+    if (debug) {
+      console.error('[RecallLogic Telemetry] Unexpected insert exception:', err);
+    }
   }
 }

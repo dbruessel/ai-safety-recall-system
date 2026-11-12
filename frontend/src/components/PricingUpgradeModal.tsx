@@ -86,15 +86,18 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
   const handleStripeCheckout = async (plan: TierPlan) => {
     setLoadingTier(plan.id);
 
-    trackEvent({
-      event: 'pricing_plan_selected',
-      portal,
-      metadata: {
-        plan_id: plan.id,
-        billing_cycle: 'monthly',
-        price: plan.price
-      },
-    });
+    await Promise.race([
+      trackEvent({
+        event: 'pricing_plan_selected',
+        portal,
+        metadata: {
+          plan_id: plan.id,
+          billing_cycle: 'monthly',
+          price: plan.price,
+        },
+      }),
+      new Promise((resolve) => setTimeout(resolve, 350)),
+    ]);
 
     try {
       if (onSelectTier) {

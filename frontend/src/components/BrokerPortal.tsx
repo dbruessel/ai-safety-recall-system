@@ -254,12 +254,15 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
     setIsFleetioModalOpen(true);
   };
 
-  const handleAuditClient = (clientName: string, source: "alert_banner" | "account_card") => {
-    trackEvent({
-      event: "broker_client_drilled_down",
-      portal: "broker",
-      metadata: { client_name: clientName, source },
-    });
+  const handleAuditClient = async (clientName: string, source: "alert_banner" | "account_card") => {
+    await Promise.race([
+      trackEvent({
+        event: "broker_client_drilled_down",
+        portal: "broker",
+        metadata: { client_name: clientName, source },
+      }),
+      new Promise((resolve) => setTimeout(resolve, 350)),
+    ]);
 
     if (onAuditClient) {
       onAuditClient(clientName);
