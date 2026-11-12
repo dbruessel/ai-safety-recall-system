@@ -16,6 +16,7 @@ export interface MonitoredVehicle {
   compliance_status: 'OPEN' | 'SCHEDULED' | 'CLEARED';
   punitive_exposure: number;
   work_order_id?: string;
+  fleetio_wo_url?: string;
   ecosystem_feeds?: string[];
   remedy_logistics?: string;
 }
@@ -28,14 +29,17 @@ interface TaskBoardProps {
   onOpenShareModal?: () => void;
 }
 
+const FLEETIO_ACCOUNT_SLUG =
+  import.meta.env.VITE_FLEETIO_ACCOUNT_TOKEN || '0827581100';
+
 const DEFAULT_VEHICLES: MonitoredVehicle[] = [
   {
     id: 'veh-1',
-    vin: '1FUJGLDR5MLKE1234',
+    vin: '3AKJHHDR5KSKB7190',
     unit_number: 'UNIT-101',
     make: 'FREIGHTLINER',
     model: 'CASCADIA',
-    year: 2023,
+    year: 2019,
     terminal: 'Dallas Hub (TX)',
     division: 'Southwest Division',
     campaign_id: '23V-891',
@@ -44,15 +48,16 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 250000,
     ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
     remedy_logistics: 'Fleetio Work Order Issued',
-    work_order_id: 'WO #22',
+    work_order_id: 'WO #1',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
   },
   {
     id: 'veh-2',
-    vin: '1FT8W1Y85PKA54321',
+    vin: '1FTBW2CM5KKA84112',
     unit_number: 'UNIT-204',
     make: 'FORD',
-    model: 'TRANSIT VAN',
-    year: 2022,
+    model: 'TRANSIT 250',
+    year: 2019,
     terminal: 'Chicago Terminal (IL)',
     division: 'Midwest Division',
     campaign_id: '24V-012',
@@ -62,14 +67,15 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     ecosystem_feeds: ['FLEETIO'],
     remedy_logistics: 'Metro Ford Commercial (Parts Backorder)',
     work_order_id: 'WO-FLT-772910',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
   },
   {
     id: 'veh-3',
-    vin: '5YJ3E1EA7MF987654',
+    vin: '4V4NC9EHXKN904821',
     unit_number: 'UNIT-309',
     make: 'VOLVO',
     model: 'VNL 860',
-    year: 2023,
+    year: 2019,
     terminal: 'Atlanta Logistics (GA)',
     division: 'Southeast Division',
     campaign_id: '23V-838',
@@ -79,14 +85,15 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     ecosystem_feeds: ['FLEETIO'],
     remedy_logistics: 'Volvo Truck Center (Recall Completed)',
     work_order_id: 'WO-FLT-665120',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
   },
   {
     id: 'veh-4',
-    vin: '3AKJHHDR8NS112233',
+    vin: '1FVACWDT2FHGD9018',
     unit_number: 'UNIT-412',
-    make: 'PETERBILT',
-    model: '579 ULTRALOFT',
-    year: 2024,
+    make: 'FREIGHTLINER',
+    model: 'M2 106',
+    year: 2015,
     terminal: 'Dallas Hub (TX)',
     division: 'Southwest Division',
     campaign_id: 'CLEAN',
@@ -96,6 +103,7 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     ecosystem_feeds: ['FLEETIO', 'GEOTAB'],
     remedy_logistics: 'Inspected & Underwriter Cleared',
     work_order_id: 'WO-FLT-991044',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
   },
 ];
 
@@ -137,10 +145,22 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [riskOfficerEmail, setRiskOfficerEmail] = useState<string>('safety@dennisfleet.com');
   const [riskOfficerPhone, setRiskOfficerPhone] = useState<string>('(214) 555-0144');
 
+  // Helper to resolve the active Fleetio account token (localStorage override -> env -> 0827581100)
+  const getActiveFleetioSlug = () => {
+    return (
+      localStorage.getItem('fleetio_account_token') ||
+      FLEETIO_ACCOUNT_SLUG ||
+      '0827581100'
+    );
+  };
+
   // Fetch live fleet data from Supabase if connected
   useEffect(() => {
     const fetchMonitoredVehicles = async () => {
       try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('demo') === 'true') return;
+
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -152,6 +172,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           .eq('profile_id', user.id);
 
         if (!error && data && data.length > 0) {
+          const slug = getActiveFleetioSlug();
           const mappedVehicles: MonitoredVehicle[] = data.map((item: any, idx: number) => ({
             id: item.id || `veh-${idx}`,
             vin: item.vin,
@@ -175,7 +196,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
             remedy_logistics:
               idx === 0 ? 'Fleetio Work Order Issued' : 'Inspected & Underwriter Cleared',
-            work_order_id: idx === 0 ? 'WO #22' : `WO-FLT-${889100 + idx}`,
+            work_order_id: item.work_order_id || (idx === 0 ? 'WO #1' : `WO-FLT-${889100 + idx}`),
+            fleetio_wo_url:
+              item.fleetio_wo_url || `https://secure.fleetio.com/${slug}/work_orders`,
           }));
           setVehicles(mappedVehicles);
         }
@@ -234,24 +257,24 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const availableSlots = Math.max(0, vehicleLimit - vehicles.length);
   const capacityPercent = Math.min(100, Math.round((vehicles.length / vehicleLimit) * 100));
 
+  // Build dynamic Fleetio Work Order URL for any vehicle
+  const getFleetioWorkOrderUrl = (vehicle?: MonitoredVehicle) => {
+    const slug = getActiveFleetioSlug();
+    if (vehicle?.fleetio_wo_url) {
+      return vehicle.fleetio_wo_url.replace('52f335f6cd', slug);
+    }
+    return `https://secure.fleetio.com/${slug}/work_orders`;
+  };
+
   // Dynamic deep-link navigation into Fleetio Work Orders
   const handleRemediateInFleetio = () => {
     setStatusFilter('OPEN');
     const openDefectVehicle = vehicles.find((v) => v.compliance_status === 'OPEN');
-
-    if (openDefectVehicle?.vin === '1FUJGLDR5MLKE1234') {
-      window.open(
-        'https://secure.fleetio.com/52f335f6cd/vehicles/5863002/work_orders/22',
-        '_blank',
-        'noopener,noreferrer'
-      );
-    } else {
-      window.open(
-        'https://secure.fleetio.com/52f335f6cd/work_orders',
-        '_blank',
-        'noopener,noreferrer'
-      );
-    }
+    window.open(
+      getFleetioWorkOrderUrl(openDefectVehicle),
+      '_blank',
+      'noopener,noreferrer'
+    );
   };
 
   // 2-Way Fleetio sync status transition loop
@@ -288,6 +311,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Add individual VIN
   const handleAddVin = () => {
     if (!scanVinInput.trim()) return;
+    const slug = getActiveFleetioSlug();
     const newEntry: MonitoredVehicle = {
       id: `veh-${Date.now()}`,
       vin: scanVinInput.trim().toUpperCase(),
@@ -306,6 +330,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       ecosystem_feeds: ['FLEETIO'],
       remedy_logistics: 'NHTSA API Scan: Zero Open Recalls',
       work_order_id: `WO-FLT-${Math.floor(100000 + Math.random() * 900000)}`,
+      fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders`,
     };
 
     setVehicles([newEntry, ...vehicles]);
@@ -317,6 +342,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Bulk CSV import parser
   const handleCsvImport = () => {
     if (!csvRawText.trim()) return;
+    const slug = getActiveFleetioSlug();
     const lines = csvRawText.trim().split('\n');
     const imported: MonitoredVehicle[] = [];
 
@@ -345,6 +371,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           ecosystem_feeds: ['FLEETIO'],
           remedy_logistics: 'Batch Ingestion Verified',
           work_order_id: `WO-FLT-${Math.floor(100000 + Math.random() * 900000)}`,
+          fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders`,
         });
       }
     });
@@ -407,7 +434,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error('Direct PDF export error, falling back to evidence locker print:', err);
-      // Fallback if backend is sleeping
       window.open(
         `/audit/evidence-locker?token=rl_live_${btoa(targetFleet).replace(/=+$/, '')}&print=true`,
         '_blank'
@@ -830,11 +856,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           {vehicle.work_order_id && (
                             <a
-                              href={
-                                vehicle.vin === '1FUJGLDR5MLKE1234'
-                                  ? 'https://secure.fleetio.com/52f335f6cd/vehicles/5863002/work_orders/22'
-                                  : 'https://secure.fleetio.com/52f335f6cd/work_orders'
-                              }
+                              href={getFleetioWorkOrderUrl(vehicle)}
                               target="_blank"
                               rel="noreferrer"
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded text-[11px] font-mono border border-slate-700 transition"
@@ -881,7 +903,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 <label className="block text-slate-400 mb-1">17-Digit Vehicle VIN</label>
                 <input
                   type="text"
-                  placeholder="e.g. 1FUJGLDR5MLKE1234"
+                  placeholder="e.g. 3AKJHHDR5KSKB7190"
                   value={scanVinInput}
                   onChange={(e) => setScanVinInput(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-100 uppercase focus:outline-none focus:border-cyan-500"
@@ -933,7 +955,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               rows={6}
               value={csvRawText}
               onChange={(e) => setCsvRawText(e.target.value)}
-              placeholder={`1FUJGLDR5MLKE1234, UNIT-501, Dallas Hub (TX), Southwest Division\n1FT8W1Y85PKA54321, UNIT-502, Chicago Terminal (IL), Midwest Division`}
+              placeholder={`3AKJHHDR5KSKB7190, UNIT-501, Dallas Hub (TX), Southwest Division\n1FTBW2CM5KKA84112, UNIT-502, Chicago Terminal (IL), Midwest Division`}
               className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
             />
 

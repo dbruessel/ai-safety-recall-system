@@ -22,6 +22,9 @@ interface FleetioIntegrationModalProps {
   clientName?: string;
 }
 
+const DEFAULT_ACCOUNT_TOKEN =
+  import.meta.env.VITE_FLEETIO_ACCOUNT_TOKEN || '0827581100';
+
 export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = ({
   isOpen,
   onClose,
@@ -56,10 +59,12 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
 
   // Path 2 (Direct API Entry) Form State
   const [fleetioApiKey, setFleetioApiKey] = useState<string>(() =>
-    isDemoFleet ? 'flt_live_demo_auth_token_9841' : ''
+    localStorage.getItem('fleetio_api_key') ||
+    (isDemoFleet ? 'flt_live_demo_auth_token_9841' : '')
   );
   const [fleetioAccountToken, setFleetioAccountToken] = useState<string>(() =>
-    isDemoFleet ? '52f335f6cd' : ''
+    localStorage.getItem('fleetio_account_token') ||
+    (isDemoFleet ? DEFAULT_ACCOUNT_TOKEN : '')
   );
   const [showKeyGuide, setShowKeyGuide] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
@@ -76,8 +81,12 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     if (org) {
       setTargetFleet(org);
       if (org.toLowerCase().includes('dennis') || org.toLowerCase().includes('demo')) {
-        setFleetioAccountToken('52f335f6cd');
-        setFleetioApiKey('flt_live_demo_auth_token_9841');
+        setFleetioAccountToken(
+          localStorage.getItem('fleetio_account_token') || DEFAULT_ACCOUNT_TOKEN
+        );
+        setFleetioApiKey(
+          localStorage.getItem('fleetio_api_key') || 'flt_live_demo_auth_token_9841'
+        );
       }
     }
     if (params.get('connect_fleetio') === 'true') {
@@ -144,6 +153,13 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
     setIsConnecting(true);
     setConnectionError(null);
 
+    const cleanKey = fleetioApiKey.trim();
+    const cleanToken = fleetioAccountToken.trim();
+
+    // Persist updated credentials so TaskBoard deep links use the active account slug
+    localStorage.setItem('fleetio_api_key', cleanKey);
+    localStorage.setItem('fleetio_account_token', cleanToken);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/fleetio/sync`, {
         method: 'POST',
@@ -152,8 +168,8 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
         },
         body: JSON.stringify({
           fleet_name: targetFleet,
-          api_key: fleetioApiKey.trim(),
-          account_token: fleetioAccountToken.trim(),
+          api_key: cleanKey,
+          account_token: cleanToken,
         }),
       });
 
@@ -403,7 +419,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       Connected Sandbox Active: Dennis Enterprise Fleet
                     </strong>
                     <span className="text-slate-300 text-[11px] leading-tight block mt-0.5">
-                      Your Fleetio Account Token (<code className="text-cyan-300 font-mono">52f335f6cd</code>) and Read-Only sync credentials are pre-configured. Click below to verify live 2-way sync.
+                      Your Fleetio Account Token (<code className="text-cyan-300 font-mono">{fleetioAccountToken || DEFAULT_ACCOUNT_TOKEN}</code>) and Read-Only sync credentials are pre-configured. Click below to verify live 2-way sync.
                     </span>
                   </div>
                 </div>
@@ -463,7 +479,7 @@ export const FleetioIntegrationModal: React.FC<FleetioIntegrationModalProps> = (
                       type="text"
                       value={fleetioAccountToken}
                       onChange={(e) => setFleetioAccountToken(e.target.value)}
-                      placeholder="e.g. 52f335f6cd"
+                      placeholder="e.g. 0827581100"
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
                       required
                     />
