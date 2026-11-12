@@ -48,8 +48,8 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 250000,
     ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
     remedy_logistics: 'Fleetio Work Order Issued',
-    work_order_id: 'WO #1',
-    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
+    work_order_id: 'WO #22',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/22`,
   },
   {
     id: 'veh-2',
@@ -196,7 +196,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
             remedy_logistics:
               idx === 0 ? 'Fleetio Work Order Issued' : 'Inspected & Underwriter Cleared',
-            work_order_id: item.work_order_id || (idx === 0 ? 'WO #1' : `WO-FLT-${889100 + idx}`),
+            work_order_id: item.work_order_id || (idx === 0 ? 'WO #22' : `WO-FLT-${889100 + idx}`),
             fleetio_wo_url:
               item.fleetio_wo_url || `https://secure.fleetio.com/${slug}/work_orders`,
           }));
