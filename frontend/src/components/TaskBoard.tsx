@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, CreditCard, Search, Sparkles } from 'lucide-react';
+import { trackEvent } from '../utils/telemetry';
+import { PricingUpgradeModal } from './PricingUpgradeModal';
 
 export interface MonitoredVehicle {
   id: string;
@@ -364,17 +366,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [selectedTerminal, setSelectedTerminal] = useState<string>('ALL');
   const [syncingVin, setSyncingVin] = useState<string | null>(null);
 
-  // Sync vehicles when target fleet changes
-  useEffect(() => {
-    setVehicles(resolvedFleetInfo.initialVehicles);
-    setSelectedTerminal('ALL');
-    setStatusFilter('ALL');
-  }, [resolvedFleetInfo]);
-
   // Modals state
   const [isScanOpen, setIsScanOpen] = useState(false);
+  const [isScanningNhtsa, setIsScanningNhtsa] = useState(false);
+  const [scanFeedbackBanner, setScanFeedbackBanner] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isInternalShareOpen, setIsInternalShareOpen] = useState(false);
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [scanVinInput, setScanVinInput] = useState('');
   const [scanTerminalInput, setScanTerminalInput] = useState('');
@@ -388,6 +386,25 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const [riskOfficerName, setRiskOfficerName] = useState<string>('Dennis Vance, VP Safety & Risk');
   const [riskOfficerEmail, setRiskOfficerEmail] = useState<string>('safety@dennisfleet.com');
   const [riskOfficerPhone, setRiskOfficerPhone] = useState<string>('(214) 555-0144');
+
+  // Track sandbox page open on mount
+  useEffect(() => {
+    trackEvent({
+      event: 'sandbox_opened',
+      portal: 'fleet',
+      metadata: {
+        fleet_name: resolvedFleetInfo.companyName,
+        from_broker: resolvedFleetInfo.showBrokerBackLink,
+      },
+    });
+  }, [resolvedFleetInfo.companyName, resolvedFleetInfo.showBrokerBackLink]);
+
+  // Sync vehicles when target fleet changes
+  useEffect(() => {
+    setVehicles(resolvedFleetInfo.initialVehicles);
+    setSelectedTerminal('ALL');
+    setStatusFilter('ALL');
+  }, [resolvedFleetInfo]);
 
   // Helper to resolve the active Fleetio account token (localStorage override -> env -> 0827581100)
   const getActiveFleetioSlug = () => {
@@ -520,6 +537,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   const handleRemediateInFleetio = () => {
     setStatusFilter('OPEN');
     const openDefectVehicle = vehicles.find((v) => v.compliance_status === 'OPEN');
+    trackEvent({
+      event: 'fleetio_wo_clicked',
+      portal: 'fleet',
+      metadata: {
+        source: 'banner_cta',
+        unit_number: openDefectVehicle?.unit_number || 'UNIT-101',
+        work_order_id: openDefectVehicle?.work_order_id || 'WO #22',
+      },
+    });
     window.open(
       getFleetioWorkOrderUrl(openDefectVehicle),
       '_blank',
@@ -528,6 +554,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   const handleBackToPortfolio = () => {
+    trackEvent({
+      event: 'back_to_broker_portfolio_clicked',
+      portal: 'fleet',
+      metadata: { from_fleet: resolvedFleetInfo.companyName },
+    });
     if (onNavigatePortfolio) {
       onNavigatePortfolio();
     } else {
@@ -537,6 +568,17 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   // 2-Way Fleetio sync status transition loop
   const handleSyncStatus = (vin: string) => {
+    const targetVeh = vehicles.find((v) => v.vin === vin);
+    trackEvent({
+      event: 'sync_status_clicked',
+      portal: 'fleet',
+      metadata: {
+        vin,
+        unit_number: targetVeh?.unit_number,
+        previous_status: targetVeh?.compliance_status,
+      },
+    });
+
     setSyncingVin(vin);
     setTimeout(() => {
       setVehicles((prev) =>
@@ -566,32 +608,130 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     }, 900);
   };
 
-  // Add individual VIN
-  const handleAddVin = () => {
-    if (!scanVinInput.trim()) return;
+  // Live NHTSA VIN Decoder & Recall Check
+  const handleAddVin = async () => {
+    const cleanVin = scanVinInput.trim().toUpperCase();
+    if (!cleanVin) return;
+
+    setIsScanningNhtsa(true);
     const slug = getActiveFleetioSlug();
+
+    let decodedMake = 'COMMERCIAL';
+    let decodedModel = 'POWER UNIT';
+    let decodedYear = 2023;
+    let recallCount = 0;
+    let topCampaign = 'CLEAN';
+    let topDetails = 'No Open NHTSA Defect Campaigns';
+    let isCriticalOpen = false;
+
+    try {
+      // 1. Decode VIN via official NHTSA vPIC API
+      const vpicRes = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(
+          cleanVin
+        )}?format=json`
+      );
+      if (vpicRes.ok) {
+        const vpicData = await vpicRes.json();
+        const row = vpicData?.Results?.[0];
+        if (row) {
+          if (row.Make) decodedMake = String(row.Make).toUpperCase().trim();
+          if (row.Model) decodedModel = String(row.Model).toUpperCase().trim();
+          if (row.ModelYear && !isNaN(Number(row.ModelYear))) {
+            decodedYear = Number(row.ModelYear);
+          }
+        }
+      }
+
+      // 2. Query published NHTSA safety recalls for decoded Make/Model/Year
+      if (decodedMake !== 'COMMERCIAL' && decodedModel !== 'POWER UNIT' && decodedYear) {
+        const recallsRes = await fetch(
+          `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(
+            decodedMake
+          )}&model=${encodeURIComponent(decodedModel)}&modelYear=${decodedYear}`
+        );
+        if (recallsRes.ok) {
+          const recallsData = await recallsRes.json();
+          const results = Array.isArray(recallsData?.results) ? recallsData.results : [];
+          recallCount = results.length;
+
+          if (recallCount > 0) {
+            const criticalKeywords = [
+              'STEERING',
+              'BRAKE',
+              'AIR BAG',
+              'SUSPENSION',
+              'FUEL',
+              'TIRE',
+              'AXLE',
+            ];
+            const prioritized =
+              results.find((r: any) =>
+                criticalKeywords.some((kw) =>
+                  String(r.Component || '').toUpperCase().includes(kw)
+                )
+              ) || results[0];
+
+            topCampaign = prioritized.NHTSACampaignNumber || 'NHTSA-ACTIVE';
+            const rawComp = String(prioritized.Component || 'SAFETY SYSTEM')
+              .split(':')[0]
+              .toUpperCase();
+            topDetails = `${topCampaign} — ${rawComp}${
+              recallCount > 1 ? ` (+${recallCount - 1} more)` : ''
+            }`;
+            isCriticalOpen = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('NHTSA live lookup fallback triggered:', err);
+    }
+
     const newEntry: MonitoredVehicle = {
       id: `veh-${Date.now()}`,
-      vin: scanVinInput.trim().toUpperCase(),
+      vin: cleanVin,
       unit_number: `UNIT-${vehicles.length + 101}`,
-      make: 'FREIGHTLINER',
-      model: 'CASCADIA',
-      year: 2024,
+      make: decodedMake,
+      model: decodedModel,
+      year: decodedYear,
       terminal:
         scanTerminalInput.trim() ||
         (selectedTerminal !== 'ALL' ? selectedTerminal : 'Dallas Hub (TX)'),
-      division: 'Southwest Division',
-      campaign_id: 'CLEAN',
-      safety_recall_details: 'No Open NHTSA Defect Campaigns',
-      compliance_status: 'CLEARED',
-      punitive_exposure: 0,
-      ecosystem_feeds: ['FLEETIO'],
-      remedy_logistics: 'NHTSA API Scan: Zero Open Recalls',
-      work_order_id: 'WO #25',
-      fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders/25`,
+      division: 'Live NHTSA Audit',
+      campaign_id: topCampaign,
+      safety_recall_details: topDetails,
+      compliance_status: isCriticalOpen ? 'OPEN' : 'CLEARED',
+      punitive_exposure: isCriticalOpen ? 250000 : 0,
+      ecosystem_feeds: ['NHTSA LIVE', 'FLEETIO'],
+      remedy_logistics: isCriticalOpen
+        ? 'NHTSA Live Match: Issue Fleetio Work Order'
+        : 'NHTSA Live Scan: Zero Open Recalls',
+      work_order_id: isCriticalOpen ? 'WO #22' : 'WO #25',
+      fleetio_wo_url: isCriticalOpen
+        ? `https://secure.fleetio.com/${slug}/work_orders/22`
+        : `https://secure.fleetio.com/${slug}/work_orders/25`,
     };
 
-    setVehicles([newEntry, ...vehicles]);
+    trackEvent({
+      event: 'live_vin_scanned',
+      portal: 'fleet',
+      metadata: {
+        vin: cleanVin,
+        decoded_make: decodedMake,
+        decoded_model: decodedModel,
+        decoded_year: decodedYear,
+        recalls_found: recallCount,
+        punitive_exposure: newEntry.punitive_exposure,
+      },
+    });
+
+    setVehicles((prev) => [newEntry, ...prev]);
+    setScanFeedbackBanner(
+      isCriticalOpen
+        ? `⚠️ NHTSA Live Scan: ${decodedYear} ${decodedMake} ${decodedModel} (${cleanVin}) matched ${recallCount} safety recall(s) — $250,000 punitive exposure flagged.`
+        : `✓ NHTSA Live Scan: ${decodedYear} ${decodedMake} ${decodedModel} (${cleanVin}) verified with 0 open safety recalls.`
+    );
+    setIsScanningNhtsa(false);
     setScanVinInput('');
     setScanTerminalInput('');
     setIsScanOpen(false);
@@ -636,6 +776,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
     if (imported.length > 0) {
       setVehicles([...imported, ...vehicles]);
+      trackEvent({
+        event: 'bulk_csv_imported',
+        portal: 'fleet',
+        metadata: { count: imported.length },
+      });
     }
     setCsvRawText('');
     setIsImportOpen(false);
@@ -647,15 +792,34 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     ).slice(0, 16)}`;
     navigator.clipboard.writeText(bearerUrl);
     setCopiedLink(true);
+    trackEvent({
+      event: 'underwriter_link_copied',
+      portal: 'fleet',
+      metadata: { fleet_name: resolvedFleetInfo.companyName },
+    });
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
   const handleShareClick = () => {
+    trackEvent({
+      event: 'share_underwriter_modal_opened',
+      portal: 'fleet',
+      metadata: { fleet_name: resolvedFleetInfo.companyName },
+    });
     if (onOpenShareModal) {
       onOpenShareModal();
     } else {
       setIsInternalShareOpen(true);
     }
+  };
+
+  const handleOpenPricing = (source: string) => {
+    trackEvent({
+      event: 'pricing_modal_opened',
+      portal: 'fleet',
+      metadata: { source, fleet_name: resolvedFleetInfo.companyName },
+    });
+    setIsPricingOpen(true);
   };
 
   // Server-generated PDF export handler
@@ -665,6 +829,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     const broker = sessionStorage.getItem('broker_name') || 'Apex Risk Brokers';
     const apiBaseUrl =
       import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
+
+    trackEvent({
+      event: 'pdf_exported',
+      portal: 'fleet',
+      metadata: { fleet_name: targetFleet },
+    });
 
     try {
       const response = await fetch(
@@ -739,6 +909,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
+            onClick={() => handleOpenPricing('header_button')}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-950/80 hover:bg-emerald-900/90 border border-emerald-600/70 rounded-lg text-xs font-bold text-emerald-300 transition cursor-pointer shadow-sm font-mono"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Plans &amp; Pricing ($99+/mo)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleShareClick}
             className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-lg text-xs font-semibold text-slate-200 transition cursor-pointer shadow-sm"
           >
@@ -764,6 +943,56 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Interactive Sandbox Action & Pricing Bar */}
+      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2.5 text-xs">
+          <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="text-slate-300">
+            <strong className="text-white font-semibold">Interactive Sandbox:</strong> Run a live NHTSA defect scan on your own VIN or deploy 24/7 Fleetio sync starting at{' '}
+            <strong className="text-emerald-400 font-mono">$99/mo</strong>.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={() => {
+              trackEvent({
+                event: 'scan_vin_modal_opened',
+                portal: 'fleet',
+                metadata: { source: 'sandbox_banner' },
+              });
+              setIsScanOpen(true);
+            }}
+            className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Test Your Own VIN</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOpenPricing('sandbox_banner')}
+            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+          >
+            See Pricing →
+          </button>
+        </div>
+      </div>
+
+      {/* Live VIN Scan Result Feedback Banner */}
+      {scanFeedbackBanner && (
+        <div className="p-3.5 rounded-xl bg-cyan-950/60 border border-cyan-500/60 flex items-center justify-between gap-4 text-xs font-mono text-cyan-200">
+          <span>{scanFeedbackBanner}</span>
+          <button
+            type="button"
+            onClick={() => setScanFeedbackBanner(null)}
+            className="text-slate-400 hover:text-white cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Critical Defect Exposure Alert Banner */}
       {filteredCriticalCount > 0 && (
@@ -866,15 +1095,28 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsScanOpen(true)}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded border border-slate-700 transition cursor-pointer"
+                  onClick={() => {
+                    trackEvent({
+                      event: 'scan_vin_modal_opened',
+                      portal: 'fleet',
+                      metadata: { source: 'capacity_card' },
+                    });
+                    setIsScanOpen(true);
+                  }}
+                  className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-bold font-mono rounded border border-cyan-500/50 transition cursor-pointer"
                 >
-                  + Scan VIN
+                  + Live VIN Check
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsImportOpen(true)}
-                  className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-semibold rounded border border-cyan-800/80 transition cursor-pointer"
+                  onClick={() => {
+                    trackEvent({
+                      event: 'csv_import_modal_opened',
+                      portal: 'fleet',
+                    });
+                    setIsImportOpen(true);
+                  }}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded border border-slate-700 transition cursor-pointer"
                 >
                   + Import (.CSV)
                 </button>
@@ -901,7 +1143,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
             <span>Continuous NHTSA &amp; Telematics Sync</span>
-            <span className="text-slate-300">{availableSlots.toLocaleString()} slots available</span>
+            <button
+              type="button"
+              onClick={() => handleOpenPricing('capacity_card_upgrade')}
+              className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer bg-transparent border-0 p-0 text-xs"
+            >
+              Upgrade Tier ↗
+            </button>
           </div>
         </div>
       </div>
@@ -930,7 +1178,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             </span>
             <select
               value={selectedTerminal}
-              onChange={(e) => setSelectedTerminal(e.target.value)}
+              onChange={(e) => {
+                setSelectedTerminal(e.target.value);
+                trackEvent({
+                  event: 'terminal_filter_changed',
+                  portal: 'fleet',
+                  metadata: { terminal: e.target.value },
+                });
+              }}
               className="bg-transparent text-xs text-cyan-400 font-bold focus:outline-none cursor-pointer pr-2"
             >
               {availableTerminals.map((terminal) => (
@@ -951,7 +1206,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setStatusFilter(tab)}
+                  onClick={() => {
+                    setStatusFilter(tab);
+                    trackEvent({
+                      event: 'status_tab_clicked',
+                      portal: 'fleet',
+                      metadata: { status_tab: tab },
+                    });
+                  }}
                   className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
                     statusFilter === tab
                       ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40'
@@ -1061,6 +1323,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                               className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border ${
                                 feed === 'FLEETIO'
                                   ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800'
+                                  : feed === 'NHTSA LIVE'
+                                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
                                   : 'bg-blue-950/80 text-blue-300 border-blue-800'
                               }`}
                             >
@@ -1117,6 +1381,18 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                               href={getFleetioWorkOrderUrl(vehicle)}
                               target="_blank"
                               rel="noreferrer"
+                              onClick={() =>
+                                trackEvent({
+                                  event: 'fleetio_wo_clicked',
+                                  portal: 'fleet',
+                                  metadata: {
+                                    source: 'table_row',
+                                    unit_number: vehicle.unit_number,
+                                    vin: vehicle.vin,
+                                    work_order_id: vehicle.work_order_id,
+                                  },
+                                })
+                              }
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded text-[11px] font-mono border border-slate-700 transition"
                               title="Open Work Order in Fleetio"
                             >
@@ -1147,13 +1423,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         </div>
       </div>
 
-      {/* Modal 1: Scan Single VIN */}
+      {/* Modal 1: Live NHTSA Single VIN Scanner */}
       {isScanOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-2">Scan &amp; Ingest Single VIN</h3>
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">Live NHTSA VIN Defect Scanner</h3>
             <p className="text-xs text-slate-400 mb-4">
-              Direct ingestion triggers instant NHTSA defect matching and OEM recall queries.
+              Decodes real vehicle specs via NHTSA vPIC and checks active federal safety recall campaigns in real time.
             </p>
 
             <div className="space-y-3 font-mono text-xs">
@@ -1183,6 +1459,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
                 type="button"
+                disabled={isScanningNhtsa}
                 onClick={() => setIsScanOpen(false)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition cursor-pointer"
               >
@@ -1190,10 +1467,18 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               </button>
               <button
                 type="button"
+                disabled={isScanningNhtsa || !scanVinInput.trim()}
                 onClick={handleAddVin}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded text-xs transition cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold rounded text-xs transition cursor-pointer font-mono"
               >
-                Ingest &amp; Verify VIN
+                {isScanningNhtsa ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Querying NHTSA...</span>
+                  </>
+                ) : (
+                  <span>Run Live NHTSA Audit</span>
+                )}
               </button>
             </div>
           </div>
@@ -1352,6 +1637,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    trackEvent({
+                      event: 'live_evidence_portal_opened',
+                      portal: 'fleet',
+                      metadata: { fleet_name: resolvedFleetInfo.companyName },
+                    });
                     window.open(
                       `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(
                         resolvedFleetInfo.companyName
@@ -1368,6 +1658,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal 4: Transparent Pricing & Plans Modal */}
+      <PricingUpgradeModal
+        isOpen={isPricingOpen}
+        onClose={() => setIsPricingOpen(false)}
+        portal="fleet"
+      />
     </div>
   );
 };

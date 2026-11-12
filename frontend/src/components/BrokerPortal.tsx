@@ -14,8 +14,12 @@ import {
   Radio,
   Plug,
   Mail,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { FleetioIntegrationModal } from "./FleetioIntegrationModal";
+import { PricingUpgradeModal } from "./PricingUpgradeModal";
+import { trackEvent } from "../utils/telemetry";
 
 interface ClientAccount {
   id: string;
@@ -47,6 +51,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
   const [showScoreTooltip, setShowScoreTooltip] = useState<boolean>(false);
   const [showLiabilityTooltip, setShowLiabilityTooltip] = useState<boolean>(false);
   const [isFleetioModalOpen, setIsFleetioModalOpen] = useState<boolean>(false);
+  const [isPricingOpen, setIsPricingOpen] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [activeSelectedClient, setActiveSelectedClient] = useState<{ id: string; name: string }>({
     id: "dennis-enterprise",
@@ -55,6 +60,11 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
 
   useEffect(() => {
     document.title = "RECALLLOGIC — Enterprise Loss Control System";
+
+    trackEvent({
+      event: "sandbox_opened",
+      portal: "broker",
+    });
 
     const fetchBrokerPortfolio = async () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://recalllogic-api.onrender.com";
@@ -132,11 +142,9 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             ? 500000
             : 0,
         underwriterDiscount:
-          client.id === "dennis-enterprise"
-            ? "Locked — Resolve Recalls to Unlock 15% Credit"
-            : client.id === "apex-logistics"
-            ? "Locked — Resolve Recalls to Unlock 15% Credit"
-            : client.id === "titan-hauling"
+          client.id === "dennis-enterprise" ||
+          client.id === "apex-logistics" ||
+          client.id === "titan-hauling"
             ? "Locked — Resolve Recalls to Unlock 15% Credit"
             : "15% Optimal Credit",
         hasNuclearRecall:
@@ -237,11 +245,22 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
   const avgMaintDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.maintenancePenalty || 0), 0) / (clientAccounts.length || 1));
 
   const handleOpenIntegrationModal = (clientId: string, clientName: string) => {
+    trackEvent({
+      event: "sync_fleetio_modal_opened",
+      portal: "broker",
+      metadata: { client_id: clientId, client_name: clientName },
+    });
     setActiveSelectedClient({ id: clientId, name: clientName });
     setIsFleetioModalOpen(true);
   };
 
-  const handleAuditClient = (clientName: string) => {
+  const handleAuditClient = (clientName: string, source: "alert_banner" | "account_card") => {
+    trackEvent({
+      event: "broker_client_drilled_down",
+      portal: "broker",
+      metadata: { client_name: clientName, source },
+    });
+
     if (onAuditClient) {
       onAuditClient(clientName);
     } else {
@@ -251,6 +270,15 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
       fleetUrl.searchParams.set("from", "broker");
       window.location.href = fleetUrl.toString();
     }
+  };
+
+  const handleOpenPricing = (source: string) => {
+    trackEvent({
+      event: "pricing_modal_opened",
+      portal: "broker",
+      metadata: { source },
+    });
+    setIsPricingOpen(true);
   };
 
   const getTierBadgeDetails = (score: number, hasNuclear: boolean) => {
@@ -302,7 +330,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
       </div>
 
       {/* HEADER COMMAND BAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-cyan-400" />
@@ -317,6 +345,15 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleOpenPricing("header_button")}
+            className="flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-600/70 hover:bg-emerald-900/90 text-emerald-300 px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm cursor-pointer font-mono"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Plans &amp; Pricing ($99+/mo)</span>
+          </button>
+
           <button 
             onClick={() => handleOpenIntegrationModal("dennis-enterprise", "Dennis Enterprise Fleet")}
             className="flex items-center gap-2 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-3.5 py-2 rounded-lg text-xs font-semibold transition shadow-sm shadow-cyan-950 cursor-pointer"
@@ -330,6 +367,10 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               type="button"
               onClick={async () => {
                 const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
+                trackEvent({
+                  event: "broker_onboarding_link_copied",
+                  portal: "broker",
+                });
                 try {
                   await navigator.clipboard.writeText(onboardingLink);
                   setIsCopied(true);
@@ -350,6 +391,10 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             <button
               type="button"
               onClick={() => {
+                trackEvent({
+                  event: "broker_email_draft_opened",
+                  portal: "broker",
+                });
                 const onboardingLink = `${window.location.origin}/signup?broker=apex-risk&broker_name=${encodeURIComponent('Apex Risk Brokers')}`;
                 const subject = encodeURIComponent("Action Required: Loss-Control Audit & Pre-Renewal Rate Credit");
                 const body = encodeURIComponent(
@@ -379,10 +424,44 @@ Apex Risk Brokers`
           </div>
           
           <button 
-            onClick={() => alert("Generating aggregate portfolio loss control audit PDF for underwriters...")}
+            onClick={() => {
+              trackEvent({
+                event: "portfolio_pdf_exported",
+                portal: "broker",
+              });
+              alert("Generating aggregate portfolio loss control audit PDF for underwriters...");
+            }}
             className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-cyan-900/40 transition cursor-pointer"
           >
             <FileText className="w-4 h-4" /> Export Portfolio Audit PDF
+          </button>
+        </div>
+      </div>
+
+      {/* BROKER SANDBOX CONVERSION & PRICING STRIP */}
+      <div className="mb-8 p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2.5 text-xs">
+          <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="text-slate-300">
+            <strong className="text-white font-semibold">Broker Portfolio Sandbox:</strong> Click any client workspace below to inspect unit-level NHTSA defects, run a free 5-VIN renewal scrub, or deploy across your book starting at{' '}
+            <strong className="text-emerald-400 font-mono">$99/mo</strong>.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={() => handleAuditClient("Dennis Enterprise Fleet", "account_card")}
+            className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+          >
+            Test Live VIN Scanner
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOpenPricing("sandbox_banner")}
+            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
+          >
+            See Pricing →
           </button>
         </div>
       </div>
@@ -412,7 +491,7 @@ Apex Risk Brokers`
                       {account.name}: <span className="font-mono text-red-300">{account.nuclearCampaign || "Campaign #23V-891"}</span> ({account.nuclearComponent || "CRITICAL SAFETY COMPONENT"})
                     </span>
                     <button 
-                      onClick={() => handleAuditClient(account.name)}
+                      onClick={() => handleAuditClient(account.name, "alert_banner")}
                       className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded font-medium transition cursor-pointer"
                     >
                       Audit Client Workspace →
@@ -441,7 +520,13 @@ Apex Risk Brokers`
           <div className="flex items-center justify-between">
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">BOOK SAFETY SCORE</span>
             <button 
-              onClick={() => setShowScoreTooltip(!showScoreTooltip)}
+              onClick={() => {
+                const next = !showScoreTooltip;
+                setShowScoreTooltip(next);
+                if (next) {
+                  trackEvent({ event: "actuarial_score_tooltip_opened", portal: "broker" });
+                }
+              }}
               className="text-slate-400 hover:text-cyan-400 p-1 transition cursor-pointer"
               title="Click to view actuarial calculation breakdown"
             >
@@ -504,7 +589,13 @@ Apex Risk Brokers`
           <div className="flex items-center justify-between">
             <span className="text-slate-400 text-xs font-mono uppercase tracking-wider">PUNITIVE LIABILITY EXPOSURE</span>
             <button 
-              onClick={() => setShowLiabilityTooltip(!showLiabilityTooltip)}
+              onClick={() => {
+                const next = !showLiabilityTooltip;
+                setShowLiabilityTooltip(next);
+                if (next) {
+                  trackEvent({ event: "punitive_liability_tooltip_opened", portal: "broker" });
+                }
+              }}
               className="text-slate-400 hover:text-red-400 p-1 transition cursor-pointer"
               title="Click to view legal exposure calculation breakdown"
             >
@@ -682,7 +773,7 @@ Apex Risk Brokers`
                       <Plug className="w-3 h-3 text-cyan-400" /> Sync Fleetio
                     </button>
                     <button 
-                      onClick={() => handleAuditClient(account.name)}
+                      onClick={() => handleAuditClient(account.name, "account_card")}
                       className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
                     >
                       Audit Client Workspace <ChevronRight className="w-3.5 h-3.5" />
@@ -700,6 +791,12 @@ Apex Risk Brokers`
         onClose={() => setIsFleetioModalOpen(false)}
         organizationId={activeSelectedClient.id}
         clientName={activeSelectedClient.name}
+      />
+
+      <PricingUpgradeModal
+        isOpen={isPricingOpen}
+        onClose={() => setIsPricingOpen(false)}
+        portal="broker"
       />
     </div>
   );

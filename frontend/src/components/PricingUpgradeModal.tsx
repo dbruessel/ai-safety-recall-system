@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { trackEvent } from '../utils/telemetry';
 
 export interface PricingUpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  portal?: 'broker' | 'fleet' | 'evidence_locker';
   onSelectTier?: (tierId: 'standard' | 'professional' | 'enterprise') => void;
 }
 
@@ -23,6 +25,7 @@ interface TierPlan {
 export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
   isOpen,
   onClose,
+  portal = 'fleet',
   onSelectTier,
 }) => {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
@@ -34,21 +37,22 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
       id: 'standard',
       name: 'Standard',
       subtitle: 'Compliance Baseline',
-      price: '\$99',
+      price: '$99',
       billing: '/mo',
       buttonClass: 'bg-slate-800 hover:bg-slate-700 text-slate-200',
       cardClass: 'border-slate-800 bg-slate-900/90',
       features: [
-        'Up to 50 Vehicles Monitored',
+        'Up to 75 Power Units',
         'Continuous NHTSA Ingestion',
-        'Punitive Risk Threshold Alerts'
+        'Punitive Risk Threshold Alerts',
+        '1-Click Fleetio VIN Sync'
       ]
     },
     {
       id: 'professional',
       name: 'Professional',
       subtitle: 'Underwriter Engine',
-      price: '\$249',
+      price: '$249',
       billing: '/mo',
       badge: 'RECOMMENDED',
       popular: true,
@@ -65,7 +69,7 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
       id: 'enterprise',
       name: 'Enterprise',
       subtitle: 'Agency License',
-      price: '\$499',
+      price: '$499',
       billing: '/mo',
       badge: 'AGENCY PARTNER',
       buttonClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold',
@@ -81,6 +85,16 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
 
   const handleStripeCheckout = async (plan: TierPlan) => {
     setLoadingTier(plan.id);
+
+    trackEvent({
+      event: 'pricing_plan_selected',
+      portal,
+      metadata: {
+        plan_id: plan.id,
+        billing_cycle: 'monthly',
+        price: plan.price
+      },
+    });
 
     try {
       if (onSelectTier) {
@@ -134,10 +148,10 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
-              CAPACITY THRESHOLD REACHED
+              RecallLogic Continuous Risk Defense
             </span>
             <h3 className="text-lg font-bold text-white uppercase tracking-wider mt-0.5">
-              Upgrade Subscription Plan
+              Select Subscription Plan
             </h3>
           </div>
           <button
