@@ -66,8 +66,8 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 0,
     ecosystem_feeds: ['FLEETIO'],
     remedy_logistics: 'Metro Ford Commercial (Parts Backorder)',
-    work_order_id: 'WO-FLT-772910',
-    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
+    work_order_id: 'WO #23',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/23`,
   },
   {
     id: 'veh-3',
@@ -84,8 +84,8 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 0,
     ecosystem_feeds: ['FLEETIO'],
     remedy_logistics: 'Volvo Truck Center (Recall Completed)',
-    work_order_id: 'WO-FLT-665120',
-    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
+    work_order_id: 'WO #24',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/24`,
   },
   {
     id: 'veh-4',
@@ -102,8 +102,8 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
     punitive_exposure: 0,
     ecosystem_feeds: ['FLEETIO', 'GEOTAB'],
     remedy_logistics: 'Inspected & Underwriter Cleared',
-    work_order_id: 'WO-FLT-991044',
-    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders`,
+    work_order_id: 'WO #25',
+    fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/25`,
   },
 ];
 
@@ -196,9 +196,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
             remedy_logistics:
               idx === 0 ? 'Fleetio Work Order Issued' : 'Inspected & Underwriter Cleared',
-            work_order_id: item.work_order_id || (idx === 0 ? 'WO #22' : `WO-FLT-${889100 + idx}`),
+            work_order_id: item.work_order_id || `WO #${22 + idx}`,
             fleetio_wo_url:
-              item.fleetio_wo_url || `https://secure.fleetio.com/${slug}/work_orders`,
+              item.fleetio_wo_url || `https://secure.fleetio.com/${slug}/work_orders/${22 + idx}`,
           }));
           setVehicles(mappedVehicles);
         }
