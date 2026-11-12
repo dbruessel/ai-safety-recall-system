@@ -67,6 +67,129 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
         { id: "metro-delivery", name: "Metro Last-Mile Delivery", tier: "STANDARD TIER" }
       ];
 
+      const getFallbackAccount = (client: { id: string; name: string; tier: string }): ClientAccount => ({
+        id: client.id,
+        name: client.name,
+        tier: client.tier,
+        totalVins:
+          client.id === "dennis-enterprise"
+            ? 4
+            : client.id === "apex-logistics"
+            ? 142
+            : client.id === "titan-hauling"
+            ? 210
+            : client.id === "summit-regional"
+            ? 68
+            : 45,
+        openRecalls:
+          client.id === "dennis-enterprise"
+            ? 1
+            : client.id === "apex-logistics"
+            ? 3
+            : client.id === "titan-hauling"
+            ? 14
+            : client.id === "metro-delivery"
+            ? 1
+            : 0,
+        clearedRecalls:
+          client.id === "dennis-enterprise"
+            ? 3
+            : client.id === "apex-logistics"
+            ? 139
+            : client.id === "titan-hauling"
+            ? 196
+            : client.id === "summit-regional"
+            ? 68
+            : 44,
+        safetyScore:
+          client.id === "dennis-enterprise"
+            ? 82
+            : client.id === "apex-logistics"
+            ? 82
+            : client.id === "titan-hauling"
+            ? 58
+            : client.id === "metro-delivery"
+            ? 90
+            : 98,
+        riskTier:
+          client.id === "titan-hauling"
+            ? "HIGH RISK / NUCLEAR EXPOSURE"
+            : client.id === "dennis-enterprise" || client.id === "apex-logistics"
+            ? "STANDARD"
+            : "PREFERRED",
+        nuclearLiabilityCount:
+          client.id === "dennis-enterprise" ||
+          client.id === "apex-logistics" ||
+          client.id === "titan-hauling"
+            ? 1
+            : 0,
+        financialExposureUsd:
+          client.id === "dennis-enterprise"
+            ? 250000
+            : client.id === "apex-logistics"
+            ? 250000
+            : client.id === "titan-hauling"
+            ? 500000
+            : 0,
+        underwriterDiscount:
+          client.id === "dennis-enterprise"
+            ? "Locked — Resolve Recalls to Unlock 15% Credit"
+            : client.id === "apex-logistics"
+            ? "Locked — Resolve Recalls to Unlock 15% Credit"
+            : client.id === "titan-hauling"
+            ? "Locked — Resolve Recalls to Unlock 15% Credit"
+            : "15% Optimal Credit",
+        hasNuclearRecall:
+          client.id === "dennis-enterprise" ||
+          client.id === "apex-logistics" ||
+          client.id === "titan-hauling",
+        nuclearCampaign:
+          client.id === "dennis-enterprise" || client.id === "apex-logistics"
+            ? "Campaign #23V-891"
+            : client.id === "titan-hauling"
+            ? "Campaign #23V-838"
+            : undefined,
+        nuclearComponent:
+          client.id === "dennis-enterprise" || client.id === "apex-logistics"
+            ? "STEERING AXLE DRAG LINK"
+            : client.id === "titan-hauling"
+            ? "AIR BRAKE ACTUATOR DIAPHRAGM"
+            : undefined,
+        recallPenalty:
+          client.id === "dennis-enterprise"
+            ? 11
+            : client.id === "apex-logistics"
+            ? 11
+            : client.id === "titan-hauling"
+            ? 28
+            : client.id === "metro-delivery"
+            ? 2
+            : 0,
+        maintenancePenalty:
+          client.id === "dennis-enterprise"
+            ? 7
+            : client.id === "apex-logistics"
+            ? 7
+            : client.id === "titan-hauling"
+            ? 14
+            : 0,
+        telematicsPenalty: 0,
+        connectedProviders:
+          client.id === "dennis-enterprise"
+            ? ["fleetio", "samsara"]
+            : client.id === "apex-logistics"
+            ? ["fleetio", "samsara"]
+            : client.id === "titan-hauling"
+            ? ["geotab"]
+            : ["fleetio"],
+      });
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("demo") === "true") {
+        setClientAccounts(mockClients.map(getFallbackAccount));
+        return;
+      }
+
       const updatedAccounts = await Promise.all(
         mockClients.map(async (client) => {
           try {
@@ -95,26 +218,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
               connectedProviders: client.id === "dennis-enterprise" ? ["fleetio", "samsara"] : client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
             };
           } catch {
-            return {
-              id: client.id,
-              name: client.name,
-              tier: client.tier,
-              totalVins: client.id === "dennis-enterprise" ? 4 : client.id === "apex-logistics" ? 142 : client.id === "titan-hauling" ? 210 : client.id === "summit-regional" ? 68 : 45,
-              openRecalls: client.id === "dennis-enterprise" ? 1 : client.id === "apex-logistics" ? 3 : client.id === "titan-hauling" ? 14 : client.id === "metro-delivery" ? 1 : 0,
-              clearedRecalls: client.id === "dennis-enterprise" ? 3 : client.id === "apex-logistics" ? 139 : client.id === "titan-hauling" ? 196 : client.id === "summit-regional" ? 68 : 44,
-              safetyScore: client.id === "dennis-enterprise" ? 82 : client.id === "apex-logistics" ? 82 : client.id === "titan-hauling" ? 58 : client.id === "metro-delivery" ? 90 : 98,
-              riskTier: client.id === "titan-hauling" ? "HIGH RISK / NUCLEAR EXPOSURE" : client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "STANDARD" : "PREFERRED",
-              nuclearLiabilityCount: client.id === "dennis-enterprise" || client.id === "apex-logistics" || client.id === "titan-hauling" ? 1 : 0,
-              financialExposureUsd: client.id === "dennis-enterprise" ? 250000 : client.id === "apex-logistics" ? 250000 : client.id === "titan-hauling" ? 500000 : 0,
-              underwriterDiscount: client.id === "dennis-enterprise" ? "Locked — Resolve Recalls to Unlock 15% Credit" : client.id === "apex-logistics" ? "12-15% Optimal Credit" : client.id === "titan-hauling" ? "Subject to Surcharge Risk" : "15% Optimal Credit",
-              hasNuclearRecall: client.id === "dennis-enterprise" || client.id === "apex-logistics" || client.id === "titan-hauling",
-              nuclearCampaign: client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "Campaign #23V-891" : client.id === "titan-hauling" ? "Campaign #23V-838" : undefined,
-              nuclearComponent: client.id === "dennis-enterprise" || client.id === "apex-logistics" ? "STEERING AXLE DRAG LINK" : client.id === "titan-hauling" ? "AIR BRAKE ACTUATOR DIAPHRAGM" : undefined,
-              recallPenalty: client.id === "dennis-enterprise" ? 11 : client.id === "apex-logistics" ? 11 : client.id === "titan-hauling" ? 28 : client.id === "metro-delivery" ? 2 : 0,
-              maintenancePenalty: client.id === "dennis-enterprise" ? 7 : client.id === "apex-logistics" ? 7 : client.id === "titan-hauling" ? 14 : 0,
-              telematicsPenalty: 0,
-              connectedProviders: client.id === "dennis-enterprise" ? ["fleetio", "samsara"] : client.id === "apex-logistics" ? ["fleetio", "samsara"] : client.id === "titan-hauling" ? ["geotab"] : ["fleetio"]
-            };
+            return getFallbackAccount(client);
           }
         })
       );
@@ -141,9 +245,11 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
     if (onAuditClient) {
       onAuditClient(clientName);
     } else {
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('org', clientName);
-      window.location.href = currentUrl.toString();
+      const fleetUrl = new URL("/portal/fleet", window.location.origin);
+      fleetUrl.searchParams.set("demo", "true");
+      fleetUrl.searchParams.set("fleet", clientName);
+      fleetUrl.searchParams.set("from", "broker");
+      window.location.href = fleetUrl.toString();
     }
   };
 

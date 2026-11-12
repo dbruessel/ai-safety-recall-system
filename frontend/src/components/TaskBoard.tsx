@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, Download } from 'lucide-react'; // Added icons for the export button
+import { Loader2, Download } from 'lucide-react';
 
 export interface MonitoredVehicle {
   id: string;
@@ -19,6 +19,13 @@ export interface MonitoredVehicle {
   fleetio_wo_url?: string;
   ecosystem_feeds?: string[];
   remedy_logistics?: string;
+}
+
+interface FleetDemoProfile {
+  company: string;
+  tier: string;
+  totalUnitsOverride?: number;
+  vehicles: MonitoredVehicle[];
 }
 
 interface TaskBoardProps {
@@ -107,6 +114,218 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
   },
 ];
 
+const DEMO_FLEET_PROFILES: Record<string, FleetDemoProfile> = {
+  'Dennis Enterprise Fleet': {
+    company: 'Dennis Enterprise Fleet',
+    tier: 'enterprise',
+    vehicles: DEFAULT_VEHICLES,
+  },
+  'Apex Logistics & Freight': {
+    company: 'Apex Logistics & Freight',
+    tier: 'enterprise',
+    vehicles: [
+      {
+        id: 'apex-1',
+        vin: '3AKJHHDR5KSKB7190',
+        unit_number: 'APX-114',
+        make: 'FREIGHTLINER',
+        model: 'CASCADIA',
+        year: 2021,
+        terminal: 'Houston Port Hub (TX)',
+        division: 'Gulf Coast Linehaul',
+        campaign_id: '23V-891',
+        safety_recall_details: '23V-891 — STEERING AXLE DRAG LINK',
+        compliance_status: 'OPEN',
+        punitive_exposure: 250000,
+        ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
+        remedy_logistics: 'Fleetio Work Order Issued',
+        work_order_id: 'WO #22',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/22`,
+      },
+      {
+        id: 'apex-2',
+        vin: '1FTBW2CM5KKA84112',
+        unit_number: 'APX-208',
+        make: 'KENWORTH',
+        model: 'T680 NEXT GEN',
+        year: 2022,
+        terminal: 'Memphis Intermodal (TN)',
+        division: 'Mid-South Freight',
+        campaign_id: '24V-012',
+        safety_recall_details: '24V-012 — REAR DRIVESHAFT FLEX COUPLING',
+        compliance_status: 'SCHEDULED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO', 'SAMSARA'],
+        remedy_logistics: 'MHC Kenworth (Bay Reserved)',
+        work_order_id: 'WO #23',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/23`,
+      },
+      {
+        id: 'apex-3',
+        vin: '4V4NC9EHXKN904821',
+        unit_number: 'APX-319',
+        make: 'VOLVO',
+        model: 'VNL 860',
+        year: 2023,
+        terminal: 'Houston Port Hub (TX)',
+        division: 'Gulf Coast Linehaul',
+        campaign_id: 'CLEAN',
+        safety_recall_details: 'No Open NHTSA Defect Campaigns',
+        compliance_status: 'CLEARED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO'],
+        remedy_logistics: 'Inspected & Underwriter Cleared',
+        work_order_id: 'WO #24',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/24`,
+      },
+    ],
+  },
+  'Titan Heavy Hauling Co.': {
+    company: 'Titan Heavy Hauling Co.',
+    tier: 'professional',
+    vehicles: [
+      {
+        id: 'titan-1',
+        vin: '4V4NC9EHXKN904821',
+        unit_number: 'THH-402',
+        make: 'VOLVO',
+        model: 'VNL 860',
+        year: 2020,
+        terminal: 'Columbus Heavy Yard (OH)',
+        division: 'Great Lakes Heavy Haul',
+        campaign_id: '23V-838',
+        safety_recall_details: '23V-838 — AIR BRAKE ACTUATOR DIAPHRAGM',
+        compliance_status: 'OPEN',
+        punitive_exposure: 250000,
+        ecosystem_feeds: ['GEOTAB'],
+        remedy_logistics: 'Critical Brake Defect — Immediate Bay Hold',
+        work_order_id: 'WO #22',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/22`,
+      },
+      {
+        id: 'titan-2',
+        vin: '3AKJHHDR5KSKB7190',
+        unit_number: 'THH-419',
+        make: 'MACK',
+        model: 'ANTHEM 700',
+        year: 2021,
+        terminal: 'Pittsburgh Terminal (PA)',
+        division: 'Northeast Steel Division',
+        campaign_id: '23V-838',
+        safety_recall_details: '23V-838 — AIR BRAKE ACTUATOR DIAPHRAGM',
+        compliance_status: 'OPEN',
+        punitive_exposure: 250000,
+        ecosystem_feeds: ['GEOTAB'],
+        remedy_logistics: 'Dealer Parts Dispatched',
+        work_order_id: 'WO #23',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/23`,
+      },
+      {
+        id: 'titan-3',
+        vin: '1FVACWDT2FHGD9018',
+        unit_number: 'THH-511',
+        make: 'PETERBILT',
+        model: '579 HEAVY',
+        year: 2022,
+        terminal: 'Columbus Heavy Yard (OH)',
+        division: 'Great Lakes Heavy Haul',
+        campaign_id: 'CLEAN',
+        safety_recall_details: 'No Open NHTSA Defect Campaigns',
+        compliance_status: 'CLEARED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['GEOTAB'],
+        remedy_logistics: 'Inspected & Underwriter Cleared',
+        work_order_id: 'WO #24',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/24`,
+      },
+    ],
+  },
+  'Summit Regional Transport': {
+    company: 'Summit Regional Transport',
+    tier: 'professional',
+    vehicles: [
+      {
+        id: 'summit-1',
+        vin: '3AKJHHDR5KSKB7190',
+        unit_number: 'SRT-102',
+        make: 'FREIGHTLINER',
+        model: 'CASCADIA',
+        year: 2023,
+        terminal: 'Denver Hub (CO)',
+        division: 'Mountain West Regional',
+        campaign_id: 'CLEAN',
+        safety_recall_details: 'No Open NHTSA Defect Campaigns',
+        compliance_status: 'CLEARED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO'],
+        remedy_logistics: 'Inspected & Underwriter Cleared',
+        work_order_id: 'WO #24',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/24`,
+      },
+      {
+        id: 'summit-2',
+        vin: '4V4NC9EHXKN904821',
+        unit_number: 'SRT-118',
+        make: 'VOLVO',
+        model: 'VNL 760',
+        year: 2022,
+        terminal: 'Salt Lake City (UT)',
+        division: 'Mountain West Regional',
+        campaign_id: 'CLEAN',
+        safety_recall_details: 'No Open NHTSA Defect Campaigns',
+        compliance_status: 'CLEARED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO'],
+        remedy_logistics: 'Inspected & Underwriter Cleared',
+        work_order_id: 'WO #25',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/25`,
+      },
+    ],
+  },
+  'Metro Last-Mile Delivery': {
+    company: 'Metro Last-Mile Delivery',
+    tier: 'standard',
+    vehicles: [
+      {
+        id: 'metro-1',
+        vin: '1FTBW2CM5KKA84112',
+        unit_number: 'MLM-014',
+        make: 'FORD',
+        model: 'TRANSIT 250',
+        year: 2021,
+        terminal: 'Phoenix Metro Depot (AZ)',
+        division: 'Southwest Parcel',
+        campaign_id: '24V-012',
+        safety_recall_details: '24V-012 — REAR DRIVESHAFT FLEX COUPLING',
+        compliance_status: 'SCHEDULED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO'],
+        remedy_logistics: 'Chapman Ford Commercial (Appointment Confirmed)',
+        work_order_id: 'WO #23',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/23`,
+      },
+      {
+        id: 'metro-2',
+        vin: '1FVACWDT2FHGD9018',
+        unit_number: 'MLM-029',
+        make: 'FREIGHTLINER',
+        model: 'M2 106',
+        year: 2022,
+        terminal: 'Phoenix Metro Depot (AZ)',
+        division: 'Southwest Parcel',
+        campaign_id: 'CLEAN',
+        safety_recall_details: 'No Open NHTSA Defect Campaigns',
+        compliance_status: 'CLEARED',
+        punitive_exposure: 0,
+        ecosystem_feeds: ['FLEETIO'],
+        remedy_logistics: 'Inspected & Underwriter Cleared',
+        work_order_id: 'WO #25',
+        fleetio_wo_url: `https://secure.fleetio.com/${FLEETIO_ACCOUNT_SLUG}/work_orders/25`,
+      },
+    ],
+  },
+};
+
 const CARRIER_PRESETS = [
   { id: 'travelers', name: 'Travelers Commercial Auto', badge: '🛡️ Travelers' },
   { id: 'acrisure', name: 'Acrisure Risk Solutions', badge: '🔷 Acrisure' },
@@ -121,11 +340,36 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   onNavigatePortfolio,
   onOpenShareModal,
 }) => {
-  const [vehicles, setVehicles] = useState<MonitoredVehicle[]>(DEFAULT_VEHICLES);
+  // Resolve requested fleet from URL (?fleet=...) or prop
+  const resolvedFleetInfo = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlFleet = params.get('fleet') || params.get('org');
+    const isFromBroker = params.get('from') === 'broker';
+    const targetName = urlFleet || userCompany;
+    const matchedProfile = DEMO_FLEET_PROFILES[targetName];
+
+    return {
+      companyName: matchedProfile?.company || targetName,
+      tierName: matchedProfile?.tier || userTier,
+      initialVehicles: matchedProfile?.vehicles || DEFAULT_VEHICLES,
+      showBrokerBackLink: Boolean(onNavigatePortfolio || isFromBroker),
+    };
+  }, [userCompany, userTier, onNavigatePortfolio]);
+
+  const [vehicles, setVehicles] = useState<MonitoredVehicle[]>(
+    resolvedFleetInfo.initialVehicles
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'SCHEDULED' | 'CLEARED'>('ALL');
   const [selectedTerminal, setSelectedTerminal] = useState<string>('ALL');
   const [syncingVin, setSyncingVin] = useState<string | null>(null);
+
+  // Sync vehicles when target fleet changes
+  useEffect(() => {
+    setVehicles(resolvedFleetInfo.initialVehicles);
+    setSelectedTerminal('ALL');
+    setStatusFilter('ALL');
+  }, [resolvedFleetInfo]);
 
   // Modals state
   const [isScanOpen, setIsScanOpen] = useState(false);
@@ -154,7 +398,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     );
   };
 
-  // Fetch live fleet data from Supabase if connected
+  // Fetch live fleet data from Supabase if connected (skipped in demo mode)
   useEffect(() => {
     const fetchMonitoredVehicles = async () => {
       try {
@@ -253,7 +497,13 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   }, [filteredVehicles]);
 
   // Capacity metadata
-  const vehicleLimit = userTier.toLowerCase() === 'enterprise' ? 9999 : 250;
+  const normalizedTier = resolvedFleetInfo.tierName.toLowerCase();
+  const vehicleLimit =
+    normalizedTier === 'enterprise'
+      ? 9999
+      : normalizedTier === 'professional'
+      ? 250
+      : 75;
   const availableSlots = Math.max(0, vehicleLimit - vehicles.length);
   const capacityPercent = Math.min(100, Math.round((vehicles.length / vehicleLimit) * 100));
 
@@ -275,6 +525,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       '_blank',
       'noopener,noreferrer'
     );
+  };
+
+  const handleBackToPortfolio = () => {
+    if (onNavigatePortfolio) {
+      onNavigatePortfolio();
+    } else {
+      window.location.href = '/portal/broker?demo=true';
+    }
   };
 
   // 2-Way Fleetio sync status transition loop
@@ -329,8 +587,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       punitive_exposure: 0,
       ecosystem_feeds: ['FLEETIO'],
       remedy_logistics: 'NHTSA API Scan: Zero Open Recalls',
-      work_order_id: `WO-FLT-${Math.floor(100000 + Math.random() * 900000)}`,
-      fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders`,
+      work_order_id: 'WO #25',
+      fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders/25`,
     };
 
     setVehicles([newEntry, ...vehicles]);
@@ -370,8 +628,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           punitive_exposure: 0,
           ecosystem_feeds: ['FLEETIO'],
           remedy_logistics: 'Batch Ingestion Verified',
-          work_order_id: `WO-FLT-${Math.floor(100000 + Math.random() * 900000)}`,
-          fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders`,
+          work_order_id: 'WO #25',
+          fleetio_wo_url: `https://secure.fleetio.com/${slug}/work_orders/25`,
         });
       }
     });
@@ -385,7 +643,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
 
   const handleCopyUnderwriterLink = () => {
     const bearerUrl = `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(
-      userCompany
+      resolvedFleetInfo.companyName
     ).slice(0, 16)}`;
     navigator.clipboard.writeText(bearerUrl);
     setCopiedLink(true);
@@ -403,7 +661,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Server-generated PDF export handler
   const handleExportLossControlPDF = async () => {
     setIsExportingPDF(true);
-    const targetFleet = userCompany || 'Dennis Enterprise Fleet';
+    const targetFleet = resolvedFleetInfo.companyName || 'Dennis Enterprise Fleet';
     const broker = sessionStorage.getItem('broker_name') || 'Apex Risk Brokers';
     const apiBaseUrl =
       import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
@@ -449,19 +707,19 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono tracking-wider uppercase mb-1">
-            {onNavigatePortfolio && (
+            {resolvedFleetInfo.showBrokerBackLink && (
               <>
                 <button
                   type="button"
-                  onClick={onNavigatePortfolio}
+                  onClick={handleBackToPortfolio}
                   className="text-cyan-400 hover:text-cyan-300 transition cursor-pointer font-bold"
                 >
-                  PORTFOLIO COMMAND
+                  ← PORTFOLIO COMMAND
                 </button>
                 <span className="text-slate-600">›</span>
               </>
             )}
-            <span className="text-cyan-300 font-bold">{userCompany}</span>
+            <span className="text-cyan-300 font-bold">{resolvedFleetInfo.companyName}</span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase">
               Role: {userRole}
             </span>
@@ -628,7 +886,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                 {vehicles.length} / {vehicleLimit} Units
               </span>
               <span className="text-xs font-mono text-cyan-400 font-bold uppercase">
-                ({userTier.toUpperCase()})
+                ({resolvedFleetInfo.tierName.toUpperCase()})
               </span>
             </div>
 
@@ -1072,7 +1330,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
               </label>
               <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-[11px] text-cyan-300 break-all select-all">
                 https://recalllogic.ai/audit/evidence-locker?token=rl_live_{btoa(
-                  userCompany
+                  resolvedFleetInfo.companyName
                 ).slice(0, 16)}
               </div>
             </div>
@@ -1096,7 +1354,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                   onClick={() => {
                     window.open(
                       `https://recalllogic.ai/audit/evidence-locker?token=rl_live_${btoa(
-                        userCompany
+                        resolvedFleetInfo.companyName
                       ).slice(0, 16)}`,
                       '_blank'
                     );
