@@ -13,6 +13,7 @@ import UnderwriterEvidenceLocker from './components/UnderwriterEvidenceLocker';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
 import { FleetioIntegrationModal } from './components/FleetioIntegrationModal';
+import { FleetioDocs } from './components/FleetioDocs';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
@@ -42,6 +43,7 @@ const MainApp: React.FC = () => {
   const isAcceptInvitePath = pathname.startsWith('/accept-invite');
   const isUnderwriterPortalPath = pathname.startsWith('/portal/audit');
   const isEvidenceLockerPath = pathname.startsWith('/audit/evidence-locker');
+  const isFleetioDocsPath = pathname.startsWith('/docs/fleetio');
 
   // Track DEMO routes for Fleet & Broker outreach
   const isFleetDemoPath =
@@ -116,7 +118,9 @@ const MainApp: React.FC = () => {
     const auditedOrg = params.get('org') || params.get('fleet');
     const shouldConnectFleetio = params.get('connect_fleetio') === 'true';
 
-    if (auditedOrg) {
+    if (isFleetioDocsPath) {
+      document.title = 'RecallLogic — Fleetio Integration Setup Guide';
+    } else if (auditedOrg) {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
       sessionStorage.setItem('current_fleet_name', auditedOrg);
@@ -126,15 +130,15 @@ const MainApp: React.FC = () => {
       }
     } else if (isFleetDemoPath) {
       setActiveView('workspace');
-      document.title = "RecallLogic — Fleet Audit Demo";
+      document.title = 'RecallLogic — Fleet Audit Demo';
     } else if (isBrokerDemoPath || isBrokerUser) {
       setActiveView('broker_portal');
-      document.title = "RecallLogic — Enterprise Loss Control System";
+      document.title = 'RecallLogic — Enterprise Loss Control System';
     } else {
       setActiveView('workspace');
-      document.title = "RecallLogic — Continuous Risk Defense Platform";
+      document.title = 'RecallLogic — Continuous Risk Defense Platform';
     }
-  }, [isBrokerUser, isFleetDemoPath, isBrokerDemoPath]);
+  }, [isBrokerUser, isFleetDemoPath, isBrokerDemoPath, isFleetioDocsPath]);
 
   // Clean URL parameters upon modal closure to avoid re-triggering modal on page reload
   const handleCloseFleetioModal = () => {
@@ -198,6 +202,11 @@ const MainApp: React.FC = () => {
 
     handlePostCheckoutSync();
   }, [user, companyName]);
+
+  // UNRESTRICTED PUBLIC ACCESS: FLEETIO INTEGRATION SETUP DOCS
+  if (isFleetioDocsPath) {
+    return <FleetioDocs />;
+  }
 
   // UNRESTRICTED PUBLIC ACCESS: WHITE-LABELED UNDERWRITER EVIDENCE LOCKER
   if (isEvidenceLockerPath) {
