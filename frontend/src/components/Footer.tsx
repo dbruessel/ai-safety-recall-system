@@ -29,10 +29,10 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <span className="text-slate-500">✉️ Email:</span>
             <a
-              href="mailto:dennis@recalllogic.ai"
+              href="mailto:support@recalllogic.ai"
               className="text-slate-300 hover:text-cyan-400 transition underline underline-offset-2"
             >
-              dennis@recalllogic.ai
+              support@recalllogic.ai
             </a>
           </div>
           <div className="flex items-center gap-1.5">
