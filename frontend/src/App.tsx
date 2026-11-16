@@ -13,7 +13,7 @@ import UnderwriterEvidenceLocker from './components/UnderwriterEvidenceLocker';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
 import { FleetioIntegrationModal } from './components/FleetioIntegrationModal';
-import { FleetioDocs } from './components/FleetioDocs';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 
@@ -39,11 +39,11 @@ const MainApp: React.FC = () => {
   const searchParams = new URLSearchParams(window.location.search);
   const token = searchParams.get('token') || '';
 
+  const isPrivacyPath = pathname.startsWith('/privacy');
   const isSignupPath = pathname.startsWith('/signup');
   const isAcceptInvitePath = pathname.startsWith('/accept-invite');
   const isUnderwriterPortalPath = pathname.startsWith('/portal/audit');
   const isEvidenceLockerPath = pathname.startsWith('/audit/evidence-locker');
-  const isFleetioDocsPath = pathname.startsWith('/docs/fleetio');
 
   // Track DEMO routes for Fleet & Broker outreach
   const isFleetDemoPath =
@@ -118,8 +118,8 @@ const MainApp: React.FC = () => {
     const auditedOrg = params.get('org') || params.get('fleet');
     const shouldConnectFleetio = params.get('connect_fleetio') === 'true';
 
-    if (isFleetioDocsPath) {
-      document.title = 'RecallLogic — Fleetio Integration Setup Guide';
+    if (isPrivacyPath) {
+      document.title = 'RecallLogic — Privacy Policy';
     } else if (auditedOrg) {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
@@ -138,7 +138,7 @@ const MainApp: React.FC = () => {
       setActiveView('workspace');
       document.title = 'RecallLogic — Continuous Risk Defense Platform';
     }
-  }, [isBrokerUser, isFleetDemoPath, isBrokerDemoPath, isFleetioDocsPath]);
+  }, [isPrivacyPath, isBrokerUser, isFleetDemoPath, isBrokerDemoPath]);
 
   // Clean URL parameters upon modal closure to avoid re-triggering modal on page reload
   const handleCloseFleetioModal = () => {
@@ -203,9 +203,9 @@ const MainApp: React.FC = () => {
     handlePostCheckoutSync();
   }, [user, companyName]);
 
-  // UNRESTRICTED PUBLIC ACCESS: FLEETIO INTEGRATION SETUP DOCS
-  if (isFleetioDocsPath) {
-    return <FleetioDocs />;
+  // UNRESTRICTED PUBLIC ACCESS: PRIVACY POLICY
+  if (isPrivacyPath) {
+    return <PrivacyPolicy />;
   }
 
   // UNRESTRICTED PUBLIC ACCESS: WHITE-LABELED UNDERWRITER EVIDENCE LOCKER

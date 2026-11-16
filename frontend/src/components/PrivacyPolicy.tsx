@@ -1,18 +1,40 @@
 import React from 'react';
+import Footer from './Footer';
 
 export const PrivacyPolicy: React.FC = () => {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 py-16 px-6">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#070B14] text-slate-200 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      <header className="border-b border-slate-800/80 bg-[#070B14]/95 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-3 flex items-center justify-between">
+        <a href="/" className="flex items-center gap-3 hover:opacity-95 transition">
+          <img
+            src="/recall-logo.png"
+            alt="RecallLogic Continuous Risk Defense"
+            className="h-9 w-auto object-contain"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = 'none';
+            }}
+          />
+          <div className="flex flex-col">
+            <span className="text-[#06B6D4] font-extrabold tracking-wider font-mono text-sm sm:text-base leading-none">
+              RecallLogic
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono tracking-widest uppercase mt-0.5">
+              Continuous Risk Defense Platform
+            </span>
+          </div>
+        </a>
+        <a
+          href="/"
+          className="text-xs font-mono text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 bg-slate-900/80 px-3 py-1.5 rounded-lg transition"
+        >
+          &larr; Back to RecallLogic
+        </a>
+      </header>
+
+      <main className="flex-1 max-w-3xl mx-auto w-full py-12 px-6 space-y-8">
         <div className="border-b border-slate-800 pb-6">
-          <a
-            href="/"
-            className="text-sm text-sky-400 hover:text-sky-300 transition-colors"
-          >
-            &larr; Back to RecallLogic
-          </a>
-          <h1 className="text-3xl font-bold text-white mt-4">Privacy Policy</h1>
-          <p className="text-sm text-slate-400 mt-2">
+          <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
+          <p className="text-xs font-mono text-slate-400 mt-2">
             Effective Date: November 16, 2026 &bull; Last Updated: November 16, 2026
           </p>
         </div>
@@ -29,7 +51,7 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-white">1. Information We Collect</h2>
-          <h3 className="text-base font-medium text-slate-100">
+          <h3 className="text-base font-medium text-cyan-400">
             A. Account &amp; Contact Information
           </h3>
           <ul className="list-disc pl-5 space-y-1 text-slate-300">
@@ -38,7 +60,7 @@ export const PrivacyPolicy: React.FC = () => {
             <li>Company or organization name, USDOT/MC identifiers (if provided), and billing details</li>
           </ul>
 
-          <h3 className="text-base font-medium text-slate-100 pt-2">
+          <h3 className="text-base font-medium text-cyan-400 pt-2">
             B. Fleet &amp; Integration Data (Fleetio &amp; Telematics Connectors)
           </h3>
           <p className="text-slate-300">
@@ -63,7 +85,7 @@ export const PrivacyPolicy: React.FC = () => {
             </li>
           </ul>
 
-          <h3 className="text-base font-medium text-slate-100 pt-2">
+          <h3 className="text-base font-medium text-cyan-400 pt-2">
             C. Usage &amp; Technical Telemetry
           </h3>
           <p className="text-slate-300">
@@ -88,7 +110,7 @@ export const PrivacyPolicy: React.FC = () => {
             </li>
             <li>
               <strong>Account &amp; Customer Support:</strong> Delivering recall alerts, responding
-              to support inquiries at <span className="text-sky-400">support@recalllogic.ai</span>,
+              to support inquiries at <span className="text-cyan-400">support@recalllogic.ai</span>,
               and maintaining service security.
             </li>
             <li>
@@ -103,7 +125,7 @@ export const PrivacyPolicy: React.FC = () => {
           <h2 className="text-xl font-semibold text-white">
             3. Third-Party Integrations &amp; Data Sharing
           </h2>
-          <p className="text-slate-300 font-medium">
+          <p className="text-slate-200 font-medium">
             We do not sell, rent, or trade your personal information or fleet data to third parties.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-300">
@@ -144,7 +166,7 @@ export const PrivacyPolicy: React.FC = () => {
             <li>
               <strong>Revocation &amp; Deletion:</strong> You may revoke RecallLogic&rsquo;s API
               access at any time. Upon account cancellation or written request to{' '}
-              <span className="text-sky-400">support@recalllogic.ai</span>, we delete your
+              <span className="text-cyan-400">support@recalllogic.ai</span>, we delete your
               organization&rsquo;s fleet records and API credentials within 30 days.
             </li>
           </ul>
@@ -156,7 +178,7 @@ export const PrivacyPolicy: React.FC = () => {
             Depending on your jurisdiction (including California under the CCPA/CPRA and the EEA/UK
             under the GDPR), you may request access to, correction of, or deletion of your personal
             information and connected fleet records by emailing{' '}
-            <span className="text-sky-400">support@recalllogic.ai</span>. We respond within 30
+            <span className="text-cyan-400">support@recalllogic.ai</span>. We respond within 30
             days.
           </p>
         </section>
@@ -166,11 +188,15 @@ export const PrivacyPolicy: React.FC = () => {
           <p className="text-slate-300">
             <strong>RecallLogic</strong> &bull; Las Vegas, Nevada, United States
             <br />
-            Email: <span className="text-sky-400">support@recalllogic.ai</span> &bull; Website:{' '}
-            <span className="text-sky-400">https://recalllogic.ai</span>
+            Email: <span className="text-cyan-400">support@recalllogic.ai</span> &bull; Website:{' '}
+            <span className="text-cyan-400">https://recalllogic.ai</span>
           </p>
         </section>
-      </div>
+      </main>
+
+      <Footer />
     </div>
   );
 };
+
+export default PrivacyPolicy;
