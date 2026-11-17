@@ -20,6 +20,7 @@ import {
 import { FleetioIntegrationModal } from "./FleetioIntegrationModal";
 import { PricingUpgradeModal } from "./PricingUpgradeModal";
 import { trackEvent } from "../utils/telemetry";
+import { supabase } from "../supabaseClient"; // Adjust path if your Supabase client is in ../utils/supabase
 
 interface ClientAccount {
   id: string;
@@ -58,6 +59,14 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
     name: "Dennis Enterprise Fleet",
   });
 
+  // Broker Lead Capture Modal State
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState<boolean>(false);
+  const [leadEmail, setLeadEmail] = useState<string>("");
+  const [leadBrokerage, setLeadBrokerage] = useState<string>("");
+  const [leadPortfolioSize, setLeadPortfolioSize] = useState<string>("50-250");
+  const [leadSubmitted, setLeadSubmitted] = useState<boolean>(false);
+  const [isSubmittingLead, setIsSubmittingLead] = useState<boolean>(false);
+
   useEffect(() => {
     document.title = "RECALLLOGIC — Enterprise Loss Control System";
 
@@ -65,6 +74,40 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
       event: "sandbox_opened",
       portal: "broker",
     });
+
+    // Auto-capture broker leads when arriving via Instantly URL parameters (?email=...&company=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramEmail = urlParams.get("email");
+    const paramCompany = urlParams.get("company") || urlParams.get("brokerage");
+
+    if (paramEmail && paramEmail.includes("@")) {
+      const cleanEmail = paramEmail.trim().toLowerCase();
+      const cleanCompany = paramCompany ? decodeURIComponent(paramCompany).trim() : "Campaign B Prospect";
+      setLeadEmail(cleanEmail);
+      setLeadBrokerage(cleanCompany);
+
+      supabase
+        .from("broker_leads")
+        .upsert(
+          {
+            email: cleanEmail,
+            brokerage_name: cleanCompany,
+            portfolio_size: "Sandbox Click",
+          },
+          { onConflict: "email", ignoreDuplicates: true }
+        )
+        .then(({ error }) => {
+          if (error) {
+            console.error("Auto broker_leads capture failed:", error);
+          } else {
+            trackEvent({
+              event: "broker_lead_auto_captured",
+              portal: "broker",
+              metadata: { email: cleanEmail, brokerage_name: cleanCompany },
+            });
+          }
+        });
+    }
 
     const fetchBrokerPortfolio = async () => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://recalllogic-api.onrender.com";
@@ -192,8 +235,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             : ["fleetio"],
       });
 
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("demo") === "true") {
+      if (urlParams.get("demo") === "true") {
         setClientAccounts(mockClients.map(getFallbackAccount));
         return;
       }
@@ -284,6 +326,48 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
     setIsPricingOpen(true);
   };
 
+  const handleSubmitBrokerLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadEmail.trim() || !leadEmail.includes("@")) return;
+
+    setIsSubmittingLead(true);
+    const cleanEmail = leadEmail.trim().toLowerCase();
+    const cleanBrokerage = leadBrokerage.trim() || "Independent Brokerage";
+
+    const { error } = await supabase.from("broker_leads").upsert(
+      {
+        email: cleanEmail,
+        brokerage_name: cleanBrokerage,
+        portfolio_size: leadPortfolioSize,
+      },
+      { onConflict: "email" }
+    );
+
+    setIsSubmittingLead(false);
+
+    if (error) {
+      console.error("Failed to save broker lead:", error);
+      alert("Could not submit your request right now. Please try again.");
+      return;
+    }
+
+    trackEvent({
+      event: "broker_lead_captured",
+      portal: "broker",
+      metadata: {
+        email: cleanEmail,
+        brokerage_name: cleanBrokerage,
+        portfolio_size: leadPortfolioSize,
+      },
+    });
+
+    setLeadSubmitted(true);
+    setTimeout(() => {
+      setIsLeadModalOpen(false);
+      setLeadSubmitted(false);
+    }, 1800);
+  };
+
   const getTierBadgeDetails = (score: number, hasNuclear: boolean) => {
     if (hasNuclear || score < 60) {
       return {
@@ -337,7 +421,9 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
         <div>
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-cyan-400" />
-            <h1 className="text-2xl font-bold tracking-tight text-white">Apex Risk Brokers</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              {leadBrokerage && leadBrokerage !== "Campaign B Prospect" ? leadBrokerage : "Apex Risk Brokers"}
+            </h1>
             <span className="bg-cyan-950 text-cyan-400 text-xs px-2.5 py-1 rounded-full border border-cyan-800 font-mono">
               PORTFOLIO COMMAND
             </span>
@@ -432,7 +518,7 @@ Apex Risk Brokers`
                 event: "portfolio_pdf_exported",
                 portal: "broker",
               });
-              alert("Generating aggregate portfolio loss control audit PDF for underwriters...");
+              setIsLeadModalOpen(true);
             }}
             className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-cyan-900/40 transition cursor-pointer"
           >
@@ -446,8 +532,8 @@ Apex Risk Brokers`
         <div className="flex items-center gap-2.5 text-xs">
           <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
           <span className="text-slate-300">
-            <strong className="text-white font-semibold">Broker Portfolio Sandbox:</strong> Click any client workspace below to inspect unit-level NHTSA defects, run a free 5-VIN renewal scrub, or deploy across your book starting at{' '}
-            <strong className="text-emerald-400 font-mono">$99/mo</strong>.
+            <strong className="text-white font-semibold">Broker Portfolio Sandbox:</strong> Click any client workspace below to inspect unit-level NHTSA defects, run a free 5-VIN renewal scrub, or activate your{' '}
+            <strong className="text-emerald-400 font-mono">20% Partner Rev-Share</strong> workspace.
           </span>
         </div>
 
@@ -461,10 +547,13 @@ Apex Risk Brokers`
           </button>
           <button
             type="button"
-            onClick={() => handleOpenPricing("sandbox_banner")}
+            onClick={() => {
+              trackEvent({ event: "claim_partner_portal_clicked", portal: "broker" });
+              setIsLeadModalOpen(true);
+            }}
             className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-mono font-bold transition cursor-pointer"
           >
-            See Pricing →
+            Activate Partner Portal →
           </button>
         </div>
       </div>
@@ -659,7 +748,7 @@ Apex Risk Brokers`
       {/* CLIENT ACCOUNTS GRID */}
       <div className="mb-4">
         <h2 className="text-sm font-mono text-slate-400 uppercase tracking-wider mb-4">
-          APEX RISK BROKERS — CLIENT ACCOUNTS
+          {leadBrokerage && leadBrokerage !== "Campaign B Prospect" ? leadBrokerage.toUpperCase() : "APEX RISK BROKERS"} — CLIENT ACCOUNTS
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -766,7 +855,7 @@ Apex Risk Brokers`
 
                 <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-800/60">
                   <span className="text-xs text-slate-500 font-mono">
-                    Partnered via Apex Risk Brokers
+                    Partnered via {leadBrokerage && leadBrokerage !== "Campaign B Prospect" ? leadBrokerage : "Apex Risk Brokers"}
                   </span>
                   <div className="flex gap-2">
                     <button 
@@ -788,6 +877,79 @@ Apex Risk Brokers`
           })}
         </div>
       </div>
+
+      {/* BROKER LEAD CAPTURE & PARTNER ACTIVATION MODAL */}
+      {isLeadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-cyan-500/50 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-cyan-400" /> Activate Partner Portal &amp; Audit PDF
+              </h3>
+              <button
+                onClick={() => setIsLeadModalOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {leadSubmitted ? (
+              <div className="py-6 text-center text-emerald-400 font-semibold text-sm">
+                ✓ Co-branded Partner Portal &amp; 20% Rev-Share workspace unlocked!
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitBrokerLead} className="space-y-4 text-xs">
+                <p className="text-slate-300 leading-relaxed">
+                  Enter your brokerage details to generate a co-branded Underwriter Loss Control PDF and unlock your{" "}
+                  <strong className="text-emerald-400">20% recurring broker rev-share</strong> partner workspace.
+                </p>
+                <div>
+                  <label className="block text-slate-400 font-mono uppercase mb-1">Work Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={leadEmail}
+                    onChange={(e) => setLeadEmail(e.target.value)}
+                    placeholder="you@brokerage.com"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono uppercase mb-1">Brokerage / Agency Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={leadBrokerage}
+                    onChange={(e) => setLeadBrokerage(e.target.value)}
+                    placeholder="Apex Risk Partners"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-mono uppercase mb-1">Commercial Auto Fleet Book Size</label>
+                  <select
+                    value={leadPortfolioSize}
+                    onChange={(e) => setLeadPortfolioSize(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-400 outline-none"
+                  >
+                    <option value="1-50">1 – 50 Commercial Fleets</option>
+                    <option value="50-250">50 – 250 Commercial Fleets</option>
+                    <option value="250+">250+ Commercial Fleets</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmittingLead}
+                  className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition cursor-pointer"
+                >
+                  {isSubmittingLead ? "Activating Workspace..." : "Generate PDF & Unlock Partner Portal →"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <FleetioIntegrationModal
         isOpen={isFleetioModalOpen}
