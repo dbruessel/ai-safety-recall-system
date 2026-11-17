@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { Loader2, Download, CreditCard, Search, Sparkles } from 'lucide-react';
-import { trackEvent } from '../utils/telemetry';
+import { trackEvent, captureOutboundLead, getSessionAttribution } from '../utils/telemetry';
 import { PricingUpgradeModal } from './PricingUpgradeModal';
 
 export interface MonitoredVehicle {
@@ -117,8 +117,13 @@ const DEFAULT_VEHICLES: MonitoredVehicle[] = [
 ];
 
 const DEMO_FLEET_PROFILES: Record<string, FleetDemoProfile> = {
+  'Vanguard Freight Lines': {
+    company: 'Vanguard Freight Lines',
+    tier: 'enterprise',
+    vehicles: DEFAULT_VEHICLES,
+  },
   'Dennis Enterprise Fleet': {
-    company: 'Dennis Enterprise Fleet',
+    company: 'Vanguard Freight Lines',
     tier: 'enterprise',
     vehicles: DEFAULT_VEHICLES,
   },
@@ -336,7 +341,7 @@ const CARRIER_PRESETS = [
 ];
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({
-  userCompany = 'Dennis Enterprise Fleet',
+  userCompany = 'Vanguard Freight Lines',
   userTier = 'enterprise',
   userRole = 'admin',
   onNavigatePortfolio,
@@ -384,11 +389,17 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // White-label configuration state
   const [selectedCarrier, setSelectedCarrier] = useState<string>(CARRIER_PRESETS[0].name);
   const [riskOfficerName, setRiskOfficerName] = useState<string>('Dennis Vance, VP Safety & Risk');
-  const [riskOfficerEmail, setRiskOfficerEmail] = useState<string>('safety@dennisfleet.com');
+  const [riskOfficerEmail, setRiskOfficerEmail] = useState<string>('safety@vanguardfreight.com');
   const [riskOfficerPhone, setRiskOfficerPhone] = useState<string>('(214) 555-0144');
 
-  // Track sandbox page open on mount
+  // Track sandbox page open & auto-capture any direct fleet-campaign URL parameters
   useEffect(() => {
+    captureOutboundLead('fleet', 'Fleet Workspace Click').then(({ email }) => {
+      if (email) {
+        setRiskOfficerEmail(email);
+      }
+    });
+
     trackEvent({
       event: 'sandbox_opened',
       portal: 'fleet',
@@ -562,7 +573,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     if (onNavigatePortfolio) {
       onNavigatePortfolio();
     } else {
-      window.location.href = '/portal/broker?demo=true';
+      const attr = getSessionAttribution();
+      const brokerUrl = new URL('/portal/broker', window.location.origin);
+      brokerUrl.searchParams.set('demo', 'true');
+      if (attr.prospect_email) brokerUrl.searchParams.set('email', attr.prospect_email);
+      if (attr.prospect_company) brokerUrl.searchParams.set('company', attr.prospect_company);
+      window.location.href = brokerUrl.toString();
     }
   };
 
@@ -825,15 +841,16 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Server-generated PDF export handler
   const handleExportLossControlPDF = async () => {
     setIsExportingPDF(true);
-    const targetFleet = resolvedFleetInfo.companyName || 'Dennis Enterprise Fleet';
-    const broker = sessionStorage.getItem('broker_name') || 'Apex Risk Brokers';
+    const attr = getSessionAttribution();
+    const targetFleet = resolvedFleetInfo.companyName || 'Vanguard Freight Lines';
+    const broker = attr.prospect_company || sessionStorage.getItem('broker_name') || 'Apex Risk Brokers';
     const apiBaseUrl =
       import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
 
     trackEvent({
       event: 'pdf_exported',
       portal: 'fleet',
-      metadata: { fleet_name: targetFleet },
+      metadata: { fleet_name: targetFleet, broker_name: broker },
     });
 
     try {
