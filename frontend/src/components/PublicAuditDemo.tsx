@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { trackEvent } from '../utils/telemetry';
 
 interface PublicAuditDemoProps {
   onSubscribe: () => void;
@@ -22,29 +24,67 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [copiedNote, setCopiedNote] = useState<boolean>(false);
 
-  // Read ?broker= query parameter dynamically on load, fallback to default
+  // Read ?company= or ?broker= query parameter dynamically on load, fallback to default
   const [brokerageName, setBrokerageName] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('broker') || 'Apex Commercial Risk';
+    const paramCompany = params.get('company') || params.get('brokerage') || params.get('broker');
+    return paramCompany ? decodeURIComponent(paramCompany).trim() : 'Apex Commercial Risk';
   });
 
   // --- VIN SCANNER & FILE DROP STATE ---
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
   const [pastedText, setPastedText] = useState<string>('');
-  const [inputVin, setInputVin] = useState<string>('');
   const [scansLeft, setScansLeft] = useState<number>(10);
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Track 10 Free Scans in browser session
+  // Track 10 Free Scans in browser session & auto-capture outbound broker leads
   useEffect(() => {
     const storedScans = sessionStorage.getItem('recalllogic_demo_scans');
     if (storedScans !== null) {
       setScansLeft(parseInt(storedScans, 10));
     } else {
       sessionStorage.setItem('recalllogic_demo_scans', '10');
+    }
+
+    trackEvent({
+      event: 'evidence_locker_opened',
+      portal: 'evidence_locker',
+    });
+
+    // Auto-capture broker leads when arriving via Instantly URL parameters (?email=...&company=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramEmail = urlParams.get('email');
+    const paramCompany = urlParams.get('company') || urlParams.get('brokerage') || urlParams.get('broker');
+
+    if (paramEmail && paramEmail.includes('@')) {
+      const cleanEmail = paramEmail.trim().toLowerCase();
+      const cleanCompany = paramCompany ? decodeURIComponent(paramCompany).trim() : 'Evidence Locker Prospect';
+      setBrokerageName(cleanCompany);
+
+      supabase
+        .from('broker_leads')
+        .upsert(
+          {
+            email: cleanEmail,
+            brokerage_name: cleanCompany,
+            portfolio_size: 'Certificate Click',
+          },
+          { onConflict: 'email', ignoreDuplicates: true }
+        )
+        .then(({ error }) => {
+          if (error) {
+            console.error('Auto broker_leads capture failed (Evidence Locker):', error);
+          } else {
+            trackEvent({
+              event: 'broker_lead_auto_captured',
+              portal: 'evidence_locker',
+              metadata: { email: cleanEmail, brokerage_name: cleanCompany },
+            });
+          }
+        });
     }
   }, []);
 
@@ -105,7 +145,6 @@ export const PublicAuditDemo: React.FC<PublicAuditDemoProps> = ({ onSubscribe })
     }
 
     // Execute audit on the first extracted VIN from the input
-    setInputVin(uniqueVins[0]);
     await executeVinCheck(uniqueVins[0]);
   };
 
@@ -154,6 +193,12 @@ Attached is the live RecallLogic Risk & Safety Scorecard for Las Vegas Commercia
   };
 
   const handleExportPdf = async () => {
+    trackEvent({
+      event: 'evidence_locker_pdf_exported',
+      portal: 'evidence_locker',
+      metadata: { brokerage_name: brokerageName },
+    });
+
     const cleanBrokerName = brokerageName.replace(/\s+/g, '_');
     
     try {
