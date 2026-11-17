@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { captureOutboundLead, trackEvent } from '../utils/telemetry';
 
 export interface LandingPageProps {
   onSignIn: () => void;
@@ -77,6 +78,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [scanError, setScanError] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  // Capture outbound attribution & pre-fill prospect modals on load
+  useEffect(() => {
+    trackEvent({
+      event: 'landing_opened',
+      portal: 'landing',
+    });
+
+    captureOutboundLead('landing', 'Landing Page Click').then(({ email: capturedEmail, company: capturedCompany }) => {
+      if (capturedEmail) {
+        setBrokerEmail(capturedEmail);
+        setEmail(capturedEmail);
+      }
+      if (capturedCompany) {
+        setBrokerageName(capturedCompany);
+        setCompanyName(capturedCompany);
+      }
+    });
+  }, []);
+
   // Alternate top banner ticker every 3.5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -112,16 +132,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setBrokerLeadError('');
 
     try {
-      const { error } = await supabase.from('broker_leads').insert([
+      const cleanEmail = brokerEmail.trim().toLowerCase();
+      const cleanBrokerage = brokerageName.trim();
+
+      const { error } = await supabase.from('broker_leads').upsert(
         {
-          email: brokerEmail.trim(),
-          brokerage_name: brokerageName.trim(),
+          email: cleanEmail,
+          brokerage_name: cleanBrokerage,
           portfolio_size: portfolioSize,
-          created_at: new Date().toISOString(),
         },
-      ]);
+        { onConflict: 'email' }
+      );
 
       if (error) throw error;
+
+      trackEvent({
+        event: 'landing_broker_modal_submitted',
+        portal: 'landing',
+        metadata: { email: cleanEmail, brokerage_name: cleanBrokerage, portfolio_size: portfolioSize },
+      });
+
       setBrokerLeadSuccess(true);
     } catch (err: any) {
       console.error('Supabase broker lead submission error:', err);
@@ -162,6 +192,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           },
         ]);
 
+        trackEvent({
+          event: 'landing_certificate_claimed',
+          portal: 'landing',
+          metadata: { email: email.trim().toLowerCase(), company_name: finalCompanyName, selected_tier: selectedTier },
+        });
+
         setIsSubmittingAuth(false);
         setIsAuthModalOpen(false);
 
@@ -194,6 +230,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setAuditResult(null);
 
     if (uniqueVins.includes("1FUJGLDR5MLKE1234")) {
+      trackEvent({
+        event: 'landing_sample_vin_audited',
+        portal: 'landing',
+        metadata: { vins: uniqueVins },
+      });
+
       setTimeout(() => {
         setAuditResult({
           vin: "3 Power Unit(s) Audited (KE1234, A54321, 987654)",
@@ -222,8 +264,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             vin: vin,
-            broker: 'RecallLogic Direct',
-            fleet: 'Inspected Fleet Unit',
+            broker: brokerageName || 'RecallLogic Direct',
+            fleet: companyName || 'Inspected Fleet Unit',
           }),
         }).then(res => res.ok ? res.json() : null)
       );
@@ -250,6 +292,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       });
 
       const hasAnyOpenRecalls = totalOpenRecalls > 0;
+
+      trackEvent({
+        event: 'landing_real_vin_audited',
+        portal: 'landing',
+        metadata: {
+          vins: uniqueVins,
+          unit_count: results.length,
+          open_recall_count: totalOpenRecalls,
+        },
+      });
 
       setAuditResult({
         vin: `${results.length} Power Unit(s) Audited (${results.map(r => r.vin.slice(-6)).join(', ')})`,
@@ -301,6 +353,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       const userEmail = email.trim() || user?.email || 'admin@fleet.com';
       const finalCompanyName = companyName.trim() || 'My Fleet Co.';
+
+      trackEvent({
+        event: 'landing_checkout_initiated',
+        portal: 'landing',
+        metadata: { tier: tier.id, email: userEmail, company_name: finalCompanyName },
+      });
 
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
 
@@ -712,11 +770,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-emerald-300">
-                    Zero active safety recalls detected across audited units. Your fleet qualifies for Preferred Risk pricing[cite: 9].
+                    Zero active safety recalls detected across audited units. Your fleet qualifies for Preferred Risk pricing.
                   </p>
 
                   <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-2 bg-slate-950/80 p-3 rounded-xl border border-emerald-900/50">
-                    <span className="text-slate-300 text-xs font-bold">Lock in your 12–15% Underwriter Rate Credit[cite: 9]</span>
+                    <span className="text-slate-300 text-xs font-bold">Lock in your 12–15% Underwriter Rate Credit</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -779,11 +837,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <ul className="space-y-2 text-xs text-slate-200 font-mono">
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400">✓</span>
-                  <span><strong>Core Focus:</strong> OEM safety recalls, "Do Not Drive" notices, fire risks, mechanical defects[cite: 9].</span>
+                  <span><strong>Core Focus:</strong> OEM safety recalls, "Do Not Drive" notices, fire risks, mechanical defects.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400">✓</span>
-                  <span><strong>Legal Defense:</strong> Eliminates Negligent Maintenance &amp; $250k punitive damages[cite: 9].</span>
+                  <span><strong>Legal Defense:</strong> Eliminates Negligent Maintenance &amp; $250k punitive damages.</span>
                 </li>
               </ul>
             </div>
@@ -791,7 +849,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="mt-8 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center font-mono text-xs text-slate-300 flex items-center justify-center gap-2">
             <span className="text-cyan-400">⚡</span>
-            <span><strong>System of Record Integration:</strong> RecallLogic connects directly to <strong className="text-cyan-400">Fleetio</strong> to automatically trigger work orders, verify repairs, and generate clean loss control certificates for your insurance broker[cite: 9].</span>
+            <span><strong>System of Record Integration:</strong> RecallLogic connects directly to <strong className="text-cyan-400">Fleetio</strong> to automatically trigger work orders, verify repairs, and generate clean loss control certificates for your insurance broker.</span>
           </div>
         </div>
       </section>
@@ -836,7 +894,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="max-w-2xl space-y-2">
                 <h3 className="text-xl font-bold text-white font-mono">Secure Your Book. Defend Against Nuclear Verdicts.</h3>
                 <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                  Stop underwriting blind to mechanical risk[cite: 9]. Plaintiffs' attorneys actively seek out unrepaired vehicle safety recalls to claim "gross negligence" and secure punitive damages post-crash[cite: 9].
+                  Stop underwriting blind to mechanical risk. Plaintiffs' attorneys actively seek out unrepaired vehicle safety recalls to claim "gross negligence" and secure punitive damages post-crash.
                 </p>
               </div>
 
@@ -844,17 +902,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-sm">🔍</div>
                   <h4 className="font-bold text-white">Pre-Bind Risk Audits</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">Run prospective fleet VIN schedules through our engine to identify active fire, steering, and brake defects before binding a policy[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Run prospective fleet VIN schedules through our engine to identify active fire, steering, and brake defects before binding a policy.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">📜</div>
                   <h4 className="font-bold text-white">Verified Certificates</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">Receive automated, time-stamped proof of remediation to justify premium credits and secure optimal renewal rates[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Receive automated, time-stamped proof of remediation to justify premium credits and secure optimal renewal rates.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">📡</div>
                   <h4 className="font-bold text-white">Continuous Surveillance</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">Monitor your entire book of business for new NHTSA/OEM defect bulletins in real-time across all client accounts[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Monitor your entire book of business for new NHTSA/OEM defect bulletins in real-time across all client accounts.</p>
                 </div>
               </div>
             </div>
@@ -863,7 +921,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="max-w-2xl space-y-2">
                 <h3 className="text-xl font-bold text-white font-mono">Turn Compliance into an Underwriting Advantage</h3>
                 <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                  Don't let a buried manufacturer notice ground your fleet or void your insurance coverage[cite: 9]. RecallLogic automates the busywork of recall management[cite: 9].
+                  Don't let a buried manufacturer notice ground your fleet or void your insurance coverage. RecallLogic automates the busywork of recall management.
                 </p>
               </div>
 
@@ -871,17 +929,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">⚡</div>
                   <h4 className="font-bold text-white">Zero Data Friction</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">No heavy hardware or driver surveillance required[cite: 9]. Just sync your VIN list and we do the rest automatically[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">No heavy hardware or driver surveillance required. Just sync your VIN list and we do the rest automatically.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">🔌</div>
                   <h4 className="font-bold text-white">Fleetio Integration</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">We automatically inject open recalls directly into your Fleetio dashboard, turning safety alerts into actionable work orders[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">We automatically inject open recalls directly into your Fleetio dashboard, turning safety alerts into actionable work orders.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">💵</div>
                   <h4 className="font-bold text-white">Lower Insurance Costs</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">Use Verified Remediation Certificates to prove your proactive safety culture to your broker, unlocking loss-control credits at renewal[cite: 9].</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Use Verified Remediation Certificates to prove your proactive safety culture to your broker, unlocking loss-control credits at renewal.</p>
                 </div>
               </div>
             </div>
@@ -901,25 +959,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-bold">STEP 1</span>
               <h3 className="font-bold text-white text-sm pt-1">Detect &amp; Sync</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Syncs with Fleetio and continuously scans VINs against NHTSA, CPSC, and OEM defect databases[cite: 9].</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Syncs with Fleetio and continuously scans VINs against NHTSA, CPSC, and OEM defect databases.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">STEP 2</span>
               <h3 className="font-bold text-white text-sm pt-1">Triage &amp; Alert</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Instantly flags high-severity defects and pushes priority repair tickets into Fleetio work orders[cite: 9].</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Instantly flags high-severity defects and pushes priority repair tickets into Fleetio work orders.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-bold">STEP 3</span>
               <h3 className="font-bold text-white text-sm pt-1">Shop Remediation</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Maintenance teams complete repairs at authorized dealers inside standard Fleetio repair flows[cite: 9].</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Maintenance teams complete repairs at authorized dealers inside standard Fleetio repair flows.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-emerald-800/80 bg-emerald-950/10 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold">STEP 4</span>
               <h3 className="font-bold text-white text-sm pt-1">Certify &amp; Defend</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Ingests closed work orders and archives Verified Loss Control Certificates for underwriter renewal[cite: 9].</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Ingests closed work orders and archives Verified Loss Control Certificates for underwriter renewal.</p>
             </div>
           </div>
         </div>
@@ -994,7 +1052,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Request Co-Branded Agency Portal
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Protect portfolio loss ratios, prevent $250k punitive claim spikes, and unlock 12–15% renewal credits across your commercial accounts[cite: 9].
+                  Protect portfolio loss ratios, prevent $250k punitive claim spikes, and unlock 12–15% renewal credits across your commercial accounts.
                 </p>
               </div>
               <button
@@ -1013,7 +1071,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <h4 className="text-sm font-bold text-white">Agency Access Requested!</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Our partnership team is configuring your agency's co-branded loss-control portal[cite: 9]. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly[cite: 9].
+                  Our partnership team is configuring your agency's co-branded loss-control portal. We'll send your custom partner link to <span className="text-cyan-300 font-bold">{brokerEmail}</span> shortly.
                 </p>
                 <button
                   type="button"

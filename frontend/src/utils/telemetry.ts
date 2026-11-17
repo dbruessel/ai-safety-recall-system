@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 
 export interface TelemetryPayload {
   event: string;
-  portal: 'broker' | 'fleet' | 'evidence_locker';
+  portal: 'broker' | 'fleet' | 'evidence_locker' | 'landing';
   metadata?: Record<string, any>;
 }
 
@@ -55,16 +55,44 @@ export function getSessionAttribution(): Record<string, string> {
       'from',
       'demo',
       'broker',
+      'email',
+      'company',
+      'brokerage',
     ];
 
     let updated = false;
     keys.forEach((key) => {
       const val = params.get(key);
       if (val) {
-        existing[key] = val;
+        existing[key] = val.trim();
         updated = true;
       }
     });
+
+    // Normalize prospect identity across pages (even when URL params change on drill-down)
+    const rawEmail = params.get('email') || existing.email;
+    if (rawEmail && rawEmail.includes('@')) {
+      const cleanEmail = rawEmail.trim().toLowerCase();
+      if (existing.prospect_email !== cleanEmail) {
+        existing.prospect_email = cleanEmail;
+        updated = true;
+      }
+    }
+
+    const rawCompany =
+      params.get('company') ||
+      params.get('brokerage') ||
+      params.get('broker') ||
+      existing.company ||
+      existing.brokerage ||
+      existing.broker;
+    if (rawCompany) {
+      const cleanCompany = decodeURIComponent(rawCompany).trim();
+      if (existing.prospect_company !== cleanCompany) {
+        existing.prospect_company = cleanCompany;
+        updated = true;
+      }
+    }
 
     if (!existing.landing_path) {
       existing.landing_path = window.location.pathname + window.location.search;
@@ -84,6 +112,48 @@ export function getSessionAttribution(): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Captures outbound prospect email + company from URL params (or sessionStorage)
+ * and upserts into Supabase `broker_leads` across any portal page.
+ */
+export async function captureOutboundLead(
+  portal: 'broker' | 'fleet' | 'evidence_locker' | 'landing',
+  defaultSourceLabel = 'Outbound Click'
+): Promise<{ email?: string; company?: string }> {
+  const attribution = getSessionAttribution();
+  const cleanEmail = attribution.prospect_email;
+  const cleanCompany = attribution.prospect_company || `${portal.toUpperCase()} Prospect`;
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { company: attribution.prospect_company };
+  }
+
+  try {
+    const { error } = await supabase.from('broker_leads').upsert(
+      {
+        email: cleanEmail,
+        brokerage_name: cleanCompany,
+        portfolio_size: defaultSourceLabel,
+      },
+      { onConflict: 'email', ignoreDuplicates: true }
+    );
+
+    if (!error) {
+      await trackEvent({
+        event: 'outbound_lead_captured',
+        portal,
+        metadata: { email: cleanEmail, brokerage_name: cleanCompany, source_label: defaultSourceLabel },
+      });
+    }
+  } catch (err) {
+    if (isDebugEnabled()) {
+      console.error('[RecallLogic Telemetry] Outbound lead capture error:', err);
+    }
+  }
+
+  return { email: cleanEmail, company: attribution.prospect_company };
 }
 
 export async function trackEvent({
