@@ -9,15 +9,19 @@ export interface LandingPageProps {
 }
 
 export interface PricingTier {
-  id: 'standard' | 'professional' | 'enterprise';
+  id: 'standard' | 'professional' | 'enterprise' | 'custom_enterprise';
+  backendTierId?: 'standard' | 'professional' | 'enterprise';
   stripePriceId: string;
   name: string;
   subtitle: string;
   price: string;
   billing: string;
   badge: string;
+  badgeStyle?: string;
+  incentiveCallout?: string;
   popular?: boolean;
   color: string;
+  buttonText: string;
   buttonStyle: string;
   features: string[];
 }
@@ -63,7 +67,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
-  const [selectedFeed, setSelectedFeed] = useState<string>('fleetio');
+  const [selectedFeed, setSelectedFeed] = useState<string>('api_webhook');
   const [authError, setAuthError] = useState<string>('');
   const [isSubmittingAuth, setIsSubmittingAuth] = useState<boolean>(false);
 
@@ -348,6 +352,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   // DIRECT STRIPE CHECKOUT SESSION REDIRECT
   const handleTierCheckout = async (tier: PricingTier) => {
+    if (tier.id === 'custom_enterprise') {
+      trackEvent({
+        event: 'landing_enterprise_scope_requested',
+        portal: 'landing',
+        metadata: { tier: 'custom_enterprise' },
+      });
+      window.location.href =
+        'mailto:sales@recalllogic.ai?subject=RecallLogic%20National%20Enterprise%20%2F%20MGA%20Deployment&body=Hi%20RecallLogic%20Team%2C%0A%0AWe%20would%20like%20to%20scope%20an%20Enterprise%20deployment%20for%20our%20fleet%20%2F%20book.%0A%0ACompany%3A%20%0AEstimated%20Power%20Units%3A%20%0ACurrent%20Telematics%20%2F%20Maintenance%20System%3A%20';
+      return;
+    }
+
+    const backendTier = tier.backendTierId || (tier.id as 'standard' | 'professional' | 'enterprise');
+
     setIsAuditing(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -357,7 +374,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       trackEvent({
         event: 'landing_checkout_initiated',
         portal: 'landing',
-        metadata: { tier: tier.id, email: userEmail, company_name: finalCompanyName },
+        metadata: { tier: backendTier, tier_name: tier.name, email: userEmail, company_name: finalCompanyName },
       });
 
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://ai-safety-recall-system.onrender.com';
@@ -368,7 +385,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         body: JSON.stringify({
           email: userEmail,
           customer_email: userEmail,
-          tier: tier.id, // "standard" | "professional" | "enterprise"
+          tier: backendTier, // "standard" ($495) | "professional" ($1,450) | "enterprise" ($995)
           company_name: finalCompanyName,
           success_url: `${window.location.origin}/taskboard/demo?checkout=success`,
           cancel_url: `${window.location.origin}?checkout=cancel`,
@@ -398,61 +415,89 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const pricingTiers: PricingTier[] = [
     {
       id: 'standard',
+      backendTierId: 'standard',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_STANDARD || '',
-      name: 'Standard',
-      subtitle: 'Automated Compliance Baseline',
-      price: '$99',
-      billing: 'per month',
+      name: 'Growth Fleet',
+      subtitle: 'Compliance Essentials',
+      price: '$495',
+      billing: '/ mo',
       badge: 'COMPLIANCE SHIELD',
       color: 'border-slate-800 bg-slate-900/50',
+      buttonText: 'Select Growth Fleet',
       buttonStyle: 'bg-slate-800 text-slate-200 hover:bg-slate-700 font-bold',
       features: [
-        'Up to 50 Monitored Power Units',
-        'Continuous Active NHTSA & OEM Hazard Ingestion',
-        'Automated Hazard Detection Alerts',
-        'Punitive Exposure Threshold Tracking ($250k Shield)',
-        'Standard Underwriter Audit Export'
+        'Up to 100 Monitored Power Units',
+        'Continuous Active NHTSA & OEM Defect Feed',
+        'CSV & Bulk VIN Roster Ingestion',
+        'Punitive Exposure Threshold Alerts ($250k Shield)',
+        'Standard Underwriter Evidence Locker'
       ]
     },
     {
       id: 'professional',
+      backendTierId: 'professional',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || '',
-      name: 'Professional',
-      subtitle: 'Underwriter Loss-Control Engine',
-      price: '$249',
-      billing: 'per month',
-      badge: 'RECOMMENDED FOR FLEETS',
+      name: 'Enterprise Fleet',
+      subtitle: 'Multi-Hub Risk Defense',
+      price: '$1,450',
+      billing: '/ mo',
+      badge: 'MOST POPULAR',
+      badgeStyle: 'bg-[#06B6D4] text-slate-950',
       popular: true,
       color: 'border-[#06B6D4] bg-gradient-to-b from-[#06B6D4]/10 to-slate-900/80 shadow-[0_0_30px_rgba(6,182,212,0.15)]',
+      buttonText: 'Select Enterprise Fleet',
       buttonStyle: 'bg-[#06B6D4] text-slate-950 hover:bg-cyan-400 font-bold',
       features: [
-        'Everything in Standard, plus:',
         'Up to 250 Monitored Power Units',
-        'Automated 2-Way Fleetio Work Order Fix-It Loop',
-        'Signed Underwriter Compliance Certificates (PDF)',
-        'Shareable Read-Only Underwriter Audit Links',
-        '12–15% Premium Credit Evidence Locker',
+        'Automated API & Webhook Roster Sync',
+        'Multi-Terminal & Division Rollups',
+        'Signed PDF Underwriter Compliance Certs',
+        '5%–15% Rate Credit Evidence Locker',
         'Eliminates $250k Punitive Lawsuit Exposure'
       ]
     },
     {
       id: 'enterprise',
+      backendTierId: 'enterprise',
       stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || '',
-      name: 'Enterprise',
-      subtitle: 'Agency Distribution License',
-      price: '$499',
-      billing: 'per month',
-      badge: 'FOR BROKERS & AGENCIES',
+      name: 'Brokerage Practice',
+      subtitle: 'White-Label Command',
+      price: '$995',
+      billing: '/ mo',
+      badge: 'AGENCY PARTNER',
+      badgeStyle: 'bg-amber-500 text-slate-950',
+      popular: true,
+      incentiveCallout: '$100/mo credit per active fleet — drops to $0/mo at 10 fleets',
       color: 'border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-slate-900/80',
+      buttonText: 'Select Brokerage Practice',
       buttonStyle: 'bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold',
       features: [
-        'Everything in Professional, plus:',
-        'Unlimited Vehicles & Accounts (or $1.50 / VIN)',
-        'Co-Branded Agency Broker Portal',
-        'Multi-Telematics Ingestion (Samsara, Geotab, Motive)',
-        'Actuarial Book-of-Business Safety Analytics',
-        'Custom Underwriter Carrier SLAs & QBRs',
-        'Dedicated Loss Control Advisor'
+        '10 Client Fleet Workspaces Included',
+        'Unlimited Pre-Bind & Renewal VIN Scrubs',
+        'Co-Branded Agency Risk Portal',
+        'Carrier-Ready Submission Packets',
+        'Unlimited Producer & Account Exec Seats'
+      ]
+    },
+    {
+      id: 'custom_enterprise',
+      stripePriceId: '',
+      name: 'National Enterprise',
+      subtitle: '500+ Units, MGAs & Carriers',
+      price: 'Custom',
+      billing: '',
+      badge: 'CUSTOM SLA',
+      badgeStyle: 'bg-purple-500 text-white',
+      popular: true,
+      color: 'border-purple-500/50 bg-gradient-to-b from-purple-950/30 to-slate-900/80',
+      buttonText: 'Request Enterprise Scope',
+      buttonStyle: 'bg-purple-600 text-white hover:bg-purple-500 font-bold',
+      features: [
+        '500+ Power Units / Unlimited Book Capacity',
+        'Custom Telematics & ERP Webhook Pipelines',
+        'Dedicated Loss Control Engineer',
+        'Custom Domain & Carrier Portal',
+        'SOC2 & Custom MSA / SLA Terms'
       ]
     }
   ];
@@ -598,25 +643,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* CONNECTED FEEDS */}
+          {/* INGESTION & ECOSYSTEM PIPELINES */}
           <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-400 flex-wrap">
-            <span className="text-slate-500 font-bold uppercase text-[10px]">Connected Systems:</span>
+            <span className="text-slate-500 font-bold uppercase text-[10px]">Ingestion Pipelines:</span>
             
             <span className="bg-cyan-950/80 border border-cyan-500/60 text-cyan-300 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-sm font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-              Fleetio <span className="text-[9px] bg-cyan-900/80 text-cyan-200 px-1 rounded uppercase">LIVE</span>
+              REST API &amp; Webhooks <span className="text-[9px] bg-cyan-900/80 text-cyan-200 px-1 rounded uppercase">LIVE</span>
             </span>
 
-            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
-              Samsara <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
+            <span className="bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 font-bold">
+              CSV / Bulk Roster <span className="text-[9px] bg-emerald-900/80 text-emerald-200 px-1 rounded uppercase">LIVE</span>
             </span>
 
-            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
-              Geotab <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
-            </span>
-
-            <span className="bg-slate-900/40 border border-dashed border-slate-800 text-slate-500 px-2 py-0.5 rounded flex items-center gap-1 opacity-70">
-              Motive <span className="text-[9px] bg-slate-800/80 text-slate-400 px-1 rounded uppercase">SOON</span>
+            <span className="bg-slate-900/60 border border-slate-700 text-slate-300 px-2 py-0.5 rounded">
+              Fleetio / Samsara / Geotab Compatible
             </span>
           </div>
 
@@ -737,7 +778,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <div className="mt-4 pt-4 border-t border-red-900/60 flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
                     <div>
                       <p className="text-xs font-bold text-white">Shield Punitive Risk &amp; Unlock 12–15% Premium Credit</p>
-                      <p className="text-[11px] text-slate-400">Automate two-way Fleetio work orders to clear this recall and generate certified loss-control proof.</p>
+                      <p className="text-[11px] text-slate-400">Automate closed-loop remediation alerts to clear this recall and generate certified loss-control proof.</p>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
@@ -750,7 +791,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         }}
                         className="flex-1 md:flex-none px-4 py-2 bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition shadow-lg shadow-cyan-950 flex items-center justify-center gap-1.5 font-mono cursor-pointer"
                       >
-                        <span>🔌 Connect Fleetio to Fix</span>
+                        <span>⚡ Deploy Continuous Defense</span>
                       </button>
 
                       <button
@@ -849,7 +890,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="mt-8 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center font-mono text-xs text-slate-300 flex items-center justify-center gap-2">
             <span className="text-cyan-400">⚡</span>
-            <span><strong>System of Record Integration:</strong> RecallLogic connects directly to <strong className="text-cyan-400">Fleetio</strong> to automatically trigger work orders, verify repairs, and generate clean loss control certificates for your insurance broker.</span>
+            <span><strong>System of Record Ingestion:</strong> RecallLogic ingests rosters via <strong className="text-cyan-400">REST API, webhooks, or CSV</strong> alongside your maintenance workflow to verify repairs and generate clean loss control certificates for your insurance broker.</span>
           </div>
         </div>
       </section>
@@ -929,12 +970,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">⚡</div>
                   <h4 className="font-bold text-white">Zero Data Friction</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">No heavy hardware or driver surveillance required. Just sync your VIN list and we do the rest automatically.</p>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">No heavy hardware or driver surveillance required. Sync your VIN roster via API, webhook, or CSV in under 60 seconds.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-sm">🔌</div>
-                  <h4 className="font-bold text-white">Fleetio Integration</h4>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">We automatically inject open recalls directly into your Fleetio dashboard, turning safety alerts into actionable work orders.</p>
+                  <h4 className="font-bold text-white">Maintenance Workflow Sync</h4>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Turn critical NHTSA defect alerts directly into prioritized repair tickets and audit logs for your shop teams.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">💵</div>
@@ -959,25 +1000,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-bold">STEP 1</span>
               <h3 className="font-bold text-white text-sm pt-1">Detect &amp; Sync</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Syncs with Fleetio and continuously scans VINs against NHTSA, CPSC, and OEM defect databases.</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Ingests fleet VINs via API, webhook, or CSV and continuously scans against NHTSA, CPSC, and OEM defect databases.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">STEP 2</span>
               <h3 className="font-bold text-white text-sm pt-1">Triage &amp; Alert</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Instantly flags high-severity defects and pushes priority repair tickets into Fleetio work orders.</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Instantly flags high-severity defects and dispatches priority repair alerts into your maintenance work-order queue.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded font-bold">STEP 3</span>
               <h3 className="font-bold text-white text-sm pt-1">Shop Remediation</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Maintenance teams complete repairs at authorized dealers inside standard Fleetio repair flows.</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Maintenance teams complete repairs at authorized dealers inside standard shop service workflows.</p>
             </div>
 
             <div className="p-5 rounded-xl bg-slate-900/80 border border-emerald-800/80 bg-emerald-950/10 space-y-2 shadow-lg relative">
               <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold">STEP 4</span>
               <h3 className="font-bold text-white text-sm pt-1">Certify &amp; Defend</h3>
-              <p className="text-slate-400 text-[11px] leading-relaxed">Ingests closed work orders and archives Verified Loss Control Certificates for underwriter renewal.</p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">Logs completed remedies and archives Verified Loss Control Certificates for underwriter renewal.</p>
             </div>
           </div>
         </div>
@@ -985,17 +1026,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* PRICING GRID */}
       <section id="pricing" className="relative z-10 py-12 bg-slate-950 border-t border-slate-800/80">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-8 space-y-1">
-            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Transparent Subscription Plans</h2>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-10 space-y-1">
+            <h2 className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest font-mono">Enterprise Deployment Tiers</h2>
             <p className="text-xl sm:text-2xl font-extrabold text-white font-mono">Choose Your Loss Control Tier</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-stretch">
             {pricingTiers.map((tier) => (
               <div key={tier.id} className={`relative rounded-xl border p-5 flex flex-col justify-between ${tier.color}`}>
                 {tier.popular && (
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-black text-[9px] tracking-wider uppercase shadow-md font-mono">
+                  <div
+                    className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full font-black text-[9px] tracking-wider uppercase shadow-md font-mono whitespace-nowrap ${
+                      tier.badgeStyle || 'bg-[#06B6D4] text-slate-950'
+                    }`}
+                  >
                     {tier.badge}
                   </div>
                 )}
@@ -1004,9 +1049,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <h3 className="text-base font-bold text-white font-mono">{tier.name}</h3>
                     <p className="text-[11px] text-slate-400 mt-0.5">{tier.subtitle}</p>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
-                    <span className="text-[11px] text-slate-400 font-mono">{tier.billing}</span>
+                  <div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-extrabold text-white font-mono">{tier.price}</span>
+                      {tier.billing && (
+                        <span className="text-[11px] text-slate-400 font-mono">{tier.billing}</span>
+                      )}
+                    </div>
+                    {tier.incentiveCallout && (
+                      <p className="mt-2 text-[10px] leading-snug text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 rounded px-2.5 py-1.5 font-mono">
+                        {tier.incentiveCallout}
+                      </p>
+                    )}
                   </div>
                   <ul className="space-y-2 text-[11px] text-slate-300">
                     {tier.features.map((feat, i) => (
@@ -1022,7 +1076,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   onClick={() => handleTierCheckout(tier)}
                   className={`w-full mt-5 py-2.5 rounded-lg transition-all text-xs cursor-pointer font-mono ${tier.buttonStyle}`}
                 >
-                  Subscribe to {tier.name}
+                  {tier.buttonText}
                 </button>
               </div>
             ))}
@@ -1033,7 +1087,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* STRATEGIC RISK DEFENSE QUOTE BANNER */}
       <section className="py-12 bg-black/60 border-t border-slate-900 text-center px-4">
         <p className="font-mono text-cyan-400 text-sm sm:text-base max-w-3xl mx-auto leading-relaxed">
-          "You manage your drivers with telematics. You manage your maintenance with Fleetio. You defend your risk and underwriter rate credits with RecallLogic Continuous Risk Defense Platform."
+          "You manage your drivers with telematics. You manage your maintenance with shop work orders. You defend your risk and underwriter rate credits with RecallLogic Continuous Risk Defense Platform."
         </p>
       </section>
 
@@ -1171,7 +1225,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
                   {authMode === 'signin'
                     ? 'Enter your account credentials to access your active fleet workspace.'
-                    : 'Enter your fleet details to generate your signed Loss Control Certificate PDF and connect your feed.'}
+                    : 'Enter your fleet details to generate your signed Loss Control Certificate PDF and connect your roster.'}
                 </p>
               </div>
               <button 
@@ -1226,17 +1280,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-bold">Primary Maintenance / Telematics Feed</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-bold">Primary Roster Ingestion Method</label>
                     <select 
                       value={selectedFeed}
                       onChange={(e) => setSelectedFeed(e.target.value)}
                       className="w-full bg-[#070B14] border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-[#06B6D4] font-mono"
                     >
-                      <option value="fleetio">🔌 Fleetio (Live 2-Way Work Order Sync)</option>
-                      <option value="samsara">📡 Samsara Telematics (Coming Soon)</option>
-                      <option value="geotab">📡 Geotab Telemetry (Coming Soon)</option>
-                      <option value="motive">📡 Motive ELD (Coming Soon)</option>
-                      <option value="other">📋 Standalone / Manual CSV Export</option>
+                      <option value="api_webhook">🔌 REST API / Webhook Ingestion</option>
+                      <option value="csv_bulk">📋 Bulk CSV / Spreadsheet Roster Upload</option>
+                      <option value="fleetio">🛠️ Fleetio Maintenance Export / API</option>
+                      <option value="telematics">📡 Samsara / Geotab / Motive Roster</option>
                     </select>
                   </div>
                 </>
@@ -1258,7 +1311,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     ? 'Processing...' 
                     : authMode === 'signin' 
                     ? 'Sign In to Workspace →' 
-                    : 'Generate PDF Certificate & Connect Feed →'}
+                    : 'Generate PDF Certificate & Connect Roster →'}
                 </button>
               </div>
 
