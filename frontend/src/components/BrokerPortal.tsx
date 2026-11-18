@@ -117,7 +117,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
         { id: "apex-logistics", name: "Apex Logistics & Freight", tier: "ENTERPRISE TIER" },
         { id: "summit-regional", name: "Summit Regional Transport", tier: "PROFESSIONAL TIER" },
         { id: "titan-hauling", name: "Titan Heavy Hauling Co.", tier: "PROFESSIONAL TIER" },
-        { id: "metro-delivery", name: "Metro Last-Mile Delivery", tier: "STANDARD TIER" }
+        { id: "metro-delivery", name: "Metro Last-Mile Delivery", tier: "GROWTH TIER" }
       ];
 
       const getFallbackAccount = (client: { id: string; name: string; tier: string }): ClientAccount => ({
@@ -426,14 +426,14 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
             className="flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-600/70 hover:bg-emerald-900/90 text-emerald-300 px-3 py-2 rounded-lg text-xs font-bold transition shadow-sm cursor-pointer font-mono whitespace-nowrap"
           >
             <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Plans ($99+/mo)</span>
+            <span>Partner &amp; Fleet Plans</span>
           </button>
 
           <button 
             onClick={() => handleOpenIntegrationModal("vanguard-freight", "Vanguard Freight Lines")}
             className="flex items-center gap-1.5 bg-slate-900 border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-3 py-2 rounded-lg text-xs font-semibold transition shadow-sm shadow-cyan-950 cursor-pointer whitespace-nowrap"
           >
-            <Plug className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> Connect Fleetio
+            <Plug className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> Sync Fleet Data (API / CSV)
           </button>
           
           {/* COMBINED ONBOARDING ACTIONS (COPY & MAILTO) */}
@@ -482,7 +482,7 @@ Operating power units with open NHTSA safety recalls exposes your business to un
 Please claim your fleet workspace to verify your units and defend up to a 15% rate credit at renewal:
 👉 ${onboardingLink}
 
-You can connect your Fleetio instance in under 60 seconds (or upload your active VIN list) to certify zero open safety defects.
+You can connect via API/webhook or upload your active VIN roster in under 60 seconds to certify zero open safety defects.
 
 Best regards,
 Commercial Transportation Risk Division
@@ -518,8 +518,8 @@ ${displayBrokerageName}`
         <div className="flex items-center gap-2.5 text-xs">
           <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
           <span className="text-slate-300">
-            <strong className="text-white font-semibold">Broker Portfolio Sandbox:</strong> Click any client workspace below to inspect unit-level NHTSA defects, run a free 5-VIN renewal scrub, or activate your{' '}
-            <strong className="text-emerald-400 font-mono">20% Partner Rev-Share</strong> workspace.
+            <strong className="text-white font-semibold">Broker Portfolio Sandbox:</strong> Click any client workspace below to inspect unit-level NHTSA defects, run a free 5-VIN renewal scrub, or unlock your white-label{' '}
+            <strong className="text-emerald-400 font-mono">Brokerage Practice ($995/mo — drops to $0/mo at 10 active fleets)</strong>.
           </span>
         </div>
 
@@ -724,7 +724,7 @@ ${displayBrokerageName}`
               </div>
 
               <div className="mt-3 p-2 bg-red-950/60 border border-red-800/80 rounded text-[11px] text-red-200">
-                ⚖️ <strong>Legal Impact:</strong> Syncing Fleetio automatically pushes repair Work Orders to shops, proving due diligence and eliminating 100% of punitive lawsuit liability.
+                ⚖️ <strong>Legal Impact:</strong> Automated maintenance &amp; work-order tracking logs recall remediation to shops, proving due diligence and eliminating punitive lawsuit liability.
               </div>
             </div>
           )}
@@ -848,7 +848,7 @@ ${displayBrokerageName}`
                       onClick={() => handleOpenIntegrationModal(account.id, account.name)}
                       className="text-xs font-medium text-slate-400 hover:text-cyan-300 border border-slate-800 px-2.5 py-1 rounded transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
-                      <Plug className="w-3 h-3 text-cyan-400" /> Sync Fleetio
+                      <Plug className="w-3 h-3 text-cyan-400" /> Sync Fleet Data
                     </button>
                     <button 
                       onClick={() => handleAuditClient(account.name, "account_card")}
@@ -870,7 +870,7 @@ ${displayBrokerageName}`
           <div className="bg-slate-900 border border-cyan-500/50 rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <FileText className="w-4 h-4 text-cyan-400" /> Activate Partner Portal &amp; Audit PDF
+                <FileText className="w-4 h-4 text-cyan-400" /> Activate Brokerage Practice &amp; Audit PDF
               </h3>
               <button
                 onClick={() => setIsLeadModalOpen(false)}
@@ -882,13 +882,13 @@ ${displayBrokerageName}`
 
             {leadSubmitted ? (
               <div className="py-6 text-center text-emerald-400 font-semibold text-sm">
-                ✓ Co-branded Partner Portal &amp; 20% Rev-Share workspace unlocked!
+                ✓ Co-branded Brokerage Practice workspace unlocked!
               </div>
             ) : (
               <form onSubmit={handleSubmitBrokerLead} className="space-y-4 text-xs">
                 <p className="text-slate-300 leading-relaxed">
-                  Enter your brokerage details to generate a co-branded Underwriter Loss Control PDF and unlock your{" "}
-                  <strong className="text-emerald-400">20% recurring broker rev-share</strong> partner workspace.
+                  Enter your brokerage details to generate a co-branded Underwriter Loss Control PDF and provision your{" "}
+                  <strong className="text-emerald-400">Brokerage Practice ($995/mo — $100/mo credit per active fleet, $0/mo at 10 fleets)</strong> workspace.
                 </p>
                 <div>
                   <label className="block text-slate-400 font-mono uppercase mb-1">Work Email *</label>
@@ -929,7 +929,7 @@ ${displayBrokerageName}`
                   disabled={isSubmittingLead}
                   className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition cursor-pointer"
                 >
-                  {isSubmittingLead ? "Activating Workspace..." : "Generate PDF & Unlock Partner Portal →"}
+                  {isSubmittingLead ? "Activating Workspace..." : "Generate PDF & Unlock Brokerage Portal →"}
                 </button>
               </form>
             )}
