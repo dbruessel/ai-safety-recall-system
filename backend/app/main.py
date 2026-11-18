@@ -33,6 +33,7 @@ from app.routers import (
     stripe_router,
     telematics_router,  # Telematics & Webhooks router for Phase 2
     fleetio_sync,       # Fleetio 2-Way Sync & Webhook Router
+    samsara_sync,       # Samsara Telematics Sync & DVIR Webhook Router
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -67,8 +68,15 @@ async def continuous_risk_defense_loop():
     while True:
         try:
             logger.info("🛡️ [RECALLLOGIC ENGINE] Initiating scheduled automated fleet safety audit...")
-            from app.routers.fleetio_sync import run_fleetio_sync_task
-            await asyncio.to_thread(run_fleetio_sync_task)
+
+            if os.getenv("FLEETIO_API_KEY") and os.getenv("FLEETIO_ACCOUNT_TOKEN"):
+                from app.routers.fleetio_sync import run_fleetio_sync_task
+                await asyncio.to_thread(run_fleetio_sync_task)
+
+            if os.getenv("SAMSARA_API_TOKEN"):
+                from app.routers.samsara_sync import run_samsara_sync_task
+                await asyncio.to_thread(run_samsara_sync_task)
+
             logger.info("🛡️ [RECALLLOGIC ENGINE] Scheduled fleet safety audit completed successfully.")
         except Exception as e:
             logger.error(f"⚠️ Scheduled sync error in continuous_risk_defense_loop: {e}", exc_info=True)
@@ -119,6 +127,7 @@ class BrokerInvitePayload(BaseModel):
     fleet_name: str
     broker_name: Optional[str] = "Apex Risk Brokers"
     carrier_goal: Optional[str] = "Travelers Commercial Auto (15% Credit Defense)"
+    integration_provider: Optional[str] = "Fleetio"
 
 
 # ==========================================
@@ -191,6 +200,7 @@ def create_app() -> FastAPI:
     app.include_router(pdf_router)
     app.include_router(audit_router.router)
     app.include_router(fleetio_sync.router)
+    app.include_router(samsara_sync.router)
 
     # ==========================================
     # BROKER 1-CLICK CLIENT INVITATION ROUTE
@@ -199,8 +209,11 @@ def create_app() -> FastAPI:
     async def send_broker_client_invite(payload: BrokerInvitePayload):
         encoded_fleet = quote(payload.fleet_name)
         encoded_broker = quote(payload.broker_name or "Apex Risk Brokers")
+        provider_name = (payload.integration_provider or "Fleetio").strip()
+        provider_slug = provider_name.lower()
+
         onboarding_link = (
-            f"https://recalllogic.ai/signup?broker=apex-risk&fleet={encoded_fleet}&broker_name={encoded_broker}"
+            f"https://recalllogic.ai/signup?broker=apex-risk&fleet={encoded_fleet}&broker_name={encoded_broker}&provider={provider_slug}"
         )
 
         # Bulletproof table-based template for Outlook, Gmail, and Apple Mail
@@ -304,7 +317,7 @@ def create_app() -> FastAPI:
                               <tr>
                                 <td align="center" style="border-radius: 8px; background-color: #06B6D4;">
                                   <a href="{onboarding_link}" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 800; color: #020617; text-decoration: none; border-radius: 8px; letter-spacing: 0.02em;">
-                                    Authorize Read-Only Fleetio Access (60s) &rarr;
+                                    Authorize Read-Only {provider_name} Access (60s) &rarr;
                                   </a>
                                 </td>
                               </tr>
@@ -317,7 +330,7 @@ def create_app() -> FastAPI:
                       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #1e293b; margin-top: 24px; padding-top: 16px;">
                         <tr>
                           <td style="color: #64748b; font-size: 11px; line-height: 1.5;">
-                            🔒 <strong>Enterprise Security:</strong> Read-only access is restricted to VIN inventory and work order status. Zero credit card or software installation required.
+                            🔒 <strong>Enterprise Security:</strong> Read-only access is restricted to VIN inventory and maintenance/inspection status. Zero credit card or software installation required.
                           </td>
                         </tr>
                       </table>
@@ -330,7 +343,7 @@ def create_app() -> FastAPI:
                     <td style="background-color: #070B14; border-top: 1px solid #1e293b; padding: 18px 32px; text-align: center;">
                       <p style="margin: 0; color: #475569; font-size: 11px; font-family: monospace;">
                         RECALLLOGIC Continuous Risk Defense Platform &bull; Enterprise Loss Control System<br/>
-                        Automated NHTSA Compliance &bull; Work Order Sync &bull; Underwriter Evidence Locker
+                        Automated NHTSA Compliance &bull; Telematics &amp; Work Order Sync &bull; Underwriter Evidence Locker
                       </p>
                     </td>
                   </tr>
@@ -356,7 +369,7 @@ def create_app() -> FastAPI:
                 "from": sender_email,
                 "to": [payload.recipient_email],
                 "reply_to": reply_to_address,
-                "subject": f"Action Required: Authorize Fleetio Access for {payload.fleet_name}",
+                "subject": f"Action Required: Authorize {provider_name} Access for {payload.fleet_name}",
                 "html": html_content,
             })
             logger.info(f"Broker invite successfully sent to {payload.recipient_email}: {email_res}")
@@ -408,11 +421,11 @@ def create_app() -> FastAPI:
         target_email = payload.email or payload.customer_email or "admin@fleet.com"
         target_tier = (payload.tier or "professional").lower()
 
-        # Set monthly price tiers ($99 / $249 / $499)
+        # Set monthly price tiers ($99 / $249 / $1,499)
         tier_pricing = {
             "standard": {"amount": 9900, "name": "RecallLogic Standard Tier"},
             "professional": {"amount": 24900, "name": "RecallLogic Professional Tier"},
-            "enterprise": {"amount": 49900, "name": "RecallLogic Enterprise Tier"},
+            "enterprise": {"amount": 149900, "name": "RecallLogic Enterprise Tier"},
         }
 
         tier_data = tier_pricing.get(target_tier, tier_pricing["professional"])
