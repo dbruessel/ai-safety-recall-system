@@ -16,6 +16,8 @@ interface TierPlan {
   price: string;
   billing: string;
   badge?: string;
+  badgeClass?: string;
+  incentiveCallout?: string;
   popular?: boolean;
   buttonClass: string;
   cardClass: string;
@@ -35,50 +37,56 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
   const plans: TierPlan[] = [
     {
       id: 'standard',
-      name: 'Standard',
-      subtitle: 'Compliance Baseline',
-      price: '$99',
+      name: 'Growth Fleet',
+      subtitle: 'Compliance Essentials',
+      price: '$495',
       billing: '/mo',
       buttonClass: 'bg-slate-800 hover:bg-slate-700 text-slate-200',
       cardClass: 'border-slate-800 bg-slate-900/90',
       features: [
-        'Up to 75 Power Units',
-        'Continuous NHTSA Ingestion',
+        'Up to 100 Power Units',
+        'Continuous NHTSA Defect Feed',
+        'CSV & Bulk VIN Roster Sync',
         'Punitive Risk Threshold Alerts',
-        '1-Click Fleetio VIN Sync'
+        'Underwriter Evidence Locker'
       ]
     },
     {
       id: 'professional',
-      name: 'Professional',
-      subtitle: 'Underwriter Engine',
-      price: '$249',
+      name: 'Enterprise Fleet',
+      subtitle: 'Multi-Hub Risk Defense',
+      price: '$1,450',
       billing: '/mo',
-      badge: 'RECOMMENDED',
+      badge: 'MOST POPULAR',
+      badgeClass: 'bg-[#06B6D4] text-slate-950',
       popular: true,
       buttonClass: 'bg-[#06B6D4] hover:bg-cyan-400 text-slate-950 font-bold',
       cardClass: 'border-cyan-500/80 bg-gradient-to-b from-cyan-950/40 to-slate-900/90 shadow-xl shadow-cyan-950/50',
       features: [
         'Up to 250 Power Units',
-        '2-Way Fleetio Work Order Loop',
+        'API & Webhook Roster Ingestion',
+        'Multi-Terminal Division Rollups',
         'Signed PDF Underwriter Certs',
-        '12-15% Rate Credit Locker'
+        '5%–15% Rate Credit Evidence'
       ]
     },
     {
       id: 'enterprise',
-      name: 'Enterprise',
-      subtitle: 'Agency License',
-      price: '$499',
+      name: 'Brokerage Practice',
+      subtitle: 'White-Label Command',
+      price: '$995',
       billing: '/mo',
       badge: 'AGENCY PARTNER',
+      badgeClass: 'bg-amber-500 text-slate-950',
+      incentiveCallout: '$100/mo credit per active fleet — drops to $0/mo at 10 fleets',
       buttonClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold',
       cardClass: 'border-amber-500/40 bg-slate-900/90',
       features: [
-        'Unlimited Monitored VINs',
+        '10 Client Fleet Workspaces',
+        'Unlimited Pre-Bind VIN Scrubs',
         'Co-Branded Agency Portal',
-        'Multi-Telematics Feeds',
-        'Book Safety Analytics'
+        'Carrier Submission Packets',
+        'Unlimited Producer Seats'
       ]
     }
   ];
@@ -92,6 +100,7 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
         portal,
         metadata: {
           plan_id: plan.id,
+          plan_name: plan.name,
           billing_cycle: 'monthly',
           price: plan.price,
         },
@@ -118,7 +127,7 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
         body: JSON.stringify({
           email: userEmail,
           customer_email: userEmail,
-          tier: plan.id, // "standard" | "professional" | "enterprise"
+          tier: plan.id, // "standard" -> Growth ($495) | "professional" -> Enterprise ($1,450) | "enterprise" -> Brokerage ($995)
           company_name: companyName,
           successUrl: `${window.location.origin}/taskboard/demo?checkout=success`,
           cancelUrl: `${window.location.origin}/taskboard/demo?checkout=cancel`,
@@ -147,14 +156,14 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-mono">
-      <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-6 relative">
+      <div className="bg-[#0D1322] border border-slate-800 rounded-2xl p-6 max-w-3xl w-full shadow-2xl space-y-6 relative">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
-              RecallLogic Continuous Risk Defense
+              RecallLogic Enterprise Risk & Compliance
             </span>
             <h3 className="text-lg font-bold text-white uppercase tracking-wider mt-0.5">
-              Select Subscription Plan
+              Select Deployment Tier
             </h3>
           </div>
           <button
@@ -173,7 +182,11 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
               className={`relative rounded-xl border p-4 flex flex-col justify-between ${plan.cardClass}`}
             >
               {plan.badge && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-[#06B6D4] text-slate-950 font-extrabold text-[8px] tracking-wider uppercase font-mono shadow-md">
+                <div
+                  className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full font-extrabold text-[8px] tracking-wider uppercase font-mono shadow-md ${
+                    plan.badgeClass || 'bg-[#06B6D4] text-slate-950'
+                  }`}
+                >
                   {plan.badge}
                 </div>
               )}
@@ -184,14 +197,21 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
                   <p className="text-[10px] text-slate-400 mt-0.5">{plan.subtitle}</p>
                 </div>
 
-                <div className="flex items-baseline gap-0.5">
-                  <span className="text-2xl font-black text-white font-mono">{plan.price}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">{plan.billing}</span>
+                <div>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-2xl font-black text-white font-mono">{plan.price}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{plan.billing}</span>
+                  </div>
+                  {plan.incentiveCallout && (
+                    <p className="mt-1.5 text-[9px] leading-snug text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 rounded px-2 py-1">
+                      {plan.incentiveCallout}
+                    </p>
+                  )}
                 </div>
 
                 <ul className="space-y-1.5 text-[10px] text-slate-300">
                   {plan.features.map((feat, i) => (
-                    <li key={i} className="flex items-start gap-1">
+                    <li key={i} className="flex items-start gap-1.5">
                       <span className="text-[#06B6D4] font-bold">✓</span>
                       <span>{feat}</span>
                     </li>
@@ -212,7 +232,7 @@ export const PricingUpgradeModal: React.FC<PricingUpgradeModalProps> = ({
         </div>
 
         <p className="text-[10px] text-slate-500 text-center border-t border-slate-800 pt-3">
-          Need a custom agency SLA or multi-book billing? Contact our Loss Control team.
+          Need 500+ power units, custom telematics webhooks, or national carrier/MGA licensing? Contact our Loss Control team.
         </p>
       </div>
     </div>

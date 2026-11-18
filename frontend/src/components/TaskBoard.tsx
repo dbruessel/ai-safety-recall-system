@@ -531,7 +531,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       ? 9999
       : normalizedTier === 'professional'
       ? 250
-      : 75;
+      : 100;
   const availableSlots = Math.max(0, vehicleLimit - vehicles.length);
   const capacityPercent = Math.min(100, Math.round((vehicles.length / vehicleLimit) * 100));
 
@@ -930,7 +930,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             className="flex items-center gap-2 px-4 py-2 bg-emerald-950/80 hover:bg-emerald-900/90 border border-emerald-600/70 rounded-lg text-xs font-bold text-emerald-300 transition cursor-pointer shadow-sm font-mono"
           >
             <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Plans &amp; Pricing ($99+/mo)</span>
+            <span>Deployment Tiers &amp; Pricing</span>
           </button>
 
           <button
@@ -966,8 +966,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         <div className="flex items-center gap-2.5 text-xs">
           <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
           <span className="text-slate-300">
-            <strong className="text-white font-semibold">Interactive Sandbox:</strong> Run a live NHTSA defect scan on your own VIN or deploy 24/7 Fleetio sync starting at{' '}
-            <strong className="text-emerald-400 font-mono">$99/mo</strong>.
+            <strong className="text-white font-semibold">Interactive Sandbox:</strong> Run a live NHTSA defect scan on your own VIN or deploy continuous{' '}
+            <strong className="text-emerald-400 font-mono">API, webhook &amp; CSV</strong> fleet monitoring.
           </span>
         </div>
 
