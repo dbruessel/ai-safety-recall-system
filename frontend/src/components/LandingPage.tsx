@@ -76,7 +76,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   // DUAL-MODE VIN SCANNER STATE
   const [ingestMode, setIngestMode] = useState<'paste' | 'upload'>('paste');
-  const [pastedText, setPastedText] = useState<string>('');
+  const [pastedText, setPastedText] = useState<string>(
+    "FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nVOLVO / VNL 860 / 4V4NC9EH5MN289410"
+  );
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [scanError, setScanError] = useState<string>('');
@@ -240,9 +242,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         metadata: { vins: uniqueVins },
       });
 
+      supabase.from('vin_searches').insert(
+        uniqueVins.map((v) => ({
+          vin: v,
+          source: 'landing_sample_audit',
+        }))
+      ).then(({ error }) => {
+        if (error) console.warn('vin_searches insert skipped:', error.message);
+      });
+
       setTimeout(() => {
         setAuditResult({
-          vin: "3 Power Unit(s) Audited (KE1234, A54321, 987654)",
+          vin: "3 Power Unit(s) Audited (KE1234, A54321, 289410)",
           has_open_recall: true,
           recall_count: 1,
           recalls: [
@@ -305,6 +316,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           unit_count: results.length,
           open_recall_count: totalOpenRecalls,
         },
+      });
+
+      supabase.from('vin_searches').insert(
+        uniqueVins.map((v) => ({
+          vin: v,
+          source: 'landing_real_audit',
+        }))
+      ).then(({ error }) => {
+        if (error) console.warn('vin_searches insert skipped:', error.message);
       });
 
       setAuditResult({
@@ -686,10 +706,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {ingestMode === 'paste' && (
               <button
                 type="button"
-                onClick={() => setPastedText("FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nVOLVO / VNL 860 / 5YJ3E1EA7MF987654")}
+                onClick={() => setPastedText("FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nVOLVO / VNL 860 / 4V4NC9EH5MN289410")}
                 className="pb-2 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
               >
-                ⚡ Load Sample Fleet (3 VINs)
+                ↻ Reset Sample Fleet (3 VINs)
               </button>
             )}
           </div>
@@ -698,7 +718,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <form onSubmit={handlePasteSubmit} className="space-y-3">
               <textarea
                 rows={3}
-                placeholder={`FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nTESLA / MODEL 3 / 5YJ3E1EA7MF987654`}
+                placeholder={`FREIGHTLINER / CASCADIA / 1FUJGLDR5MLKE1234\nFORD / TRANSIT / 1FTBW1Y85PKA54321\nVOLVO / VNL 860 / 4V4NC9EH5MN289410`}
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value.toUpperCase())}
                 disabled={isAuditing}
@@ -713,7 +733,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   disabled={isAuditing}
                   className="px-6 py-2.5 bg-[#06B6D4] hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold text-xs font-mono rounded-xl transition cursor-pointer whitespace-nowrap self-end sm:self-auto shadow-lg shadow-cyan-950"
                 >
-                  {isAuditing ? 'CALCULATING ACTUARIAL RISK...' : 'AUDIT FLEET RISK & UNLOCK CREDITS →'}
+                  {isAuditing ? 'CALCULATING ACTUARIAL RISK...' : 'RUN INSTANT RISK AUDIT →'}
                 </button>
               </div>
             </form>
