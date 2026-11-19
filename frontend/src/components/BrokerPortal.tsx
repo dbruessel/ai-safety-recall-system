@@ -82,7 +82,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
 
     if (paramEmail && paramEmail.includes("@")) {
       const cleanEmail = paramEmail.trim().toLowerCase();
-      const cleanCompany = paramCompany ? decodeURIComponent(paramCompany).trim() : "Campaign B Prospect";
+      const cleanCompany = paramCompany ? decodeURIComponent(paramCompany).trim() : "Independent Brokerage / MGA";
       setLeadEmail(cleanEmail);
       setLeadBrokerage(cleanCompany);
 
@@ -287,7 +287,7 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
   const avgMaintDeduction = Math.round(clientAccounts.reduce((acc, curr) => acc + (curr.maintenancePenalty || 0), 0) / (clientAccounts.length || 1));
 
   const displayBrokerageName =
-    leadBrokerage && leadBrokerage !== "Campaign B Prospect" ? leadBrokerage : "Apex Risk Brokers";
+    leadBrokerage && leadBrokerage !== "Independent Brokerage / MGA" ? leadBrokerage : "Apex Risk Brokers";
 
   const handleOpenIntegrationModal = (clientId: string, clientName: string) => {
     trackEvent({
@@ -529,7 +529,7 @@ ${displayBrokerageName}`
             onClick={() => handleAuditClient("Vanguard Freight Lines", "account_card")}
             className="px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-xs font-mono font-bold transition cursor-pointer whitespace-nowrap shrink-0"
           >
-            Test Live VIN Scanner
+            Run Live 3-Truck VIN Audit →
           </button>
           <button
             type="button"
