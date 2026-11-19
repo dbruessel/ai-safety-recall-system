@@ -245,7 +245,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       supabase.from('vin_searches').insert(
         uniqueVins.map((v) => ({
           vin: v,
-          source: 'landing_sample_audit',
         }))
       ).then(({ error }) => {
         if (error) console.warn('vin_searches insert skipped:', error.message);
@@ -321,7 +320,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       supabase.from('vin_searches').insert(
         uniqueVins.map((v) => ({
           vin: v,
-          source: 'landing_real_audit',
         }))
       ).then(({ error }) => {
         if (error) console.warn('vin_searches insert skipped:', error.message);
