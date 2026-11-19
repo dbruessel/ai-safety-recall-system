@@ -242,11 +242,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         metadata: { vins: uniqueVins },
       });
 
-      supabase.from('vin_searches').insert(
-        uniqueVins.map((v) => ({
-          vin: v,
-        }))
-      ).then(({ error }) => {
+      supabase.from('vin_searches').insert([
+        {
+          email: email ? email.trim().toLowerCase() : null,
+          vins: uniqueVins,
+          open_recalls_found: 1,
+          ref_source: 'landing_sample_audit',
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        },
+      ]).then(({ error }) => {
         if (error) console.warn('vin_searches insert skipped:', error.message);
       });
 
@@ -317,11 +321,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         },
       });
 
-      supabase.from('vin_searches').insert(
-        uniqueVins.map((v) => ({
-          vin: v,
-        }))
-      ).then(({ error }) => {
+      supabase.from('vin_searches').insert([
+        {
+          email: email ? email.trim().toLowerCase() : null,
+          vins: uniqueVins,
+          open_recalls_found: totalOpenRecalls,
+          ref_source: 'landing_real_audit',
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        },
+      ]).then(({ error }) => {
         if (error) console.warn('vin_searches insert skipped:', error.message);
       });
 
