@@ -36,8 +36,37 @@ const MainApp: React.FC = () => {
 
   // Standalone Subpath Route Checks (Bypasses Fleet/Broker Authentication)
   const pathname = window.location.pathname.toLowerCase();
-  const searchParams = new URLSearchParams(window.location.search);
+  const rawSearch = window.location.search.replace(/&;/g, '&').replace(/\]\(https?:.*$/i, '');
+  const searchParams = new URLSearchParams(rawSearch);
   const token = searchParams.get('token') || '';
+
+  // Extract and persist outbound prospect company & email from URL params
+  const rawUrlCompany =
+    searchParams.get('company') ||
+    searchParams.get(';company') ||
+    searchParams.get('brokerage') ||
+    searchParams.get(';brokerage');
+  const sanitizedUrlCompany = rawUrlCompany
+    ? decodeURIComponent(rawUrlCompany)
+        .replace(/\]\(https?:.*$/i, '')
+        .replace(/[\]\)]+$/g, '')
+        .trim()
+    : '';
+  const validUrlCompany =
+    sanitizedUrlCompany &&
+    !sanitizedUrlCompany.includes('{{') &&
+    !sanitizedUrlCompany.includes('}}')
+      ? sanitizedUrlCompany
+      : '';
+
+  const rawUrlEmail = searchParams.get('email') || searchParams.get(';email') || '';
+  const sanitizedUrlEmail = rawUrlEmail.replace(/[\]\)]+$/g, '').trim().toLowerCase();
+  const validUrlEmail =
+    sanitizedUrlEmail &&
+    sanitizedUrlEmail.includes('@') &&
+    !sanitizedUrlEmail.includes('{{')
+      ? sanitizedUrlEmail
+      : '';
 
   const isPrivacyPath = pathname.startsWith('/privacy');
   const isSignupPath = pathname.startsWith('/signup');
@@ -99,7 +128,15 @@ const MainApp: React.FC = () => {
 
   // Handle URL parameter inspection, broker attribution capture, dynamic title, and strict view routing
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const cleanSearch = window.location.search.replace(/&;/g, '&').replace(/\]\(https?:.*$/i, '');
+    const params = new URLSearchParams(cleanSearch);
+
+    if (validUrlCompany) {
+      sessionStorage.setItem('rl_prospect_company', validUrlCompany);
+    }
+    if (validUrlEmail) {
+      sessionStorage.setItem('rl_prospect_email', validUrlEmail);
+    }
 
     // 1. SAFE BROKER ATTRIBUTION CAPTURE
     const brokerId = params.get('broker_id') || params.get('broker');
@@ -253,9 +290,14 @@ const MainApp: React.FC = () => {
   // Allow invite-flow guests into their isolated fleet workspace
   const isAuthenticated =
     Boolean(user?.email) || demoAuthenticated || isDemoPath || isClientInvitePath;
+  const persistedProspectEmail = sessionStorage.getItem('rl_prospect_email') || '';
+  const persistedProspectCompany = sessionStorage.getItem('rl_prospect_company') || '';
+
   const currentEmail =
     user?.email ||
     userProfile?.email ||
+    validUrlEmail ||
+    persistedProspectEmail ||
     (isBrokerDemoPath ? 'demo-broker@recalllogic.ai' : 'demo-fleet@recalllogic.ai');
   const effectiveTier =
     isDemoPath || isClientInvitePath
@@ -267,7 +309,16 @@ const MainApp: React.FC = () => {
       return auditingFleetId;
     }
     if (isBrokerUser || isBrokerDemoPath) {
-      return companyName || userProfile?.company_name || 'Apex Risk Brokers';
+      return (
+        validUrlCompany ||
+        persistedProspectCompany ||
+        companyName ||
+        userProfile?.company_name ||
+        'Apex Risk Brokers'
+      );
+    }
+    if (validUrlCompany || persistedProspectCompany) {
+      return validUrlCompany || persistedProspectCompany;
     }
     if (companyName && companyName.trim() !== '') {
       return companyName;
@@ -574,7 +625,7 @@ const MainApp: React.FC = () => {
           <ShareUnderwriterModal
             isOpen={isShareModalOpen}
             userCompany={auditingFleetId || getUserOrgName()}
-            brokerName={companyName || userProfile?.company_name || 'Apex Risk Brokers'}
+            brokerName={validUrlCompany || persistedProspectCompany || companyName || userProfile?.company_name || 'Apex Risk Brokers'}
             onClose={() => setIsShareModalOpen(false)}
           />
         ))}
