@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import UpgradeButton from './UpgradeButton';
+import { SamsaraIntegrationModal } from './SamsaraIntegrationModal';
 
 interface ModalsContainerProps {
   showUpgradeModal: boolean;
   onCloseUpgradeModal: () => void;
   blockedVinCount: number;
   selectedPlanType?: 'standard' | 'professional' | 'enterprise'; // Added to support dynamic tier selection
-  userId?: string;                                               // Added to pass tracking context
+  userId?: string;                                               // Retained on interface for backward compatibility
 
   showShareModal: boolean;
   onCloseShareModal: () => void;
   shareableVerificationUrl: string;
+
+  // Optional Samsara Telematics Integration Modal Props
+  showSamsaraModal?: boolean;
+  onCloseSamsaraModal?: () => void;
+  onSamsaraSyncSuccess?: () => void;
+  organizationId?: string;
+  clientName?: string;
 }
 
 export default function ModalsContainer({
@@ -18,10 +26,15 @@ export default function ModalsContainer({
   onCloseUpgradeModal,
   blockedVinCount,
   selectedPlanType = 'professional', // Default fallback
-  userId = 'anonymous_prospect',
+  userId,
   showShareModal,
   onCloseShareModal,
   shareableVerificationUrl,
+  showSamsaraModal = false,
+  onCloseSamsaraModal,
+  onSamsaraSyncSuccess,
+  organizationId,
+  clientName,
 }: ModalsContainerProps) {
   const [brokerEmail, setBrokerEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,12 +67,16 @@ export default function ModalsContainer({
           <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl">
             <div className="space-y-2 text-center">
               <span className="text-3xl">🛡️</span>
-              <h3 className="text-lg font-black text-white font-mono uppercase">Verified Safety Intelligence Limit Exceeded</h3>
+              <h3 className="text-lg font-black text-white font-mono uppercase">
+                Verified Safety Intelligence Limit Exceeded
+              </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Your manifest upload contained <strong className="text-cyan-400">{blockedVinCount} asset units</strong>, exceeding the free tier threshold. Upgrade your <span className="text-cyan-300 font-semibold">RecallLogic</span> subscription to unlock continuous background compliance tracking.
+                Your manifest upload contained{' '}
+                <strong className="text-cyan-400">{blockedVinCount} asset units</strong>, exceeding the free tier threshold. Upgrade your{' '}
+                <span className="text-cyan-300 font-semibold">RecallLogic</span> subscription to unlock continuous background compliance tracking.
               </p>
             </div>
-            
+
             <div className="bg-slate-950 border border-slate-900 rounded-xl p-4 space-y-2 text-xs font-mono">
               <div className="flex justify-between text-slate-400">
                 <span>Selected Target Tier:</span>
@@ -80,8 +97,7 @@ export default function ModalsContainer({
                 Dismiss
               </button>
               <div className="flex-1">
-                {/* FIXED: Dynamically passes the active planType and userId */}
-                <UpgradeButton planType={selectedPlanType} userId={userId} className="w-full py-3" />
+                <UpgradeButton planType={selectedPlanType} className="w-full py-3" />
               </div>
             </div>
           </div>
@@ -101,7 +117,9 @@ export default function ModalsContainer({
                   Active
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Share this cryptographic audit URL with commercial underwriters to validate your safety posture.</p>
+              <p className="text-xs text-slate-400">
+                Share this cryptographic audit URL with commercial underwriters to validate your safety posture.
+              </p>
             </div>
 
             <div className="bg-slate-950 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-2">
@@ -121,7 +139,9 @@ export default function ModalsContainer({
             </div>
 
             <form onSubmit={handleEmailSubmit} className="space-y-3 pt-2 border-t border-slate-900">
-              <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wide">Direct Broker Notification Dispatch</label>
+              <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-wide">
+                Direct Broker Notification Dispatch
+              </label>
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -140,7 +160,9 @@ export default function ModalsContainer({
                 </button>
               </div>
               {shareSuccess && (
-                <p className="text-emerald-400 text-[10px] font-mono">✓ Verified Safety Intelligence ledger transmitted to insurance provider.</p>
+                <p className="text-emerald-400 text-[10px] font-mono">
+                  ✓ Verified Safety Intelligence ledger transmitted to insurance provider.
+                </p>
               )}
             </form>
 
@@ -155,6 +177,18 @@ export default function ModalsContainer({
             </div>
           </div>
         </div>
+      )}
+
+      {/* SAMSARA ENTERPRISE TELEMATICS INTEGRATION MODAL */}
+      {showSamsaraModal && onCloseSamsaraModal && (
+        <SamsaraIntegrationModal
+          isOpen={showSamsaraModal}
+          onClose={onCloseSamsaraModal}
+          onSuccess={onSamsaraSyncSuccess}
+          organizationId={organizationId}
+          profileId={userId}
+          clientName={clientName}
+        />
       )}
     </>
   );
