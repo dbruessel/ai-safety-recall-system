@@ -10,6 +10,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 SAMSARA_BASE_URL = "https://api.samsara.com"
+RECALL_CRITICAL_TAG_NAME = "RecallLogic: Critical Safety Recall"
 
 
 class SamsaraService:
@@ -21,17 +22,41 @@ class SamsaraService:
             "Content-Type": "application/json",
         }
 
-    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
+        json_body: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         url = f"{SAMSARA_BASE_URL}{path}"
-        for attempt in range(3):
-            resp = requests.get(url, headers=self.headers, params=params, timeout=15)
+        for _ in range(3):
+            resp = requests.request(
+                method=method,
+                url=url,
+                headers=self.headers,
+                params=params,
+                json=json_body,
+                timeout=15,
+            )
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", "1.0"))
                 time.sleep(retry_after)
                 continue
             resp.raise_for_status()
+            if not resp.content:
+                return {}
             return resp.json()
         raise RuntimeError("Samsara API rate limit (429) exceeded after retries.")
+
+    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._request("GET", path, params=params)
+
+    def _post(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+        return self._request("POST", path, json_body=json_body)
+
+    def _patch(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+        return self._request("PATCH", path, json_body=json_body)
 
     def fetch_odometer_map(self) -> Dict[str, float]:
         """
@@ -113,6 +138,83 @@ class SamsaraService:
         except Exception as err:
             logger.error(f"Error fetching Samsara vehicle {vehicle_id}: {err}")
             return None
+
+    # =====================================================================
+    # CLOSED-LOOP OUTBOUND ALERTS (SAMSARA VEHICLE TAGGING)
+    # =====================================================================
+    def ensure_recall_alert_tag(self, tag_name: str = RECALL_CRITICAL_TAG_NAME) -> Optional[str]:
+        """
+        Finds or creates the RecallLogic safety alert tag in Samsara Cloud.
+        Requires 'Write Tags' scope on the Samsara API token.
+        """
+        after_cursor: Optional[str] = None
+        while True:
+            params: Dict[str, Any] = {"limit": 512}
+            if after_cursor:
+                params["after"] = after_cursor
+
+            payload = self._get("/tags", params=params)
+            for tag in payload.get("data", []):
+                if (tag.get("name") or "").strip().lower() == tag_name.lower():
+                    return str(tag["id"])
+
+            pagination = payload.get("pagination") or {}
+            if not pagination.get("hasNextPage"):
+                break
+            after_cursor = pagination.get("endCursor")
+
+        created = self._post("/tags", json_body={"name": tag_name})
+        tag_obj = created.get("data") or created
+        return str(tag_obj["id"]) if tag_obj.get("id") else None
+
+    def sync_vehicle_recall_tag(
+        self,
+        samsara_vehicle_id: str,
+        has_critical_recall: bool,
+        tag_name: str = RECALL_CRITICAL_TAG_NAME,
+    ) -> Dict[str, Any]:
+        """
+        Closed-loop outbound sync:
+        - Attaches 'RecallLogic: Critical Safety Recall' tag to the Samsara vehicle when an
+          open critical NHTSA recall exists so safety managers see it in Samsara dispatch.
+        - Removes the tag automatically once the recall is cleared/remediated.
+        """
+        if not self.api_token or not samsara_vehicle_id:
+            return {"status": "skipped", "reason": "missing_token_or_vehicle_id"}
+
+        try:
+            tag_id = self.ensure_recall_alert_tag(tag_name=tag_name)
+            if not tag_id:
+                return {"status": "skipped", "reason": "tag_unavailable"}
+
+            op = "add" if has_critical_recall else "remove"
+            self._patch(
+                f"/tags/{tag_id}",
+                json_body={"vehicles": {op: [str(samsara_vehicle_id)]}},
+            )
+            action = "tagged_critical_recall" if has_critical_recall else "cleared_recall_tag"
+            logger.info(
+                f"Samsara outbound alert synced for vehicle {samsara_vehicle_id}: {action} (tag_id={tag_id})"
+            )
+            return {
+                "status": "success",
+                "action": action,
+                "tag_id": tag_id,
+                "tag_name": tag_name,
+                "samsara_vehicle_id": str(samsara_vehicle_id),
+            }
+        except requests.HTTPError as http_err:
+            status_code = http_err.response.status_code if http_err.response is not None else None
+            if status_code in (401, 403):
+                logger.warning(
+                    f"Samsara token lacks Write Tags permission (HTTP {status_code}); skipping outbound vehicle tag."
+                )
+                return {"status": "skipped_insufficient_scope", "http_status": status_code}
+            logger.error(f"Samsara outbound tag HTTP error for vehicle {samsara_vehicle_id}: {http_err}")
+            return {"status": "error", "detail": str(http_err)}
+        except Exception as err:
+            logger.error(f"Samsara outbound tag error for vehicle {samsara_vehicle_id}: {err}")
+            return {"status": "error", "detail": str(err)}
 
     @staticmethod
     def verify_webhook_signature(
