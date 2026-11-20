@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 
@@ -24,8 +24,9 @@ def audit_and_persist_samsara_vehicle(
     dvir_defect_note: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Audits an individual vehicle from Samsara against NHTSA and upserts
-    the compliance & punitive exposure record into Supabase.
+    Audits an individual vehicle from Samsara against NHTSA, upserts
+    the compliance & punitive exposure record into Supabase, and executes
+    closed-loop outbound tagging in Samsara Cloud.
     """
     vin = vehicle_dict.get("vin")
     if not vin:
@@ -34,6 +35,7 @@ def audit_and_persist_samsara_vehicle(
 
     vin = vin.strip().upper()
     samsara_veh_id = str(vehicle_dict.get("samsara_id") or vehicle_dict.get("id", ""))
+    resolved_token = api_token or os.getenv("SAMSARA_API_TOKEN")
     supabase = get_supabase_client()
 
     # 1. Query NHTSA safety defects (reusing Fleetio router's verified helper)
@@ -57,7 +59,16 @@ def audit_and_persist_samsara_vehicle(
         else "No Open NHTSA Defect Campaigns"
     )
 
-    # 2. Resolve Liability and Compliance Status
+    # 2. Closed-loop outbound Samsara tag sync (tag on critical defect, untag when cleared)
+    outbound_result: Dict[str, Any] = {"status": "skipped"}
+    if resolved_token and samsara_veh_id:
+        samsara = SamsaraService(api_token=resolved_token)
+        outbound_result = samsara.sync_vehicle_recall_tag(
+            samsara_vehicle_id=samsara_veh_id,
+            has_critical_recall=(has_defect and is_critical),
+        )
+
+    # 3. Resolve Liability and Compliance Status
     if not has_defect:
         compliance_status = "CLEARED"
         punitive_exposure = 0
@@ -65,13 +76,14 @@ def audit_and_persist_samsara_vehicle(
     else:
         compliance_status = "OPEN"
         punitive_exposure = 250000 if is_critical else 0
-        remedy_logistics = (
-            f"Samsara DVIR Flagged: {dvir_defect_note}"
-            if dvir_defect_note
-            else "Samsara Telematics Monitored — Remediation Required"
-        )
+        if dvir_defect_note:
+            remedy_logistics = f"Samsara DVIR Flagged: {dvir_defect_note}"
+        elif outbound_result.get("status") == "success":
+            remedy_logistics = "Samsara Vehicle Tagged [Critical Safety Recall] — Remediation Required"
+        else:
+            remedy_logistics = "Samsara Telematics Monitored — Remediation Required"
 
-    # 3. Persist record in Supabase
+    # 4. Persist record in Supabase
     unit_name = vehicle_dict.get("name") or vehicle_dict.get("unit_number") or f"UNIT-{vin[-4:]}"
     make_name = vehicle_dict.get("make") or "COMMERCIAL"
     model_name = vehicle_dict.get("model") or "POWER UNIT"
@@ -119,7 +131,7 @@ def audit_and_persist_samsara_vehicle(
         ).execute()
 
     logger.info(
-        f"Audited Samsara VIN {vin}: Status={compliance_status}, Exposure=${punitive_exposure:,}"
+        f"Audited Samsara VIN {vin}: Status={compliance_status}, Exposure=${punitive_exposure:,}, Outbound={outbound_result.get('status')}"
     )
     return vehicle_data
 
@@ -154,12 +166,23 @@ def run_samsara_sync_task(
 
 
 # =====================================================================
-# REQUEST BODY MODEL
+# REQUEST BODY MODELS
 # =====================================================================
 class SamsaraSyncRequest(BaseModel):
     api_token: Optional[str] = Field(None, description="Samsara API Token (defaults to env)")
     organization_id: Optional[str] = Field(None, description="Supabase Organization ID")
     profile_id: Optional[str] = Field(None, description="Supabase Profile ID")
+
+
+class SamsaraOutboundAlertRequest(BaseModel):
+    api_token: Optional[str] = Field(None, description="Samsara API Token (defaults to env)")
+    samsara_vehicle_id: Optional[str] = Field(
+        None, description="Specific Samsara Vehicle ID to tag/untag (omit to sync all monitored Samsara vehicles)"
+    )
+    vin: Optional[str] = Field(None, description="Optional VIN lookup if samsara_vehicle_id is omitted")
+    force_clear: bool = Field(
+        False, description="Set true to remove the RecallLogic critical alert tag from the Samsara vehicle"
+    )
 
 
 # =====================================================================
@@ -202,6 +225,65 @@ async def sync_samsara_fleet(
     }
 
 
+@router.post("/push-alerts")
+async def push_samsara_outbound_alerts(payload: SamsaraOutboundAlertRequest):
+    """
+    Closed-loop outbound dispatch: Pushes or clears 'RecallLogic: Critical Safety Recall'
+    vehicle tags in Samsara Cloud for monitored fleet vehicles with open critical defects.
+    """
+    resolved_token = payload.api_token or os.getenv("SAMSARA_API_TOKEN")
+    if not resolved_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing Samsara credentials. Provide api_token or configure SAMSARA_API_TOKEN.",
+        )
+
+    samsara = SamsaraService(api_token=resolved_token)
+    supabase = get_supabase_client()
+
+    # Single-vehicle direct push/clear
+    if payload.samsara_vehicle_id:
+        res = samsara.sync_vehicle_recall_tag(
+            samsara_vehicle_id=payload.samsara_vehicle_id,
+            has_critical_recall=not payload.force_clear,
+        )
+        return {"status": "completed", "results": [res]}
+
+    # Query Supabase monitored Samsara vehicles (filtered by VIN if supplied)
+    query = supabase.table("monitored_vehicles").select(
+        "vin, samsara_vehicle_id, compliance_status, punitive_exposure"
+    )
+    if payload.vin:
+        query = query.eq("vin", payload.vin.strip().upper())
+    else:
+        query = query.eq("telematics_provider", "samsara")
+
+    rows = query.execute().data or []
+    results: List[Dict[str, Any]] = []
+
+    for row in rows:
+        veh_id = row.get("samsara_vehicle_id")
+        if not veh_id:
+            continue
+        is_open_critical = (
+            not payload.force_clear
+            and row.get("compliance_status") == "OPEN"
+            and (row.get("punitive_exposure") or 0) > 0
+        )
+        tag_res = samsara.sync_vehicle_recall_tag(
+            samsara_vehicle_id=str(veh_id),
+            has_critical_recall=is_open_critical,
+        )
+        tag_res["vin"] = row.get("vin")
+        results.append(tag_res)
+
+    return {
+        "status": "completed",
+        "processed_count": len(results),
+        "results": results,
+    }
+
+
 @router.post("/webhook")
 async def samsara_webhook_listener(
     request: Request,
@@ -209,7 +291,7 @@ async def samsara_webhook_listener(
 ):
     """
     Samsara Webhooks 2.0 Listener (returns 200 immediately within Samsara's 10s timeout):
-    1. VehicleCreated / VehicleUpdated -> Triggers instant NHTSA recall audit.
+    1. VehicleCreated / VehicleUpdated -> Triggers instant NHTSA recall audit + outbound tag sync.
     2. DvirSubmitted -> Cross-checks driver-reported defects against open NHTSA recalls.
     """
     try:
