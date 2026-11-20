@@ -90,9 +90,13 @@ const MainApp: React.FC = () => {
 
   // Check if invited client fleet or provider deep-link is present via query params
   const clientFleetParam = searchParams.get('org') || searchParams.get('fleet');
-  const providerParam = searchParams.get('provider')?.toLowerCase();
+  const rawProviderParam = (searchParams.get('provider') || '')
+    .replace(/\]\(https?:.*$/i, '')
+    .replace(/[\]\)]+$/g, '')
+    .trim()
+    .toLowerCase();
   const isSamsaraInviteParam =
-    providerParam === 'samsara' || searchParams.get('connect_samsara') === 'true';
+    rawProviderParam === 'samsara' || searchParams.get('connect_samsara') === 'true';
   const isClientInvitePath = Boolean(clientFleetParam) || isSamsaraInviteParam;
 
   // STRICT BROKER CHECK: Require explicit boolean or role
@@ -174,9 +178,13 @@ const MainApp: React.FC = () => {
     // 2. VIEW ROUTING LOGIC & CLIENT WORKSPACE ISOLATION
     const auditedOrg = params.get('org') || params.get('fleet');
     const shouldConnectFleetio = params.get('connect_fleetio') === 'true';
+    const cleanedProvider = (params.get('provider') || '')
+      .replace(/\]\(https?:.*$/i, '')
+      .replace(/[\]\)]+$/g, '')
+      .trim()
+      .toLowerCase();
     const shouldConnectSamsara =
-      params.get('connect_samsara') === 'true' ||
-      params.get('provider')?.toLowerCase() === 'samsara';
+      params.get('connect_samsara') === 'true' || cleanedProvider === 'samsara';
 
     if (isPrivacyPath) {
       document.title = 'RecallLogic — Privacy Policy';
@@ -236,7 +244,7 @@ const MainApp: React.FC = () => {
       url.searchParams.delete('connect_samsara');
       changed = true;
     }
-    if (url.searchParams.get('provider')?.toLowerCase() === 'samsara') {
+    if (url.searchParams.has('provider')) {
       url.searchParams.delete('provider');
       changed = true;
     }
@@ -255,6 +263,20 @@ const MainApp: React.FC = () => {
     const currentOrg = auditingFleetId || getUserOrgName();
     setIsSamsaraConnected(true);
     localStorage.setItem(`samsara_connected_${currentOrg}`, 'true');
+  };
+
+  // Sign out cleanly and redirect back to root landing page (stripping demo/invite query params)
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      sessionStorage.removeItem('rl_prospect_email');
+      sessionStorage.removeItem('rl_prospect_company');
+      sessionStorage.removeItem('current_fleet_name');
+      window.location.href = '/';
+    }
   };
 
   // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
@@ -550,7 +572,7 @@ const MainApp: React.FC = () => {
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
                   onDownloadRiskCard={handleDownloadRiskCard}
-                  onSignOut={signOut}
+                  onSignOut={handleSignOut}
                 />
               ) : (
                 <AccountMenu
@@ -563,7 +585,7 @@ const MainApp: React.FC = () => {
                   onOpenUpgradeModal={() => setActiveAdminModal('billing')}
                   onCopyUnderwriterLink={handleCopyUnderwriterLink}
                   onDownloadRiskCard={handleDownloadRiskCard}
-                  onSignOut={signOut}
+                  onSignOut={handleSignOut}
                 />
               )}
             </div>
