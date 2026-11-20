@@ -13,6 +13,9 @@ import UnderwriterEvidenceLocker from './components/UnderwriterEvidenceLocker';
 import TeamManagementModal from './components/TeamManagementModal';
 import BillingManagementModal from './components/BillingManagementModal';
 import { FleetioIntegrationModal } from './components/FleetioIntegrationModal';
+import { SamsaraIntegrationModal } from './components/SamsaraIntegrationModal';
+import { FleetioDocs } from './components/FleetioDocs';
+import { SamsaraDocs } from './components/SamsaraDocs';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
@@ -69,6 +72,10 @@ const MainApp: React.FC = () => {
       : '';
 
   const isPrivacyPath = pathname.startsWith('/privacy');
+  const isFleetioDocsPath =
+    pathname.startsWith('/docs/fleetio') || pathname.startsWith('/fleetio-docs');
+  const isSamsaraDocsPath =
+    pathname.startsWith('/docs/samsara') || pathname.startsWith('/samsara-docs');
   const isSignupPath = pathname.startsWith('/signup');
   const isAcceptInvitePath = pathname.startsWith('/accept-invite');
   const isUnderwriterPortalPath = pathname.startsWith('/portal/audit');
@@ -81,9 +88,12 @@ const MainApp: React.FC = () => {
     pathname.includes('/audit/demo') || pathname.includes('/broker');
   const isDemoPath = isFleetDemoPath || isBrokerDemoPath;
 
-  // Check if invited client fleet is present via query params
+  // Check if invited client fleet or provider deep-link is present via query params
   const clientFleetParam = searchParams.get('org') || searchParams.get('fleet');
-  const isClientInvitePath = Boolean(clientFleetParam);
+  const providerParam = searchParams.get('provider')?.toLowerCase();
+  const isSamsaraInviteParam =
+    providerParam === 'samsara' || searchParams.get('connect_samsara') === 'true';
+  const isClientInvitePath = Boolean(clientFleetParam) || isSamsaraInviteParam;
 
   // STRICT BROKER CHECK: Require explicit boolean or role
   const isBrokerUser = Boolean(
@@ -92,7 +102,7 @@ const MainApp: React.FC = () => {
 
   // Navigation state for active workspace view
   const [activeView, setActiveView] = useState<'workspace' | 'broker_portal'>(() => {
-    if (clientFleetParam) return 'workspace';
+    if (clientFleetParam || isSamsaraInviteParam) return 'workspace';
     if (isFleetDemoPath) return 'workspace';
     if (isBrokerDemoPath || isBrokerUser) return 'broker_portal';
     return 'workspace';
@@ -106,23 +116,33 @@ const MainApp: React.FC = () => {
   // Modal display states for header controls
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isFleetioModalOpen, setIsFleetioModalOpen] = useState(false);
+  const [isSamsaraModalOpen, setIsSamsaraModalOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<'team' | 'billing' | null>(null);
 
   // Dynamic Fleetio Connection State (persisted per fleet, Dennis Enterprise Fleet pre-wired)
   const [isFleetioConnected, setIsFleetioConnected] = useState<boolean>(() => {
     const currentOrg = clientFleetParam || 'Dennis Enterprise Fleet';
     const stored = localStorage.getItem(`fleetio_connected_${currentOrg}`);
-    const isDemo = currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
+    const isDemo =
+      currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
     return stored === 'true' || isDemo;
   });
 
-  // Keep connection state synchronized whenever auditing fleet changes
+  // Dynamic Samsara Connection State (persisted per fleet)
+  const [isSamsaraConnected, setIsSamsaraConnected] = useState<boolean>(() => {
+    const currentOrg = clientFleetParam || 'Dennis Enterprise Fleet';
+    return localStorage.getItem(`samsara_connected_${currentOrg}`) === 'true';
+  });
+
+  // Keep connection states synchronized whenever auditing fleet changes
   useEffect(() => {
     const currentOrg = auditingFleetId || clientFleetParam || '';
     if (currentOrg) {
-      const stored = localStorage.getItem(`fleetio_connected_${currentOrg}`);
-      const isDemo = currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
-      setIsFleetioConnected(stored === 'true' || isDemo);
+      const storedFleetio = localStorage.getItem(`fleetio_connected_${currentOrg}`);
+      const isDemo =
+        currentOrg.toLowerCase().includes('dennis') || currentOrg.toLowerCase().includes('demo');
+      setIsFleetioConnected(storedFleetio === 'true' || isDemo);
+      setIsSamsaraConnected(localStorage.getItem(`samsara_connected_${currentOrg}`) === 'true');
     }
   }, [auditingFleetId, clientFleetParam]);
 
@@ -154,9 +174,16 @@ const MainApp: React.FC = () => {
     // 2. VIEW ROUTING LOGIC & CLIENT WORKSPACE ISOLATION
     const auditedOrg = params.get('org') || params.get('fleet');
     const shouldConnectFleetio = params.get('connect_fleetio') === 'true';
+    const shouldConnectSamsara =
+      params.get('connect_samsara') === 'true' ||
+      params.get('provider')?.toLowerCase() === 'samsara';
 
     if (isPrivacyPath) {
       document.title = 'RecallLogic — Privacy Policy';
+    } else if (isSamsaraDocsPath) {
+      document.title = 'RecallLogic — Samsara Integration Docs';
+    } else if (isFleetioDocsPath) {
+      document.title = 'RecallLogic — Fleetio Integration Docs';
     } else if (auditedOrg) {
       setAuditingFleetId(auditedOrg);
       setActiveView('workspace');
@@ -165,6 +192,13 @@ const MainApp: React.FC = () => {
       if (shouldConnectFleetio) {
         setIsFleetioModalOpen(true);
       }
+      if (shouldConnectSamsara) {
+        setIsSamsaraModalOpen(true);
+      }
+    } else if (shouldConnectSamsara) {
+      setActiveView('workspace');
+      document.title = 'RecallLogic — Samsara Telematics Sync';
+      setIsSamsaraModalOpen(true);
     } else if (isFleetDemoPath) {
       setActiveView('workspace');
       document.title = 'RecallLogic — Fleet Audit Demo';
@@ -175,7 +209,14 @@ const MainApp: React.FC = () => {
       setActiveView('workspace');
       document.title = 'RecallLogic — Continuous Risk Defense Platform';
     }
-  }, [isPrivacyPath, isBrokerUser, isFleetDemoPath, isBrokerDemoPath]);
+  }, [
+    isPrivacyPath,
+    isSamsaraDocsPath,
+    isFleetioDocsPath,
+    isBrokerUser,
+    isFleetDemoPath,
+    isBrokerDemoPath,
+  ]);
 
   // Clean URL parameters upon modal closure to avoid re-triggering modal on page reload
   const handleCloseFleetioModal = () => {
@@ -187,10 +228,33 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const handleCloseSamsaraModal = () => {
+    setIsSamsaraModalOpen(false);
+    const url = new URL(window.location.href);
+    let changed = false;
+    if (url.searchParams.has('connect_samsara')) {
+      url.searchParams.delete('connect_samsara');
+      changed = true;
+    }
+    if (url.searchParams.get('provider')?.toLowerCase() === 'samsara') {
+      url.searchParams.delete('provider');
+      changed = true;
+    }
+    if (changed) {
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   const handleFleetioSuccess = () => {
     const currentOrg = auditingFleetId || getUserOrgName();
     setIsFleetioConnected(true);
     localStorage.setItem(`fleetio_connected_${currentOrg}`, 'true');
+  };
+
+  const handleSamsaraSuccess = () => {
+    const currentOrg = auditingFleetId || getUserOrgName();
+    setIsSamsaraConnected(true);
+    localStorage.setItem(`samsara_connected_${currentOrg}`, 'true');
   };
 
   // AUTOMATIC POST-CHECKOUT SUPABASE SYNC
@@ -240,9 +304,17 @@ const MainApp: React.FC = () => {
     handlePostCheckoutSync();
   }, [user, companyName]);
 
-  // UNRESTRICTED PUBLIC ACCESS: PRIVACY POLICY
+  // UNRESTRICTED PUBLIC ACCESS: PRIVACY POLICY & INTEGRATION DOCS
   if (isPrivacyPath) {
     return <PrivacyPolicy />;
+  }
+
+  if (isSamsaraDocsPath) {
+    return <SamsaraDocs />;
+  }
+
+  if (isFleetioDocsPath) {
+    return <FleetioDocs />;
   }
 
   // UNRESTRICTED PUBLIC ACCESS: WHITE-LABELED UNDERWRITER EVIDENCE LOCKER
@@ -526,6 +598,26 @@ const MainApp: React.FC = () => {
                   </button>
                 )}
 
+                {/* Dynamic Samsara Telematics Connection Status Badge */}
+                {isSamsaraConnected ? (
+                  <button
+                    onClick={() => setIsSamsaraModalOpen(true)}
+                    className="px-3 py-1 bg-emerald-950/80 border border-emerald-500/50 hover:border-emerald-400 text-emerald-300 rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5 shadow-sm shadow-emerald-950"
+                    title="Samsara Telematics & DVIR sync active. Click to manage settings."
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Samsara Synced</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsSamsaraModalOpen(true)}
+                    className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 font-semibold rounded-lg cursor-pointer transition text-[11px] flex items-center gap-1.5"
+                    title="Connect Samsara Enterprise Telematics & DVIR sync"
+                  >
+                    <span>📡 Connect Samsara</span>
+                  </button>
+                )}
+
                 {(isBrokerUser || isBrokerDemoPath) && (
                   <button
                     onClick={() => {
@@ -593,6 +685,18 @@ const MainApp: React.FC = () => {
         />
       )}
 
+      {/* SAMSARA TELEMATICS INTEGRATION MODAL */}
+      {isSamsaraModalOpen && (
+        <SamsaraIntegrationModal
+          isOpen={isSamsaraModalOpen}
+          onClose={handleCloseSamsaraModal}
+          onSuccess={handleSamsaraSuccess}
+          organizationId={auditingFleetId || getUserOrgName()}
+          profileId={user?.id}
+          clientName={auditingFleetId || getUserOrgName()}
+        />
+      )}
+
       {/* TEAM MANAGEMENT MODAL */}
       {activeAdminModal === 'team' && (
         <TeamManagementModal
@@ -625,7 +729,13 @@ const MainApp: React.FC = () => {
           <ShareUnderwriterModal
             isOpen={isShareModalOpen}
             userCompany={auditingFleetId || getUserOrgName()}
-            brokerName={validUrlCompany || persistedProspectCompany || companyName || userProfile?.company_name || 'Apex Risk Brokers'}
+            brokerName={
+              validUrlCompany ||
+              persistedProspectCompany ||
+              companyName ||
+              userProfile?.company_name ||
+              'Apex Risk Brokers'
+            }
             onClose={() => setIsShareModalOpen(false)}
           />
         ))}
