@@ -84,23 +84,70 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [scanError, setScanError] = useState<string>('');
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Capture outbound attribution & pre-fill prospect modals on load
+  // Capture outbound attribution, sanitize malformed query strings, & track pricing visibility
   useEffect(() => {
     trackEvent({
       event: 'landing_opened',
       portal: 'landing',
     });
 
+    // Resilient fallback parser in case URL contains '&;company=' or trailing markdown brackets
+    const rawSearch = window.location.search.replace(/&;/g, '&').replace(/\]\(https?:.*$/i, '');
+    const fallbackParams = new URLSearchParams(rawSearch);
+    const fallbackEmail = (fallbackParams.get('email') || fallbackParams.get(';email') || '')
+      .replace(/[\]\)]+$/g, '')
+      .trim()
+      .toLowerCase();
+    const fallbackCompany = decodeURIComponent(
+      fallbackParams.get('company') || fallbackParams.get(';company') || ''
+    )
+      .replace(/\]\(https?:.*$/i, '')
+      .replace(/[\]\)]+$/g, '')
+      .trim();
+
+    if (fallbackEmail && fallbackEmail.includes('@') && !fallbackEmail.includes('{{')) {
+      setBrokerEmail(fallbackEmail);
+      setEmail(fallbackEmail);
+    }
+    if (fallbackCompany && !fallbackCompany.includes('{{')) {
+      setBrokerageName(fallbackCompany);
+      setCompanyName(fallbackCompany);
+    }
+
     captureOutboundLead('landing', 'Landing Page Click').then(({ email: capturedEmail, company: capturedCompany }) => {
-      if (capturedEmail) {
-        setBrokerEmail(capturedEmail);
-        setEmail(capturedEmail);
+      const cleanEmail = (capturedEmail || '').replace(/[\]\)]+$/g, '').trim();
+      const cleanCompany = (capturedCompany || '').replace(/\]\(https?:.*$/i, '').replace(/[\]\)]+$/g, '').trim();
+
+      if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.includes('{{')) {
+        setBrokerEmail(cleanEmail);
+        setEmail(cleanEmail);
       }
-      if (capturedCompany) {
-        setBrokerageName(capturedCompany);
-        setCompanyName(capturedCompany);
+      if (cleanCompany && !cleanCompany.includes('{{')) {
+        setBrokerageName(cleanCompany);
+        setCompanyName(cleanCompany);
       }
     });
+
+    // Track passive scrolls to the pricing section once per session
+    let pricingTracked = false;
+    const pricingEl = document.getElementById('pricing');
+    if (pricingEl && typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting && !pricingTracked) {
+            pricingTracked = true;
+            trackEvent({
+              event: 'pricing_section_viewed',
+              portal: 'landing',
+            });
+            observer.disconnect();
+          }
+        },
+        { threshold: 0.35 }
+      );
+      observer.observe(pricingEl);
+      return () => observer.disconnect();
+    }
   }, []);
 
   // Alternate top banner ticker every 3.5 seconds

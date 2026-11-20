@@ -75,14 +75,35 @@ export const BrokerPortal: React.FC<BrokerPortalProps> = ({ onAuditClient }) => 
       portal: "broker",
     });
 
-    // Auto-capture broker leads when arriving via Instantly URL parameters (?email=...&company=...)
-    const urlParams = new URLSearchParams(window.location.search);
-    const paramEmail = urlParams.get("email");
-    const paramCompany = urlParams.get("company") || urlParams.get("brokerage");
+    // Resilient URL parameter parser: tolerates malformed '&;company=' typos, unencoded spaces, and trailing markdown brackets
+    const rawSearch = window.location.search.replace(/&;/g, "&").replace(/\]\(https?:.*$/i, "");
+    const urlParams = new URLSearchParams(rawSearch);
+    const paramEmail = urlParams.get("email") || urlParams.get(";email");
+    const rawCompany =
+      urlParams.get("company") ||
+      urlParams.get(";company") ||
+      urlParams.get("brokerage") ||
+      urlParams.get(";brokerage");
 
-    if (paramEmail && paramEmail.includes("@")) {
-      const cleanEmail = paramEmail.trim().toLowerCase();
-      const cleanCompany = paramCompany ? decodeURIComponent(paramCompany).trim() : "Independent Brokerage / MGA";
+    const sanitizedCompany = rawCompany
+      ? decodeURIComponent(rawCompany)
+          .replace(/\]\(https?:.*$/i, "")
+          .replace(/[\]\)]+$/g, "")
+          .trim()
+      : "";
+
+    const isUnreplacedTemplateVar =
+      !sanitizedCompany ||
+      sanitizedCompany.includes("{{") ||
+      sanitizedCompany.includes("}}");
+
+    if (!isUnreplacedTemplateVar) {
+      setLeadBrokerage(sanitizedCompany);
+    }
+
+    if (paramEmail && paramEmail.includes("@") && !paramEmail.includes("{{")) {
+      const cleanEmail = paramEmail.replace(/[\]\)]+$/g, "").trim().toLowerCase();
+      const cleanCompany = !isUnreplacedTemplateVar ? sanitizedCompany : "Independent Brokerage / MGA";
       setLeadEmail(cleanEmail);
       setLeadBrokerage(cleanCompany);
 
